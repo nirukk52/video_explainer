@@ -1,6 +1,7 @@
 """End-to-end tests for the video explainer pipeline."""
 
 import json
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -9,6 +10,7 @@ import pytest
 from src.audio.tts import MockTTS
 from src.config import Config
 from src.ingestion import parse_document
+from src.pipeline import VideoPipeline
 from src.script import ScriptGenerator
 from src.understanding import ContentAnalyzer
 
@@ -244,3 +246,140 @@ class TestPipelineOutputFormats:
         # Should be valid markdown
         assert content.startswith("# ")
         assert "---" in content
+
+
+class TestFullVideoPipeline:
+    """Test the complete VideoPipeline with mock providers.
+
+    These tests ensure the pipeline doesn't regress after code changes.
+    Uses mock LLM and TTS to avoid API costs during testing.
+    """
+
+    @pytest.fixture
+    def mock_subprocess(self):
+        """Mock subprocess for FFmpeg calls."""
+        with patch("subprocess.run") as mock_run:
+            def side_effect(*args, **kwargs):
+                result = MagicMock()
+                result.returncode = 0
+                result.stdout = '{"format": {"duration": "10.0"}}'
+                result.stderr = ""
+
+                # Create output file if specified
+                cmd = args[0] if args else kwargs.get("args", [])
+                for i, arg in enumerate(cmd):
+                    if isinstance(arg, str) and arg.endswith(".mp4"):
+                        Path(arg).parent.mkdir(parents=True, exist_ok=True)
+                        Path(arg).write_bytes(b"fake video")
+                    elif isinstance(arg, str) and arg.endswith(".mp3"):
+                        Path(arg).parent.mkdir(parents=True, exist_ok=True)
+                        Path(arg).write_bytes(b"fake audio")
+
+                return result
+
+            mock_run.side_effect = side_effect
+            yield mock_run
+
+    @pytest.fixture
+    def config(self):
+        """Create mock config for testing."""
+        config = Config()
+        config.llm.provider = "mock"
+        config.tts.provider = "mock"
+        return config
+
+    def test_pipeline_quick_test(self, config, mock_subprocess, tmp_path):
+        """Test pipeline quick_test completes all stages."""
+        pipeline = VideoPipeline(config=config, output_dir=tmp_path)
+
+        result = pipeline.quick_test()
+
+        # All stages should complete
+        assert "parsing" in result.stages_completed
+        assert "analysis" in result.stages_completed
+        assert "script" in result.stages_completed
+        assert "audio" in result.stages_completed
+        assert "animation" in result.stages_completed
+        assert "composition" in result.stages_completed
+        assert result.success
+
+    def test_pipeline_from_document(self, config, mock_subprocess, tmp_path):
+        """Test pipeline generates video from document."""
+        # Create test document
+        doc_path = tmp_path / "test_doc.md"
+        doc_path.write_text("""# Test Technical Document
+
+## Introduction
+
+This document explains an important technical concept.
+
+## Key Concept
+
+Here is the main idea with detailed explanation.
+The concept involves multiple components working together.
+
+## Conclusion
+
+In summary, this is how the concept works.
+""")
+
+        pipeline = VideoPipeline(config=config, output_dir=tmp_path)
+        result = pipeline.generate_from_document(doc_path, target_duration=60)
+
+        assert result.success
+        assert result.output_path is not None
+        assert "parsing" in result.stages_completed
+        assert "analysis" in result.stages_completed
+        assert "script" in result.stages_completed
+        assert result.metadata.get("llm_provider") == "mock"
+        assert result.metadata.get("tts_provider") == "mock"
+
+    def test_pipeline_progress_callback(self, config, mock_subprocess, tmp_path):
+        """Test that progress callbacks are fired."""
+        pipeline = VideoPipeline(config=config, output_dir=tmp_path)
+
+        progress_updates = []
+        def on_progress(stage: str, progress: float):
+            progress_updates.append((stage, progress))
+
+        pipeline.set_progress_callback(on_progress)
+        result = pipeline.quick_test()
+
+        # Should have progress updates for all stages
+        stages_with_progress = {stage for stage, _ in progress_updates}
+        assert "parsing" in stages_with_progress
+        assert "analysis" in stages_with_progress
+        assert "script" in stages_with_progress
+        assert "audio" in stages_with_progress
+
+    def test_pipeline_saves_script(self, config, mock_subprocess, tmp_path):
+        """Test that pipeline saves script for review."""
+        pipeline = VideoPipeline(config=config, output_dir=tmp_path)
+        result = pipeline.quick_test()
+
+        # Script should be saved
+        script_path = result.metadata.get("script_path")
+        assert script_path is not None
+        assert Path(script_path).exists()
+
+        # Should be valid JSON
+        with open(script_path) as f:
+            script_data = json.load(f)
+        assert "title" in script_data
+        assert "scenes" in script_data
+
+    def test_pipeline_handles_errors_gracefully(self, config, tmp_path):
+        """Test that pipeline handles errors and reports them."""
+        # Don't mock subprocess - let it fail on missing FFmpeg commands
+        pipeline = VideoPipeline(config=config, output_dir=tmp_path)
+
+        # Create a document that will parse but cause issues
+        doc_path = tmp_path / "test.md"
+        doc_path.write_text("# Test\n\nContent")
+
+        # The pipeline should catch errors and return a failed result
+        # rather than raising an exception
+        result = pipeline.generate_from_document(doc_path)
+
+        # Should have at least started
+        assert len(result.stages_completed) >= 1

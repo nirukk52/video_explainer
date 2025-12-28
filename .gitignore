@@ -52,11 +52,13 @@ output/audio/*.wav
 output/video/*.mp4
 output/storyboards/*.yaml
 !output/**/.gitkeep
+output/
 
 # Motion Canvas
 animations/node_modules/
 animations/output/
 animations/.cache/
+animations/src/**/*.meta
 
 # Logs
 *.log
