@@ -7,7 +7,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable
 
-from ..animation.renderer import MotionCanvasRenderer, RenderResult
+from ..animation.renderer import (
+    AnimationRenderer,
+    RemotionRenderer,
+    MockRenderer,
+    RenderResult,
+    get_renderer,
+)
 from ..audio.tts import get_tts_provider
 from ..composition.composer import CompositionResult, VideoComposer
 from ..config import Config, load_config
@@ -35,29 +41,43 @@ class VideoPipeline:
     The pipeline follows the configured providers:
     - LLM: Uses config.llm.provider (mock or real)
     - TTS: Uses config.tts.provider (mock or elevenlabs)
-    - Animation: Uses pre-rendered files or mock rendering
+    - Animation: Uses Remotion for real rendering, or mock for testing
     """
 
-    def __init__(self, config: Config | None = None, output_dir: Path | str = "output"):
+    def __init__(
+        self,
+        config: Config | None = None,
+        output_dir: Path | str = "output",
+        use_remotion: bool = True,
+    ):
         """Initialize the pipeline.
 
         Args:
             config: Configuration object. If None, loads from config.yaml.
             output_dir: Directory for output files.
+            use_remotion: If True, use Remotion for animation. If False, use mock.
         """
         self.config = config or load_config()
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Animation assets directory (for pre-rendered Motion Canvas exports)
-        self.animations_output_dir = Path("animations/output")
-
         # Initialize components based on config
         self.analyzer = ContentAnalyzer(self.config)
         self.script_gen = ScriptGenerator(self.config)
-        self.renderer = MotionCanvasRenderer(self.config)
         self.tts = get_tts_provider(self.config)
         self.composer = VideoComposer(self.config)
+
+        # Initialize renderer
+        self.use_remotion = use_remotion
+        if use_remotion:
+            try:
+                self.renderer: AnimationRenderer = RemotionRenderer(self.config)
+            except RuntimeError:
+                # Fall back to mock if Remotion not available
+                self.renderer = MockRenderer(self.config)
+                self.use_remotion = False
+        else:
+            self.renderer = MockRenderer(self.config)
 
         # Progress callback
         self._progress_callback: Callable[[str, float], None] | None = None
@@ -74,48 +94,6 @@ class VideoPipeline:
         """Report progress if callback is set."""
         if self._progress_callback:
             self._progress_callback(stage, progress)
-
-    def _get_animation(
-        self,
-        scene_name: str,
-        output_path: Path,
-        fallback_duration: float,
-    ) -> RenderResult:
-        """Get animation from pre-rendered file or generate mock.
-
-        Checks for pre-rendered Motion Canvas export first. If not found,
-        falls back to mock rendering.
-
-        Args:
-            scene_name: Name of the scene (e.g., "prefillDecode")
-            output_path: Where to place the animation file
-            fallback_duration: Duration for mock rendering if no pre-render exists
-
-        Returns:
-            RenderResult with animation info
-        """
-        # Check for pre-rendered Motion Canvas export
-        pre_rendered = self.animations_output_dir / "project.mp4"
-
-        if pre_rendered.exists():
-            # Use the pre-rendered animation
-            shutil.copy(pre_rendered, output_path)
-
-            # Get duration
-            duration = self._get_video_duration(output_path)
-
-            return RenderResult(
-                output_path=output_path,
-                duration_seconds=duration,
-                frame_count=int(duration * 30),
-                success=True,
-            )
-        else:
-            # Fall back to mock rendering
-            return self.renderer.render_mock(
-                output_path,
-                duration_seconds=fallback_duration,
-            )
 
     def _get_video_duration(self, video_path: Path) -> float:
         """Get duration of a video file."""
@@ -137,19 +115,17 @@ class VideoPipeline:
         self,
         source_path: Path | str,
         target_duration: int = 180,
-        animation_scene: str = "prefillDecode",
     ) -> PipelineResult:
         """Generate a complete video from a source document.
 
         Uses configured providers:
         - LLM provider from config for content analysis
         - TTS provider from config for audio generation
-        - Pre-rendered animations if available, otherwise mock
+        - Remotion for animation rendering (with script-based visual cues)
 
         Args:
             source_path: Path to the source document
             target_duration: Target video duration in seconds
-            animation_scene: Name of the Motion Canvas scene to use
 
         Returns:
             PipelineResult with output info
@@ -197,17 +173,15 @@ class VideoPipeline:
 
             stages_completed.append("audio")
 
-            # Stage 5: Get animation (pre-rendered or mock)
+            # Stage 5: Render animation from script
             self._report_progress("animation", 0)
             video_dir = self.output_dir / "video" / project_name
             video_dir.mkdir(parents=True, exist_ok=True)
 
             animation_path = video_dir / "animation.mp4"
-            render_result = self._get_animation(
-                animation_scene,
-                animation_path,
-                fallback_duration=script.total_duration_seconds,
-            )
+
+            # Use Remotion to render from script (generates visuals from visual cues)
+            render_result = self.renderer.render_from_script(script, animation_path)
 
             if not render_result.success:
                 return PipelineResult(
@@ -221,7 +195,7 @@ class VideoPipeline:
             stages_completed.append("animation")
             self._report_progress("animation", 100)
 
-            # Stage 6: Compose final video
+            # Stage 6: Compose final video (combine animation + audio)
             self._report_progress("composition", 0)
 
             # Combine all audio files into one
@@ -239,10 +213,6 @@ class VideoPipeline:
             stages_completed.append("composition")
             self._report_progress("composition", 100)
 
-            # Determine if we used real or mock components
-            used_real_animation = (self.animations_output_dir / "project.mp4").exists()
-            used_real_tts = self.config.tts.provider.lower() == "elevenlabs"
-
             return PipelineResult(
                 success=True,
                 output_path=final_output,
@@ -253,7 +223,7 @@ class VideoPipeline:
                     "audio_dir": str(audio_dir),
                     "scene_count": len(script.scenes),
                     "file_size_bytes": composition_result.file_size_bytes,
-                    "animation_source": "pre-rendered" if used_real_animation else "mock",
+                    "animation_renderer": "remotion" if self.use_remotion else "mock",
                     "tts_provider": self.config.tts.provider,
                     "llm_provider": self.config.llm.provider,
                 },
@@ -271,7 +241,6 @@ class VideoPipeline:
     def generate_from_script(
         self,
         script_path: Path | str,
-        animation_scene: str = "prefillDecode",
     ) -> PipelineResult:
         """Generate a video from an existing script.
 
@@ -279,7 +248,6 @@ class VideoPipeline:
 
         Args:
             script_path: Path to the script JSON file
-            animation_scene: Name of the Motion Canvas scene to use
 
         Returns:
             PipelineResult with output info
@@ -306,17 +274,13 @@ class VideoPipeline:
 
             stages_completed.append("audio")
 
-            # Stage 2: Get animation
+            # Stage 2: Render animation from script
             self._report_progress("animation", 0)
             video_dir = self.output_dir / "video" / project_name
             video_dir.mkdir(parents=True, exist_ok=True)
 
             animation_path = video_dir / "animation.mp4"
-            render_result = self._get_animation(
-                animation_scene,
-                animation_path,
-                fallback_duration=script.total_duration_seconds,
-            )
+            render_result = self.renderer.render_from_script(script, animation_path)
 
             if not render_result.success:
                 return PipelineResult(
@@ -355,6 +319,7 @@ class VideoPipeline:
                     "script_path": str(script_path),
                     "scene_count": len(script.scenes),
                     "file_size_bytes": composition_result.file_size_bytes,
+                    "animation_renderer": "remotion" if self.use_remotion else "mock",
                 },
             )
 
