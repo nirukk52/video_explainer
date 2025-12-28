@@ -183,7 +183,6 @@ That wraps up our explanation.
         result = pipeline.generate_from_document(
             doc_path,
             target_duration=30,
-            use_mock=True,
         )
 
         assert "parsing" in result.stages_completed
