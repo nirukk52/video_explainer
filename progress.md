@@ -44,7 +44,7 @@ Check the "Current Status" and "Next Actions" sections below.
 
 ## Current Status
 
-### Completed
+### Completed (Phase 1 MVP)
 - [x] Project structure initialized
 - [x] Git repository created
 - [x] Python package setup (pyproject.toml)
@@ -57,44 +57,53 @@ Check the "Current Status" and "Next Actions" sections below.
 - [x] CLI review interface (rich-based)
 - [x] Motion Canvas setup and validation
 - [x] Manual test animation (Prefill vs Decode scene)
-- [x] 61 tests, all passing
+- [x] ElevenLabs TTS integration (with mock for testing)
+- [x] Video composition with FFmpeg
+- [x] Dockerfile for containerization
+- [x] End-to-end tests
+- [x] **95 tests, all passing**
 
-### In Progress
-- [ ] ElevenLabs TTS integration
+### Phase 1 MVP Complete!
 
-### Not Started
-- [ ] Video composition (FFmpeg)
-- [ ] Dockerfile for containerization
-- [ ] End-to-end test with full pipeline
+The foundational pipeline is working end-to-end with mock LLM responses.
+
+### Next Steps (Phase 2)
+- [ ] Enable real LLM API calls (Claude/OpenAI)
+- [ ] Connect Motion Canvas rendering to pipeline
+- [ ] Add more animation scenes
+- [ ] Test with real TTS
 
 ---
 
 ## Architecture Summary
 
 ```
-Pipeline: Source → Parse → Analyze → Script → Review → Storyboard → Assets → Video
+Pipeline: Source → Parse → Analyze → Script → Review → TTS → Animation → Compose → Video
 
 Key files:
 ├── src/
-│   ├── config.py          # Configuration management (DONE)
-│   ├── models.py          # Pydantic data models (DONE)
-│   ├── ingestion/         # Document parsing (DONE)
+│   ├── config.py          # Configuration management
+│   ├── models.py          # Pydantic data models
+│   ├── ingestion/         # Document parsing
 │   │   ├── markdown.py    # Markdown parser
 │   │   └── parser.py      # Main parser interface
-│   ├── understanding/     # Content analysis (DONE)
+│   ├── understanding/     # Content analysis
 │   │   ├── llm_provider.py # Mock + real LLM providers
 │   │   └── analyzer.py    # Content analyzer
-│   ├── script/            # Script generation (DONE)
+│   ├── script/            # Script generation
 │   │   └── generator.py   # Script with visual cues
-│   ├── review/            # CLI review interface (DONE)
+│   ├── review/            # CLI review interface
 │   │   └── cli.py         # Rich-based review CLI
-│   ├── audio/             # TTS integration (IN PROGRESS)
-│   └── composition/       # Video assembly (TODO)
-├── animations/            # Motion Canvas project (DONE)
+│   ├── audio/             # TTS integration
+│   │   └── tts.py         # ElevenLabs + Mock TTS
+│   └── composition/       # Video assembly
+│       └── composer.py    # FFmpeg-based composer
+├── animations/            # Motion Canvas project
 │   ├── src/scenes/        # Animation scenes
-│   │   └── prefillDecode.tsx  # Test animation
+│   │   └── prefillDecode.tsx  # Prefill vs Decode animation
 │   └── src/styles/        # Color palette, fonts
-├── tests/                 # 61 passing tests
+├── tests/                 # 95 passing tests
+├── Dockerfile             # Container setup
 └── output/                # Generated assets
 ```
 
