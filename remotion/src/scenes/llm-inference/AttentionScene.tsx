@@ -441,40 +441,41 @@ export const AttentionScene: React.FC<AttentionSceneProps> = ({
           pointerEvents: "none",
         }}
       >
-        {/* Arrow from Q and K to Attention Matrix */}
+        {/* Arrow from Q to Attention Matrix - positioned relative to center */}
         <FlowArrow
-          x1={480 * (width / 1920)}
+          x1={width / 2 - 180 * scale}
           y1={320 * (height / 1080)}
-          x2={600 * (width / 1920)}
-          y2={420 * (height / 1080)}
+          x2={width / 2 - 60 * scale}
+          y2={400 * (height / 1080)}
           opacity={qkArrowOpacity}
           color={COLORS.query}
           curved
           scale={scale}
         />
+        {/* Arrow from K to Attention Matrix - positioned relative to center */}
         <FlowArrow
-          x1={680 * (width / 1920)}
+          x1={width / 2}
           y1={320 * (height / 1080)}
-          x2={620 * (width / 1920)}
-          y2={420 * (height / 1080)}
+          x2={width / 2 + 40 * scale}
+          y2={400 * (height / 1080)}
           opacity={qkArrowOpacity}
           color={COLORS.key}
           curved
           scale={scale}
         />
 
-        {/* Label for Q×K^T operation */}
+        {/* Label for Q×K^T operation - properly formatted equation */}
         {qkArrowOpacity > 0 && (
           <text
-            x={580 * (width / 1920)}
-            y={380 * (height / 1080)}
+            x={width / 2 - 10 * scale}
+            y={370 * (height / 1080)}
             fill={COLORS.text}
             fontSize={14 * scale}
             fontFamily="JetBrains Mono, monospace"
             textAnchor="middle"
             opacity={qkArrowOpacity}
           >
-            Q × K<tspan baselineShift="super" fontSize={10 * scale}>T</tspan> / √d<tspan baselineShift="sub" fontSize={10 * scale}>k</tspan>
+            Q × K<tspan baselineShift="super" fontSize={10 * scale}>T</tspan> / √d<tspan baselineShift="sub" fontSize={8 * scale}>k</tspan>
           </text>
         )}
 
@@ -730,6 +731,67 @@ export const AttentionScene: React.FC<AttentionSceneProps> = ({
         </div>
         <div style={{ fontSize: 11 * scale, color: COLORS.textDim }}>
           Σ(attention × V)
+        </div>
+      </div>
+
+      {/* √dk Explanation */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 200 * scale,
+          left: 100 * scale,
+          opacity: interpolate(
+            matrixProgress,
+            [0.5, 0.8],
+            [0, 1],
+            { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+          ),
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-start",
+          gap: 6 * scale,
+          maxWidth: 320 * scale,
+        }}
+      >
+        <div
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8 * scale,
+            backgroundColor: `${COLORS.attention}20`,
+            padding: `${8 * scale}px ${14 * scale}px`,
+            borderRadius: 8 * scale,
+            border: `${1 * scale}px solid ${COLORS.attention}50`,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 18 * scale,
+              fontFamily: "JetBrains Mono, monospace",
+              color: COLORS.attention,
+              fontWeight: 600,
+            }}
+          >
+            √d<sub style={{ fontSize: 12 * scale }}>k</sub>
+          </span>
+          <span
+            style={{
+              fontSize: 14 * scale,
+              color: COLORS.text,
+            }}
+          >
+            = key dimension
+          </span>
+        </div>
+        <div
+          style={{
+            fontSize: 12 * scale,
+            color: COLORS.textDim,
+            paddingLeft: 4 * scale,
+            lineHeight: 1.4,
+          }}
+        >
+          Scaling factor prevents attention scores from becoming too extreme, keeping gradients stable
         </div>
       </div>
 

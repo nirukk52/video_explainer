@@ -460,6 +460,53 @@
       "files_modified": [],
       "preview_branch": "feedback/fb_0009_1767124026",
       "error_message": null
+    },
+    {
+      "id": "fb_0010_1767125649",
+      "timestamp": "2025-12-30T12:14:09.674631",
+      "feedback_text": "In the Understanding Attention scene, the arrows pointing from the Q and K are off to the left. Also, the equation next to the arrows seem incorrect? We also need to explain what square root of Dk is",
+      "status": "applied",
+      "scope": "scene",
+      "affected_scenes": [
+        "3"
+      ],
+      "interpretation": "User wants to fix three issues in the Understanding Attention scene (scene 4, index 3): 1) The arrows from Q and K are positioned incorrectly (too far to the left), 2) The equation near the arrows appears incorrect or improperly formatted, 3) Need to add an explanation for what \u221adk (square root of dk) means in the attention formula",
+      "suggested_changes": {
+        "description": "Fix arrow positioning from Q and K matrices, correct the equation display, and add an explanation for \u221adk (the dimensionality scaling factor)",
+        "files_to_modify": [
+          "remotion/src/scenes/llm-inference/AttentionScene.tsx",
+          "projects/llm-inference/narration/narrations.json"
+        ],
+        "changes": [
+          {
+            "file": "remotion/src/scenes/llm-inference/AttentionScene.tsx",
+            "action": "modify",
+            "what": "Adjust the x1 coordinates for the FlowArrow components pointing from Q and K matrices (lines 446-462) - currently using hardcoded positions around 480-680 pixels which may not align with the actual Q/K matrix positions at different scales"
+          },
+          {
+            "file": "remotion/src/scenes/llm-inference/AttentionScene.tsx",
+            "action": "modify",
+            "what": "Review and fix the equation text element (lines 467-479) that displays 'Q \u00d7 K^T / \u221adk' - ensure proper formatting with correct superscript/subscript rendering and mathematical notation"
+          },
+          {
+            "file": "remotion/src/scenes/llm-inference/AttentionScene.tsx",
+            "action": "add",
+            "what": "Add a visual explanation element that explains \u221adk - this is the square root of the key dimension, used to scale down the attention scores and prevent softmax from becoming too peaked (gradient stability)"
+          },
+          {
+            "file": "projects/llm-inference/narration/narrations.json",
+            "action": "modify",
+            "what": "Consider updating the narration for scene4_attention to include an explanation of \u221adk - 'We divide by square root of dk, the key dimension, to keep attention scores from becoming too extreme'"
+          }
+        ]
+      },
+      "files_modified": [
+        "projects/llm-inference/feedback/feedback.json",
+        "projects/llm-inference/narration/narrations.json",
+        "remotion/src/scenes/llm-inference/AttentionScene.tsx"
+      ],
+      "preview_branch": null,
+      "error_message": null
     }
   ]
 }

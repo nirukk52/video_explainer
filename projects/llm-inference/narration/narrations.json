@@ -21,8 +21,8 @@
     {
       "scene_id": "scene4_attention",
       "title": "Understanding Attention",
-      "duration_seconds": 22,
-      "narration": "To understand the solution, we need to understand attention. For each token, we compute three vectors: Query, Key, and Value. The Query asks: what am I looking for? Keys answer: what information do I have? Values hold the actual content. Attention scores tell us which past tokens matter most for the current prediction."
+      "duration_seconds": 25,
+      "narration": "To understand the solution, we need to understand attention. For each token, we compute three vectors: Query, Key, and Value. The Query asks: what am I looking for? Keys answer: what information do I have? Values hold the actual content. We multiply Query by Key-transpose and divide by the square root of the key dimension. This scaling prevents attention scores from becoming too extreme. Attention scores tell us which past tokens matter most for the current prediction."
     },
     {
       "scene_id": "scene5_redundancy",
@@ -97,5 +97,5 @@
       "narration": "Putting it all together: from forty tokens per second to over three thousand five hundred. An eighty-seven times improvement. KV caching eliminates redundant computation. PagedAttention maximizes memory utilization. Quantization shrinks model size. Speculative decoding accelerates generation. And smart scaling handles millions of users. The key insight: LLM inference is memory-bound, not compute-bound. Every optimization here serves one goal: maximize useful work per byte transferred. These techniques power every major AI service today."
     }
   ],
-  "total_duration_seconds": 385
+  "total_duration_seconds": 388
 }
