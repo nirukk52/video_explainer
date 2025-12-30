@@ -39,11 +39,18 @@ class FeedbackProcessor:
         self.create_branch = create_branch
         self.store = FeedbackStore(project.root_dir, project.id)
 
-        # Initialize Claude Code provider with project directory (using Opus 4.5 for best quality)
+        # Use repo root as working directory so Claude Code can access both:
+        # - projects/{project-id}/ (storyboard, narrations)
+        # - remotion/src/scenes/{project-id}/ (scene components)
+        # Project root is like: /path/to/video_explainer/projects/llm-inference
+        # Repo root is: /path/to/video_explainer
+        repo_root = project.root_dir.parent.parent  # Go up from projects/{project-id}
+
+        # Initialize Claude Code provider with REPO root (using Opus 4.5 for best quality)
         llm_config = LLMConfig(provider="claude-code", model="claude-opus-4-5-20251101")
         self.llm = ClaudeCodeLLMProvider(
             llm_config,
-            working_dir=project.root_dir,
+            working_dir=repo_root,
             timeout=600,  # 10 minutes for complex changes with Opus
         )
 

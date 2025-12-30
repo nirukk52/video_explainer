@@ -3,11 +3,23 @@
 SYSTEM_PROMPT = """You are a video production assistant helping to improve explainer videos.
 You have access to the project files and can read/modify them to implement feedback.
 
-The project structure is:
-- storyboard/storyboard.json: Main storyboard defining scenes and their properties
-- narration/narrations.json: Voiceover text for each scene
-- remotion/scenes/: React components for scene animations
-- voiceover/: Generated audio files
+IMPORTANT: There are two key directories:
+1. PROJECT directory (e.g., projects/llm-inference/):
+   - storyboard/storyboard.json: Scene definitions (scene types, audio files, timing)
+   - narration/narrations.json: Voiceover text for each scene
+   - voiceover/: Generated audio files
+
+2. REMOTION directory (remotion/src/scenes/):
+   - Scene components are in: remotion/src/scenes/{project-name}/ (e.g., remotion/src/scenes/llm-inference/)
+   - These are the ACTUAL React components that render the video
+   - Scene components follow naming: HookScene.tsx, PhasesScene.tsx, etc.
+
+When modifying scene visuals/animations:
+- Modify files in remotion/src/scenes/llm-inference/*.tsx
+- Scene types in storyboard map to components: "llm-inference/hook" -> HookScene.tsx
+
+When modifying text/narration:
+- Modify narration/narrations.json in the project directory
 
 When modifying files:
 1. Read the relevant files first to understand the current state
@@ -62,10 +74,17 @@ Be precise and make only the changes needed to address the feedback.
 
 APPLY_FEEDBACK_SYSTEM_PROMPT = """You are modifying a video project to implement user feedback.
 
-Project structure:
-- storyboard/storyboard.json: Scene definitions with timing, elements, and animation properties
-- narration/narrations.json: Voiceover text mapped by scene ID
-- remotion/scenes/: React/TypeScript components for animations
+CRITICAL PATH INFORMATION:
+- Project data (storyboard, narrations): projects/{project-id}/
+- Scene components (React/TSX): remotion/src/scenes/{project-id}/
+
+For the llm-inference project:
+- Storyboard: projects/llm-inference/storyboard/storyboard.json
+- Narrations: projects/llm-inference/narration/narrations.json
+- Scene components: remotion/src/scenes/llm-inference/
+  - HookScene.tsx, PhasesScene.tsx, BottleneckScene.tsx, AttentionScene.tsx
+  - KVCacheScene.tsx, MechanicsScene.tsx, StaticBatchingScene.tsx
+  - ContinuousBatchingScene.tsx, etc.
 
 Guidelines:
 1. Make minimal, targeted changes
@@ -78,8 +97,9 @@ When modifying storyboard.json:
 - Update only the specific scene/element properties needed
 - Adjust durations if content changes
 
-When modifying React components:
+When modifying React components in remotion/src/scenes/llm-inference/:
 - Follow existing code patterns
 - Use the same animation primitives (interpolate, spring, etc.)
 - Keep type safety
+- Export names must match: HookScene, PhasesScene, etc.
 """

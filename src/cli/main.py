@@ -3,14 +3,23 @@
 Usage:
     python -m src.cli list                                    # List all projects
     python -m src.cli info <project>                          # Show project info
+    python -m src.cli create <project_id>                     # Create new project
+    python -m src.cli script <project>                        # Generate script from docs
+    python -m src.cli narration <project>                     # Generate narrations
     python -m src.cli voiceover <project>                     # Generate voiceovers
-    python -m src.cli storyboard <project>                    # Generate storyboard
+    python -m src.cli storyboard <project> --view             # View storyboard
     python -m src.cli render <project>                        # Render video
-    python -m src.cli render <project> --preview              # Quick preview render
+    python -m src.cli render <project> -r 4k                  # Render in 4K
     python -m src.cli feedback <project> add "<text>"         # Process feedback
-    python -m src.cli feedback <project> add "<text>" --dry-run  # Analyze only
     python -m src.cli feedback <project> list                 # List feedback
-    python -m src.cli feedback <project> show <feedback_id>   # Show feedback details
+
+Pipeline workflow:
+    1. create   - Create new project with config
+    2. script   - Generate script from input documents (optional)
+    3. narration - Generate narrations for each scene
+    4. voiceover - Generate audio files from narrations
+    5. render   - Render final video
+    6. feedback - Iterate on video with natural language feedback
 """
 
 import argparse
@@ -211,6 +220,222 @@ def cmd_storyboard(args: argparse.Namespace) -> int:
     print("Storyboard generation from LLM not yet implemented.")
     print("Use --view to view existing storyboard.")
     return 0
+
+
+def cmd_script(args: argparse.Namespace) -> int:
+    """Generate a script from input documents."""
+    from ..project import load_project
+    from ..ingestion import parse_markdown
+    from ..understanding import ContentAnalyzer
+    from ..script import ScriptGenerator
+    from ..config import Config
+
+    try:
+        project = load_project(Path(args.projects_dir) / args.project)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    print(f"Generating script for {project.id}")
+
+    # Find input documents
+    input_dir = project.input_dir
+    if not input_dir.exists():
+        print(f"Error: Input directory not found: {input_dir}", file=sys.stderr)
+        print("Add source documents to the input/ directory first.")
+        return 1
+
+    input_files = list(input_dir.glob("*.md"))
+    if not input_files:
+        print(f"Error: No markdown files found in {input_dir}", file=sys.stderr)
+        return 1
+
+    print(f"Found {len(input_files)} input file(s)")
+
+    # Parse documents
+    documents = []
+    for f in input_files:
+        print(f"  Parsing: {f.name}")
+        doc = parse_markdown(f)
+        documents.append(doc)
+
+    # Analyze content
+    print("\nAnalyzing content...")
+    config = Config()
+    if args.mock:
+        config.llm.provider = "mock"
+
+    analyzer = ContentAnalyzer(config)
+    analysis = analyzer.analyze(documents[0])  # Use first document
+
+    print(f"  Thesis: {analysis.core_thesis[:60]}...")
+    print(f"  Concepts: {len(analysis.key_concepts)}")
+
+    # Generate script
+    print("\nGenerating script...")
+    generator = ScriptGenerator(config)
+    script = generator.generate(
+        documents[0],
+        analysis,
+        target_duration=args.duration or project.video.target_duration_seconds,
+    )
+
+    print(f"  Generated {len(script.scenes)} scenes")
+    print(f"  Total duration: {script.total_duration_seconds}s")
+
+    # Save script
+    script_path = project.root_dir / "script" / "script.json"
+    script_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(script_path, "w") as f:
+        json.dump(script.model_dump(), f, indent=2)
+
+    print(f"\nScript saved to: {script_path}")
+
+    # Show scenes
+    if args.verbose:
+        print("\nScenes:")
+        for scene in script.scenes:
+            print(f"  {scene.scene_id}. {scene.title} ({scene.duration_seconds}s)")
+            print(f"      Type: {scene.scene_type}")
+            print(f"      Voiceover: {scene.voiceover[:50]}...")
+            print()
+
+    return 0
+
+
+def cmd_narration(args: argparse.Namespace) -> int:
+    """Generate narrations for a project."""
+    from ..project import load_project
+    from ..understanding.llm_provider import ClaudeCodeLLMProvider
+    from ..config import LLMConfig
+
+    try:
+        project = load_project(Path(args.projects_dir) / args.project)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    print(f"Generating narrations for {project.id}")
+
+    narration_path = project.get_path("narration")
+
+    # Check if narrations already exist
+    if narration_path.exists() and not args.force:
+        print(f"Narrations already exist: {narration_path}")
+        print("Use --force to regenerate.")
+        return 0
+
+    # If a script exists, use it as context
+    script_path = project.root_dir / "script" / "script.json"
+    script_context = ""
+    if script_path.exists():
+        with open(script_path) as f:
+            script_data = json.load(f)
+        script_context = f"\nExisting script to base narrations on:\n{json.dumps(script_data, indent=2)}"
+
+    # If topic is provided, use it
+    topic = args.topic or project.title
+
+    # Generate narrations using Claude Code
+    if args.mock:
+        # Use mock narrations for testing
+        narrations = _generate_mock_narrations(topic)
+        # Write mock narrations to file
+        narration_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(narration_path, "w") as f:
+            json.dump(narrations, f, indent=2)
+    else:
+        # Use Claude Code to generate narrations
+        print(f"Generating narrations for topic: {topic}")
+        print("Using Claude Code to generate narrations...")
+
+        llm_config = LLMConfig(provider="claude-code", model="claude-opus-4-5-20251101")
+        llm = ClaudeCodeLLMProvider(
+            llm_config,
+            working_dir=project.root_dir.parent.parent,  # Repo root
+            timeout=300,
+        )
+
+        prompt = f"""Generate narrations for a video about: {topic}
+
+{script_context}
+
+Create a narrations.json file with the following structure:
+{{
+  "scenes": [
+    {{
+      "scene_id": "scene1_hook",
+      "title": "The Hook",
+      "narration": "The voiceover text for this scene..."
+    }},
+    ...
+  ]
+}}
+
+Requirements:
+1. Write engaging, conversational narration (not academic)
+2. Each scene should be 15-30 seconds when spoken
+3. Include 8-12 scenes covering the topic comprehensively
+4. Start with a hook that creates curiosity
+5. End with a memorable conclusion
+
+Write the JSON to: {narration_path}
+"""
+
+        try:
+            result = llm.generate_with_file_access(prompt, allow_writes=True)
+            if not result.success:
+                print(f"Error: {result.error_message}", file=sys.stderr)
+                return 1
+        except Exception as e:
+            print(f"Error generating narrations: {e}", file=sys.stderr)
+            return 1
+
+    # Verify narrations were created
+    if narration_path.exists():
+        with open(narration_path) as f:
+            narrations = json.load(f)
+        scene_count = len(narrations.get("scenes", []))
+        print(f"\nGenerated {scene_count} narrations")
+        print(f"Saved to: {narration_path}")
+
+        if args.verbose:
+            print("\nScenes:")
+            for scene in narrations.get("scenes", []):
+                print(f"  {scene.get('scene_id')}: {scene.get('title')}")
+    else:
+        print("Warning: Narrations file was not created.")
+
+    return 0
+
+
+def _generate_mock_narrations(topic: str) -> dict:
+    """Generate mock narrations for testing."""
+    return {
+        "scenes": [
+            {
+                "scene_id": "scene1_hook",
+                "title": "The Hook",
+                "narration": f"What if I told you that {topic} could change everything you know about technology?",
+            },
+            {
+                "scene_id": "scene2_context",
+                "title": "Setting the Context",
+                "narration": f"To understand {topic}, we need to first look at the bigger picture.",
+            },
+            {
+                "scene_id": "scene3_explanation",
+                "title": "How It Works",
+                "narration": f"At its core, {topic} works by processing information in a fundamentally different way.",
+            },
+            {
+                "scene_id": "scene4_conclusion",
+                "title": "The Takeaway",
+                "narration": f"So remember, {topic} isn't just a technology - it's a paradigm shift.",
+            },
+        ]
+    }
 
 
 # Resolution presets
@@ -542,6 +767,50 @@ def main() -> int:
         help="View existing storyboard instead of generating",
     )
     storyboard_parser.set_defaults(func=cmd_storyboard)
+
+    # script command
+    script_parser = subparsers.add_parser("script", help="Generate script from input documents")
+    script_parser.add_argument("project", help="Project ID")
+    script_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock LLM (for testing)",
+    )
+    script_parser.add_argument(
+        "--duration",
+        type=int,
+        help="Target duration in seconds",
+    )
+    script_parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Show detailed output",
+    )
+    script_parser.set_defaults(func=cmd_script)
+
+    # narration command
+    narration_parser = subparsers.add_parser("narration", help="Generate narrations for a project")
+    narration_parser.add_argument("project", help="Project ID")
+    narration_parser.add_argument(
+        "--topic",
+        help="Topic to generate narrations for (default: project title)",
+    )
+    narration_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock narrations (for testing)",
+    )
+    narration_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing narrations",
+    )
+    narration_parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Show detailed output",
+    )
+    narration_parser.set_defaults(func=cmd_narration)
 
     # render command
     render_parser = subparsers.add_parser("render", help="Render video")
