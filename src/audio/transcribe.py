@@ -51,14 +51,14 @@ class WhisperTranscriber:
             )
 
         # Determine device
+        # Note: MPS has issues with float64, so we use CPU for Apple Silicon
         device = self.device
         if device == "auto":
             import torch
             if torch.cuda.is_available():
                 device = "cuda"
-            elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-                device = "mps"
             else:
+                # MPS has dtype issues with Whisper, use CPU instead
                 device = "cpu"
 
         self._model = whisper.load_model(self.model_name, device=device)

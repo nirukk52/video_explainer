@@ -29,6 +29,9 @@ dev = [
     "ruff>=0.1.0",
     "mypy>=1.0",
 ]
+whisper = [
+    "openai-whisper>=20231117",
+]
 
 [project.scripts]
 video-explainer = "src.cli:main"
