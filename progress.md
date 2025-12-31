@@ -141,7 +141,19 @@ Check "Next Actions" section below for current tasks.
 - [x] 75 new tests (40 feedback + 35 Claude Code provider)
 - [x] **397 tests passing (352 Python + 45 JavaScript)**
 
-### Next Steps (Phase 5 - Production Ready)
+### Completed (Phase 5 - Sound Design System)
+- [x] Frame-accurate SFX system (sfx_cues in storyboard.json)
+- [x] 10 focused procedurally generated sounds (numpy-based)
+- [x] Remotion-native SFX playback at exact frame offsets
+- [x] Storyboard schema extended with sfx_cues array
+- [x] CLI commands (`sound library --list`, `--generate`)
+- [x] Manual voiceover support with Whisper transcription
+- [x] Auto-sync storyboard durations with voiceover lengths
+- [x] Sound design for llm-inference video (100+ SFX cues, 16 scenes)
+- [x] 21 sound module tests
+- [x] **402+ tests passing (357+ Python + 45 JavaScript)**
+
+### Next Steps (Phase 6 - Production Ready)
 - [ ] Enable real LLM API (Anthropic/OpenAI) for dynamic content analysis
 - [ ] Add more animation components (code highlights, equations, diagrams)
 - [ ] Build web interface for easier use

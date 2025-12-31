@@ -23,6 +23,20 @@ import {
 import { getSceneByPath } from "./index";
 
 /**
+ * SFX cue definition - frame-accurate sound effect trigger
+ */
+export interface SFXCue {
+  /** Sound file name (without extension, looked up in sfx/ directory) */
+  sound: string;
+  /** Frame offset from scene start when sound should play */
+  frame: number;
+  /** Volume (0-1), defaults to 0.1 for subtle mix */
+  volume?: number;
+  /** Optional duration in frames (for looping sounds) */
+  duration_frames?: number;
+}
+
+/**
  * Scene definition in storyboard.json
  */
 export interface StoryboardScene {
@@ -31,6 +45,8 @@ export interface StoryboardScene {
   title: string;
   audio_file: string;
   audio_duration_seconds: number;
+  /** Frame-accurate SFX cues for this scene */
+  sfx_cues?: SFXCue[];
 }
 
 /**
@@ -227,8 +243,23 @@ export const SceneStoryboardPlayer: React.FC<SceneStoryboardPlayerProps> = ({
               )}
             </FadeTransition>
 
-            {/* Audio track */}
+            {/* Voiceover/mixed audio track */}
             <Audio src={staticFile(audioPath)} volume={1} />
+
+            {/* Frame-accurate SFX cues */}
+            {scene.sfx_cues?.map((cue, cueIndex) => (
+              <Sequence
+                key={`sfx-${scene.id}-${cueIndex}`}
+                from={cue.frame}
+                durationInFrames={cue.duration_frames || 60}
+                name={`SFX: ${cue.sound}`}
+              >
+                <Audio
+                  src={staticFile(`sfx/${cue.sound}.wav`)}
+                  volume={cue.volume ?? 0.1}
+                />
+              </Sequence>
+            ))}
           </Sequence>
         );
       })}

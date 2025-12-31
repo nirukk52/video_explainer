@@ -9,6 +9,8 @@ A system for generating high-quality explainer videos from technical documents. 
 - **Content Analysis**: Automatically extract key concepts and structure content for video
 - **Script Generation**: Generate video scripts with visual cues and voiceover text
 - **Text-to-Speech**: Integration with ElevenLabs and Edge TTS (with mock mode for development)
+- **Manual Voiceover Support**: Import your own recordings with Whisper transcription
+- **Sound Design**: Automated SFX planning, music layering, and audio mixing
 - **Remotion Animations**: React-based programmatic video generation
 - **CLI Pipeline**: Run each stage independently for easy iteration
 
@@ -78,6 +80,13 @@ python -m src.cli feedback llm-inference list
 
 # Show details of a specific feedback item
 python -m src.cli feedback llm-inference show fb_0001_1234567890
+
+# Sound design commands
+python -m src.cli sound llm-inference plan              # Plan SFX for all scenes
+python -m src.cli sound llm-inference library --list    # List available sounds
+python -m src.cli sound llm-inference library --download  # Generate sound library
+python -m src.cli sound llm-inference music --setup     # Show music setup instructions
+python -m src.cli sound llm-inference mix               # Mix voiceover + SFX + music
 ```
 
 ### Resolution Options
@@ -114,7 +123,8 @@ video_explainer/
 │   ├── ingestion/               # Document parsing
 │   ├── understanding/           # Content analysis (LLM)
 │   ├── script/                  # Script generation
-│   ├── audio/                   # TTS providers
+│   ├── audio/                   # TTS providers + transcription
+│   ├── sound/                   # Sound design (SFX, music, mixing)
 │   ├── voiceover/               # Voiceover generation
 │   ├── storyboard/              # Storyboard system
 │   ├── animation/               # Animation rendering
@@ -135,7 +145,7 @@ video_explainer/
 │   └── schema/
 │       └── storyboard.schema.json
 │
-├── tests/                       # Test suite (352 Python tests + 45 JS tests)
+├── tests/                       # Test suite (396+ Python tests + 45 JS tests)
 ├── config.yaml                  # Global configuration
 └── pyproject.toml               # Python package configuration
 ```
@@ -203,7 +213,7 @@ video:
 
 ## Testing
 
-The project includes 397 tests (352 Python + 45 JavaScript).
+The project includes 441+ tests (396+ Python + 45 JavaScript).
 
 ### Python Tests
 

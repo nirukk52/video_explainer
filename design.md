@@ -1055,6 +1055,103 @@ Feedback is stored in `projects/<project>/feedback/feedback.json`:
 
 ---
 
-*Document Version: 1.4*
+---
+
+## Sound Design System (December 2024)
+
+### Overview
+
+The sound design system adds professional audio polish through frame-accurate SFX that sync with animation events. SFX cues are defined in storyboard.json and rendered directly by Remotion.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Sound Design Pipeline                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Storyboard.json ──────────────────────► Remotion               │
+│  (scenes + sfx_cues)                     (renders video with    │
+│       │                                   SFX at exact frames)  │
+│       │                                                          │
+│       ▼                                                          │
+│  SFX Library ──────────────────────────► projects/<id>/sfx/     │
+│  (10 procedural sounds)                  (WAV files)            │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Principle: Animation-Driven SFX
+
+Sounds are tied to **visual events**, not narration content:
+
+| Animation Event | Sound | Volume |
+|----------------|-------|--------|
+| Element appears | `ui_pop` | 0.08 |
+| Text/typing | `text_tick` | 0.06 |
+| Block locks in place | `lock_click` | 0.1 |
+| Data flowing | `data_flow` | 0.08 |
+| Fast counter | `counter_sweep` | 0.12 |
+| Big reveal (87x) | `reveal_hit` | 0.15 |
+| Problem state | `warning_tone` | 0.1 |
+| Solution found | `success_tone` | 0.1 |
+| Phase transition | `transition_whoosh` | 0.1 |
+| Cache operation | `cache_click` | 0.1 |
+
+### SFX Cues in Storyboard
+
+SFX cues are defined per scene in `storyboard.json`:
+
+```json
+{
+  "id": "scene1_hook",
+  "type": "llm-inference/hook",
+  "title": "The Speed Problem",
+  "audio_file": "scene1_hook.mp3",
+  "audio_duration_seconds": 18.52,
+  "sfx_cues": [
+    {"sound": "ui_pop", "frame": 15, "volume": 0.08},
+    {"sound": "text_tick", "frame": 30, "volume": 0.06},
+    {"sound": "transition_whoosh", "frame": 270, "volume": 0.1},
+    {"sound": "counter_sweep", "frame": 330, "volume": 0.12},
+    {"sound": "reveal_hit", "frame": 390, "volume": 0.15}
+  ]
+}
+```
+
+### CLI Commands
+
+```bash
+# List available sounds
+python -m src.cli sound <project> library --list
+
+# Generate SFX files to project's sfx/ directory
+python -m src.cli sound <project> library --generate
+```
+
+### Project Structure
+
+```
+projects/<project>/
+├── sfx/                   # SFX files (used by Remotion)
+│   ├── ui_pop.wav
+│   ├── lock_click.wav
+│   └── ...
+├── storyboard/
+│   └── storyboard.json    # Includes sfx_cues per scene
+└── voiceover/
+    └── ...
+```
+
+### Workflow
+
+1. **Analyze animations** to identify visual events
+2. **Add sfx_cues** to storyboard.json with frame-accurate timing
+3. **Generate SFX** using CLI: `sound library --generate`
+4. **Render video** - Remotion plays SFX at specified frames
+
+---
+
+*Document Version: 1.6*
 *Last Updated: December 2024*
-*Current Status: 397 tests passing, feedback system complete*
+*Current Status: 402+ tests passing, frame-accurate sound design*

@@ -8,6 +8,9 @@ Usage:
     python -m src.cli narration <project>                     # Generate narrations
     python -m src.cli voiceover <project>                     # Generate voiceovers
     python -m src.cli storyboard <project> --view             # View storyboard
+    python -m src.cli sound <project> plan                    # Plan sound effects
+    python -m src.cli sound <project> library --list          # List sound library
+    python -m src.cli sound <project> mix                     # Mix audio
     python -m src.cli render <project>                        # Render video
     python -m src.cli render <project> -r 4k                  # Render in 4K
     python -m src.cli feedback <project> add "<text>"         # Process feedback
@@ -18,8 +21,9 @@ Pipeline workflow:
     2. script   - Generate script from input documents (optional)
     3. narration - Generate narrations for each scene
     4. voiceover - Generate audio files from narrations
-    5. render   - Render final video
-    6. feedback - Iterate on video with natural language feedback
+    5. sound    - Plan and mix sound effects and music
+    6. render   - Render final video
+    7. feedback - Iterate on video with natural language feedback
 """
 
 import argparse
@@ -648,8 +652,10 @@ def cmd_render(args: argparse.Namespace) -> int:
         return 1
 
     # Check for voiceover files
+    # SFX is now handled directly by Remotion via sfx_cues in storyboard.json
     voiceover_files = list(project.voiceover_dir.glob("*.mp3"))
     print(f"Found {len(voiceover_files)} voiceover files")
+    audio_dir = "voiceover"
 
     # Determine resolution
     resolution_name = args.resolution or "1080p"
@@ -672,7 +678,7 @@ def cmd_render(args: argparse.Namespace) -> int:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Build render command using new data-driven architecture
-    # The render script uses the project directory to serve static files (voiceovers)
+    # The render script uses the project directory to serve static files (voiceovers/mixed audio)
     cmd = [
         "node",
         str(render_script),
@@ -680,9 +686,11 @@ def cmd_render(args: argparse.Namespace) -> int:
         "--output", str(output_path),
         "--width", str(width),
         "--height", str(height),
+        "--voiceover-path", audio_dir,
     ]
 
     print(f"Project: {project.root_dir}")
+    print(f"Audio: {audio_dir}")
     print(f"Resolution: {resolution_name} ({width}x{height})")
     print(f"Output: {output_path}")
     print(f"Running: {' '.join(cmd)}")
@@ -867,6 +875,71 @@ def cmd_create(args: argparse.Namespace) -> int:
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
+
+
+def cmd_sound(args: argparse.Namespace) -> int:
+    """Sound design commands: generate SFX library for Remotion."""
+    from ..project import load_project
+    from ..sound.library import SoundLibrary, SOUND_MANIFEST
+
+    try:
+        project = load_project(Path(args.projects_dir) / args.project)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    # SFX files go in project's sfx/ directory (used by Remotion)
+    sfx_dir = project.root_dir / "sfx"
+
+    if not args.sound_command:
+        print("Usage: python -m src.cli sound <project> <command>")
+        print("\nCommands:")
+        print("  library    Generate/manage SFX library")
+        print("\nNote: SFX cues are defined in storyboard.json and rendered by Remotion.")
+        return 1
+
+    if args.sound_command == "library":
+        library = SoundLibrary(sfx_dir)
+
+        if args.list:
+            print(f"Sound Library ({len(SOUND_MANIFEST)} sounds)")
+            print("=" * 50)
+
+            for name, info in SOUND_MANIFEST.items():
+                status = "[ready]" if library.sound_exists(name) else "[missing]"
+                print(f"  {status} {name}")
+                print(f"         {info['description']}")
+
+            missing = library.get_missing_sounds()
+            if missing:
+                print(f"\n{len(missing)} sounds need to be generated.")
+                print("Run: python -m src.cli sound <project> library --generate")
+
+            return 0
+
+        elif args.download or args.generate:
+            print(f"Generating SFX library for {project.id}")
+
+            generated = library.generate_all()
+            print(f"Generated {len(generated)} sounds to: {sfx_dir}")
+
+            for name in generated:
+                print(f"  - {name}.wav")
+
+            return 0
+
+        else:
+            print("Usage: python -m src.cli sound <project> library [options]")
+            print("\nOptions:")
+            print("  --list       List all available sounds")
+            print("  --generate   Generate all sound effect files")
+            return 1
+
+    else:
+        print(f"Unknown sound command: {args.sound_command}")
+        return 1
+
+    return 0
 
 
 def main() -> int:
@@ -1057,6 +1130,41 @@ def main() -> int:
     )
 
     feedback_parser.set_defaults(func=cmd_feedback)
+
+    # sound command
+    sound_parser = subparsers.add_parser(
+        "sound",
+        help="Sound design: generate SFX library for Remotion",
+    )
+    sound_parser.add_argument("project", help="Project ID")
+
+    sound_subparsers = sound_parser.add_subparsers(
+        dest="sound_command",
+        help="Sound commands",
+    )
+
+    # sound library
+    sound_library_parser = sound_subparsers.add_parser(
+        "library",
+        help="Generate/manage SFX library",
+    )
+    sound_library_parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List all available sounds",
+    )
+    sound_library_parser.add_argument(
+        "--generate",
+        action="store_true",
+        help="Generate all SFX files to project's sfx/ directory",
+    )
+    sound_library_parser.add_argument(
+        "--download",
+        action="store_true",
+        help="Alias for --generate (for backwards compatibility)",
+    )
+
+    sound_parser.set_defaults(func=cmd_sound)
 
     args = parser.parse_args()
 
