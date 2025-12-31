@@ -423,7 +423,7 @@ export const PagedAttentionScene: React.FC<PagedAttentionSceneProps> = ({
               color: "#ff4757",
             }}
           >
-            35%
+            20%
           </div>
           <div style={{ fontSize: 14 * scale, color: COLORS.textDim }}>
             Before (Pre-allocation)

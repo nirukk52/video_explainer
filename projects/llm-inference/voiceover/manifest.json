@@ -1710,7 +1710,7 @@
     {
       "scene_id": "scene7_memory_fragmentation",
       "audio_path": "/Users/prajwal/Desktop/Learning/video_explainer/projects/llm-inference/voiceover/scene7_memory_fragmentation.mp3",
-      "duration_seconds": 22.875,
+      "duration_seconds": 22.95,
       "word_timestamps": [
         {
           "word": "The",
@@ -1895,82 +1895,82 @@
         {
           "word": "just",
           "start_seconds": 15.675,
-          "end_seconds": 15.9125
+          "end_seconds": 15.8875
         },
         {
-          "word": "five",
-          "start_seconds": 15.925,
-          "end_seconds": 16.1875
+          "word": "twenty",
+          "start_seconds": 15.9,
+          "end_seconds": 16.2125
         },
         {
           "word": "percent",
-          "start_seconds": 16.2,
-          "end_seconds": 16.5875
+          "start_seconds": 16.2375,
+          "end_seconds": 16.6625
         },
         {
           "word": "of",
-          "start_seconds": 16.6,
-          "end_seconds": 16.7
+          "start_seconds": 16.6875,
+          "end_seconds": 16.7875
         },
         {
           "word": "allocated",
-          "start_seconds": 16.725,
-          "end_seconds": 17.3
+          "start_seconds": 16.8125,
+          "end_seconds": 17.375
         },
         {
           "word": "memory",
-          "start_seconds": 17.325,
-          "end_seconds": 17.825
+          "start_seconds": 17.4,
+          "end_seconds": 17.9
         },
         {
           "word": "The",
-          "start_seconds": 18.7,
-          "end_seconds": 18.8375
+          "start_seconds": 18.775,
+          "end_seconds": 18.9125
         },
         {
           "word": "rest",
-          "start_seconds": 18.8625,
-          "end_seconds": 19.1125
+          "start_seconds": 18.9375,
+          "end_seconds": 19.1875
         },
         {
           "word": "sits",
-          "start_seconds": 19.125,
-          "end_seconds": 19.35
+          "start_seconds": 19.2,
+          "end_seconds": 19.425
         },
         {
           "word": "wasted",
-          "start_seconds": 19.3625,
-          "end_seconds": 19.7875
+          "start_seconds": 19.4375,
+          "end_seconds": 19.8625
         },
         {
           "word": "fragmenting",
-          "start_seconds": 19.9625,
-          "end_seconds": 20.575
+          "start_seconds": 20.0375,
+          "end_seconds": 20.65
         },
         {
           "word": "GPU",
-          "start_seconds": 20.5875,
-          "end_seconds": 21.0875
+          "start_seconds": 20.6625,
+          "end_seconds": 21.1625
         },
         {
           "word": "memory",
-          "start_seconds": 21.1,
-          "end_seconds": 21.5
+          "start_seconds": 21.175,
+          "end_seconds": 21.575
         },
         {
           "word": "into",
-          "start_seconds": 21.525,
-          "end_seconds": 21.75
+          "start_seconds": 21.6,
+          "end_seconds": 21.825
         },
         {
           "word": "unusable",
-          "start_seconds": 21.775,
-          "end_seconds": 22.3375
+          "start_seconds": 21.85,
+          "end_seconds": 22.4125
         },
         {
           "word": "chunks",
-          "start_seconds": 22.3625,
-          "end_seconds": 22.875
+          "start_seconds": 22.4375,
+          "end_seconds": 22.95
         }
       ]
     },
@@ -3220,7 +3220,7 @@
     {
       "scene_id": "scene12_paged_attention",
       "audio_path": "/Users/prajwal/Desktop/Learning/video_explainer/projects/llm-inference/voiceover/scene12_paged_attention.mp3",
-      "duration_seconds": 27.1125,
+      "duration_seconds": 26.975,
       "word_timestamps": [
         {
           "word": "The",
@@ -3465,52 +3465,52 @@
         {
           "word": "Memory",
           "start_seconds": 22.825,
-          "end_seconds": 23.25
+          "end_seconds": 23.275
         },
         {
           "word": "utilization",
-          "start_seconds": 23.275,
-          "end_seconds": 24.0
+          "start_seconds": 23.3,
+          "end_seconds": 24.0375
         },
         {
           "word": "jumps",
-          "start_seconds": 24.025,
-          "end_seconds": 24.275
+          "start_seconds": 24.0625,
+          "end_seconds": 24.325
         },
         {
           "word": "from",
-          "start_seconds": 24.3,
-          "end_seconds": 24.4875
+          "start_seconds": 24.35,
+          "end_seconds": 24.55
         },
         {
-          "word": "thirty-five",
-          "start_seconds": 24.5125,
-          "end_seconds": 25.1
+          "word": "twenty",
+          "start_seconds": 24.575,
+          "end_seconds": 24.8875
         },
         {
           "word": "percent",
-          "start_seconds": 25.125,
-          "end_seconds": 25.5625
+          "start_seconds": 24.9125,
+          "end_seconds": 25.3625
         },
         {
           "word": "to",
-          "start_seconds": 25.5875,
-          "end_seconds": 25.7
+          "start_seconds": 25.3875,
+          "end_seconds": 25.5
         },
         {
           "word": "over",
-          "start_seconds": 25.725,
-          "end_seconds": 25.9625
+          "start_seconds": 25.525,
+          "end_seconds": 25.7875
         },
         {
           "word": "ninety-five",
-          "start_seconds": 25.9875,
-          "end_seconds": 26.575
+          "start_seconds": 25.8125,
+          "end_seconds": 26.4125
         },
         {
           "word": "percent",
-          "start_seconds": 26.5875,
-          "end_seconds": 27.1125
+          "start_seconds": 26.4375,
+          "end_seconds": 26.975
         }
       ]
     },
@@ -4525,7 +4525,7 @@
     {
       "scene_id": "scene17_economics",
       "audio_path": "/Users/prajwal/Desktop/Learning/video_explainer/projects/llm-inference/voiceover/scene17_economics.mp3",
-      "duration_seconds": 28.6625,
+      "duration_seconds": 28.8625,
       "word_timestamps": [
         {
           "word": "Let's",
@@ -4695,142 +4695,142 @@
         {
           "word": "At",
           "start_seconds": 16.25,
-          "end_seconds": 16.4625
+          "end_seconds": 16.45
         },
         {
           "word": "two",
-          "start_seconds": 16.4875,
-          "end_seconds": 16.65
+          "start_seconds": 16.475,
+          "end_seconds": 16.6375
         },
         {
           "word": "dollars",
-          "start_seconds": 16.675,
-          "end_seconds": 17.05
+          "start_seconds": 16.6625,
+          "end_seconds": 17.0375
         },
         {
           "word": "per",
-          "start_seconds": 17.075,
-          "end_seconds": 17.225
+          "start_seconds": 17.0625,
+          "end_seconds": 17.2125
         },
         {
           "word": "GPU-hour",
-          "start_seconds": 17.25,
+          "start_seconds": 17.2375,
           "end_seconds": 18.025
         },
         {
           "word": "that's",
-          "start_seconds": 18.2125,
-          "end_seconds": 18.45
+          "start_seconds": 18.1875,
+          "end_seconds": 18.425
         },
         {
-          "word": "fifty",
-          "start_seconds": 18.4625,
-          "end_seconds": 18.8
+          "word": "thirty-six",
+          "start_seconds": 18.4375,
+          "end_seconds": 18.975
         },
         {
           "word": "million",
-          "start_seconds": 18.8125,
-          "end_seconds": 19.175
+          "start_seconds": 18.9875,
+          "end_seconds": 19.3375
         },
         {
           "word": "dollars",
-          "start_seconds": 19.2,
-          "end_seconds": 19.575
+          "start_seconds": 19.3625,
+          "end_seconds": 19.75
         },
         {
           "word": "per",
-          "start_seconds": 19.6,
-          "end_seconds": 19.7625
+          "start_seconds": 19.775,
+          "end_seconds": 19.9375
         },
         {
           "word": "month",
-          "start_seconds": 19.7875,
-          "end_seconds": 20.2
+          "start_seconds": 19.9625,
+          "end_seconds": 20.3875
         },
         {
           "word": "Every",
-          "start_seconds": 21.075,
-          "end_seconds": 21.4
+          "start_seconds": 21.275,
+          "end_seconds": 21.6
         },
         {
           "word": "optimization",
-          "start_seconds": 21.425,
-          "end_seconds": 22.15
+          "start_seconds": 21.625,
+          "end_seconds": 22.35
         },
         {
           "word": "in",
-          "start_seconds": 22.175,
-          "end_seconds": 22.25
-        },
-        {
-          "word": "this",
-          "start_seconds": 22.275,
+          "start_seconds": 22.375,
           "end_seconds": 22.45
         },
         {
-          "word": "video",
+          "word": "this",
           "start_seconds": 22.475,
-          "end_seconds": 22.85
+          "end_seconds": 22.65
+        },
+        {
+          "word": "video",
+          "start_seconds": 22.675,
+          "end_seconds": 23.05
         },
         {
           "word": "directly",
-          "start_seconds": 22.875,
-          "end_seconds": 23.35
+          "start_seconds": 23.075,
+          "end_seconds": 23.55
         },
         {
           "word": "reduces",
-          "start_seconds": 23.375,
-          "end_seconds": 23.875
-        },
-        {
-          "word": "that",
-          "start_seconds": 23.9,
+          "start_seconds": 23.575,
           "end_seconds": 24.075
         },
         {
-          "word": "bill",
+          "word": "that",
           "start_seconds": 24.1,
-          "end_seconds": 24.4625
+          "end_seconds": 24.275
+        },
+        {
+          "word": "bill",
+          "start_seconds": 24.3,
+          "end_seconds": 24.6625
         },
         {
           "word": "A",
-          "start_seconds": 25.35,
-          "end_seconds": 25.4875
+          "start_seconds": 25.55,
+          "end_seconds": 25.6875
         },
         {
           "word": "two-times",
-          "start_seconds": 25.5125,
-          "end_seconds": 26.0375
+          "start_seconds": 25.7125,
+          "end_seconds": 26.2375
         },
         {
           "word": "throughput",
-          "start_seconds": 26.0625,
-          "end_seconds": 26.425
+          "start_seconds": 26.2625,
+          "end_seconds": 26.625
         },
         {
           "word": "improvement",
-          "start_seconds": 26.45,
-          "end_seconds": 26.975
+          "start_seconds": 26.65,
+          "end_seconds": 27.175
         },
         {
           "word": "halves",
-          "start_seconds": 27.0,
-          "end_seconds": 27.275
+          "start_seconds": 27.2,
+          "end_seconds": 27.475
         },
         {
           "word": "your",
-          "start_seconds": 27.2875,
-          "end_seconds": 27.425
+          "start_seconds": 27.4875,
+          "end_seconds": 27.625
         },
         {
           "word": "infrastructure",
-          "start_seconds": 27.45,
-          "end_seconds": 28.1625
+          "start_seconds": 27.65,
+          "end_seconds": 28.3625
         },
         {
           "word": "cost",
-          "start_seconds": 28.1875,
-          "end_seconds": 28.6625
+          "start_seconds": 28.3875,
+          "end_seconds": 28.8625
         }
       ]
     },
@@ -5202,6 +5202,6 @@
       ]
     }
   ],
-  "total_duration_seconds": 464.5375,
+  "total_duration_seconds": 464.675,
   "output_dir": "/Users/prajwal/Desktop/Learning/video_explainer/projects/llm-inference/voiceover"
 }

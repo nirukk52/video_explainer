@@ -40,7 +40,7 @@
       "scene_id": "scene7_memory_fragmentation",
       "title": "The Memory Fragmentation Problem",
       "duration_seconds": 22,
-      "narration": "The third problem: memory fragmentation. We don't know how long responses will be, so we pre-allocate memory for the maximum length. A four thousand token buffer for every request. But most responses are short. We're using just five percent of allocated memory. The rest sits wasted, fragmenting GPU memory into unusable chunks."
+      "narration": "The third problem: memory fragmentation. We don't know how long responses will be, so we pre-allocate memory for the maximum length. A four thousand token buffer for every request. But most responses are short. We're using just twenty percent of allocated memory. The rest sits wasted, fragmenting GPU memory into unusable chunks."
     },
     {
       "scene_id": "scene8_vllm_intro",
@@ -70,7 +70,7 @@
       "scene_id": "scene12_paged_attention",
       "title": "PagedAttention",
       "duration_seconds": 28,
-      "narration": "The third solution: PagedAttention. Inspired by operating system virtual memory, we divide the KV cache into fixed-size blocks. Instead of pre-allocating one giant buffer, we allocate blocks on demand as tokens are generated. When a request finishes, its blocks return to a free list. No pre-allocation, no fragmentation. Memory utilization jumps from thirty-five percent to over ninety-five percent."
+      "narration": "The third solution: PagedAttention. Inspired by operating system virtual memory, we divide the KV cache into fixed-size blocks. Instead of pre-allocating one giant buffer, we allocate blocks on demand as tokens are generated. When a request finishes, its blocks return to a free list. No pre-allocation, no fragmentation. Memory utilization jumps from twenty percent to over ninety-five percent."
     },
     {
       "scene_id": "scene13_more_optimizations",
@@ -100,7 +100,7 @@
       "scene_id": "scene17_economics",
       "title": "The Economics of Scale",
       "duration_seconds": 30,
-      "narration": "Let's talk real numbers. One million users, fifty tokens per second each. That's fifty million tokens per second total. With optimized inference at two thousand tokens per GPU-second, you need twenty-five thousand GPUs. At two dollars per GPU-hour, that's fifty million dollars per month. Every optimization in this video directly reduces that bill. A two-times throughput improvement halves your infrastructure cost."
+      "narration": "Let's talk real numbers. One million users, fifty tokens per second each. That's fifty million tokens per second total. With optimized inference at two thousand tokens per GPU-second, you need twenty-five thousand GPUs. At two dollars per GPU-hour, that's thirty-six million dollars per month. Every optimization in this video directly reduces that bill. A two-times throughput improvement halves your infrastructure cost."
     },
     {
       "scene_id": "scene18_conclusion",

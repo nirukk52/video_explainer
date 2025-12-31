@@ -37,12 +37,12 @@ const COLORS = {
 
 const MAX_TOKENS = 4096;
 const SEQUENCES = [
-  { id: 1, actualTokens: 150, label: "Req 1" },
-  { id: 2, actualTokens: 320, label: "Req 2" },
-  { id: 3, actualTokens: 80, label: "Req 3" },
-  { id: 4, actualTokens: 250, label: "Req 4" },
-  { id: 5, actualTokens: 120, label: "Req 5" },
-  { id: 6, actualTokens: 180, label: "Req 6" },
+  { id: 1, actualTokens: 650, label: "Req 1" },
+  { id: 2, actualTokens: 1100, label: "Req 2" },
+  { id: 3, actualTokens: 400, label: "Req 3" },
+  { id: 4, actualTokens: 950, label: "Req 4" },
+  { id: 5, actualTokens: 550, label: "Req 5" },
+  { id: 6, actualTokens: 800, label: "Req 6" },
 ];
 
 export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> = ({

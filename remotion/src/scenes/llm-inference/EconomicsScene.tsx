@@ -75,7 +75,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
   const costCounter = interpolate(
     localFrame,
     [phase1End + Math.round(durationInFrames * 0.07), phase2End],
-    [0, 50],
+    [0, 36],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
 
@@ -339,7 +339,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
                   color: COLORS.cost,
                 }}
               >
-                $50M/mo
+                $36M/mo
               </div>
               <div style={{ fontSize: 14 * scale, color: COLORS.textDim }}>
                 25,000 GPUs
@@ -383,7 +383,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
                   color: COLORS.savings,
                 }}
               >
-                $25M/mo
+                $18M/mo
               </div>
               <div style={{ fontSize: 14 * scale, color: COLORS.textDim }}>
                 12,500 GPUs
@@ -407,7 +407,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
                   color: COLORS.savings,
                 }}
               >
-                $25M
+                $18M
               </div>
               <div style={{ fontSize: 14 * scale, color: COLORS.savings }}>
                 Monthly Savings
