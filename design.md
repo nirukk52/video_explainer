@@ -661,6 +661,8 @@ video_explainer/
 │   ├── understanding/           # Content analysis (LLM)
 │   ├── script/                  # Script generation
 │   ├── audio/                   # TTS providers
+│   ├── sound/                   # Sound design (SFX)
+│   ├── music/                   # AI background music (MusicGen)
 │   ├── voiceover/               # Voiceover generation
 │   ├── storyboard/              # Storyboard system
 │   ├── animation/               # Animation rendering
@@ -681,7 +683,7 @@ video_explainer/
 │   └── schema/
 │       └── storyboard.schema.json
 │
-├── tests/                       # Test suite (241 tests)
+├── tests/                       # Test suite (470+ tests)
 ├── config.yaml                  # Global configuration
 └── pyproject.toml               # Python package configuration
 ```
@@ -1152,6 +1154,136 @@ projects/<project>/
 
 ---
 
-*Document Version: 1.6*
+## AI Background Music Generation (December 2024)
+
+### Overview
+
+The music generation system uses Meta's MusicGen model to automatically generate ambient background music that matches the video topic. It supports Apple Silicon (MPS), CUDA, and CPU backends.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Music Generation Pipeline                     │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Topic/Style ──────► MusicGenerator ──────► background.mp3      │
+│       │                    │                      │              │
+│       │                    ▼                      │              │
+│       │         ┌─────────────────────┐           │              │
+│       └────────►│  Style Presets      │           │              │
+│                 │  - tech             │           │              │
+│                 │  - science          │           │              │
+│                 │  - tutorial         │           │              │
+│                 │  - dramatic         │           │              │
+│                 └─────────────────────┘           │              │
+│                                                   ▼              │
+│                                          Storyboard.json        │
+│                                          (auto-updated with     │
+│                                           background_music)     │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Key Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `MusicConfig` | `src/music/generator.py` | Configuration dataclass (model size, duration, volume) |
+| `MusicGenerator` | `src/music/generator.py` | Core generation using MusicGen model |
+| `MusicGenerationResult` | `src/music/generator.py` | Result dataclass with output path, duration |
+| `generate_for_project()` | `src/music/generator.py` | High-level function for project integration |
+| `MUSIC_STYLE_PRESETS` | `src/music/generator.py` | Topic-based style prompts |
+
+### MusicGen Integration
+
+The system uses HuggingFace Transformers to load and run MusicGen:
+
+```python
+from transformers import AutoProcessor, MusicgenForConditionalGeneration
+
+# Load model (lazy loading for efficiency)
+model = MusicgenForConditionalGeneration.from_pretrained("facebook/musicgen-small")
+processor = AutoProcessor.from_pretrained("facebook/musicgen-small")
+
+# Generate music segment
+inputs = processor(text=["ambient electronic, subtle, no vocals"], return_tensors="pt")
+audio_values = model.generate(**inputs, max_new_tokens=1500)  # ~30s
+```
+
+### Device Support
+
+| Device | Detection | Notes |
+|--------|-----------|-------|
+| MPS (Apple Silicon) | `torch.backends.mps.is_available()` | M1/M2/M3 Macs, float32 required |
+| CUDA | `torch.cuda.is_available()` | NVIDIA GPUs |
+| CPU | Fallback | Slower but works everywhere |
+
+### Style Presets
+
+```python
+MUSIC_STYLE_PRESETS = {
+    "tech": "ambient electronic, subtle synthesizers, no vocals, professional tech documentary",
+    "science": "ambient electronic, ethereal pads, no vocals, science documentary, wonder",
+    "tutorial": "lo-fi beats, calm, no vocals, background music, focused",
+    "dramatic": "cinematic ambient, building tension, no vocals, documentary score",
+    "default": "ambient electronic, subtle, no vocals, professional documentary background",
+}
+```
+
+### CLI Commands
+
+```bash
+# Generate music for a project (auto-detects duration from storyboard)
+python -m src.cli music <project> generate
+
+# Generate with custom duration
+python -m src.cli music <project> generate --duration 120
+
+# Generate with custom style
+python -m src.cli music <project> generate --style "jazz piano, smooth, relaxing"
+
+# Show device support info
+python -m src.cli music <project> info
+```
+
+### Storyboard Integration
+
+When music is generated, `storyboard.json` is automatically updated:
+
+```json
+{
+  "audio": {
+    "voiceover_dir": "voiceover",
+    "background_music": {
+      "path": "music/background.mp3",
+      "volume": 0.08
+    }
+  }
+}
+```
+
+### Output
+
+- **Format**: MP3 (192kbps, via FFmpeg conversion)
+- **Sample Rate**: 32kHz (MusicGen native)
+- **Segments**: 30s max per segment, concatenated with crossfades
+- **Processing**: Fade in (2s), fade out (3s), volume normalization
+
+### Project Structure
+
+```
+projects/<project>/
+├── music/                     # Generated background music
+│   └── background.mp3         # ~8MB for 8-minute video
+├── storyboard/
+│   └── storyboard.json        # Updated with background_music config
+└── output/
+    └── final.mp4              # Video with embedded music
+```
+
+---
+
+*Document Version: 1.7*
 *Last Updated: December 2024*
-*Current Status: 402+ tests passing, frame-accurate sound design*
+*Current Status: 470+ tests passing, AI background music generation*

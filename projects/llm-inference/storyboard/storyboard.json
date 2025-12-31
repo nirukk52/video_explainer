@@ -22,16 +22,56 @@
       "audio_file": "scene1_hook.mp3",
       "audio_duration_seconds": 18.52,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "text_tick", "frame": 30, "volume": 0.06},
-        {"sound": "text_tick", "frame": 45, "volume": 0.06},
-        {"sound": "ui_pop", "frame": 65, "volume": 0.08},
-        {"sound": "text_tick", "frame": 90, "volume": 0.05},
-        {"sound": "text_tick", "frame": 120, "volume": 0.05},
-        {"sound": "text_tick", "frame": 150, "volume": 0.05},
-        {"sound": "transition_whoosh", "frame": 270, "volume": 0.1},
-        {"sound": "counter_sweep", "frame": 330, "volume": 0.12},
-        {"sound": "reveal_hit", "frame": 390, "volume": 0.15}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "text_tick",
+          "frame": 30,
+          "volume": 0.06
+        },
+        {
+          "sound": "text_tick",
+          "frame": 45,
+          "volume": 0.06
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 65,
+          "volume": 0.08
+        },
+        {
+          "sound": "text_tick",
+          "frame": 90,
+          "volume": 0.05
+        },
+        {
+          "sound": "text_tick",
+          "frame": 120,
+          "volume": 0.05
+        },
+        {
+          "sound": "text_tick",
+          "frame": 150,
+          "volume": 0.05
+        },
+        {
+          "sound": "transition_whoosh",
+          "frame": 270,
+          "volume": 0.1
+        },
+        {
+          "sound": "counter_sweep",
+          "frame": 330,
+          "volume": 0.12
+        },
+        {
+          "sound": "reveal_hit",
+          "frame": 390,
+          "volume": 0.15
+        }
       ]
     },
     {
@@ -41,11 +81,31 @@
       "audio_file": "scene2_phases.mp3",
       "audio_duration_seconds": 22.24,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 90, "volume": 0.08},
-        {"sound": "data_flow", "frame": 150, "volume": 0.08},
-        {"sound": "transition_whoosh", "frame": 300, "volume": 0.1},
-        {"sound": "ui_pop", "frame": 360, "volume": 0.08}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 90,
+          "volume": 0.08
+        },
+        {
+          "sound": "data_flow",
+          "frame": 150,
+          "volume": 0.08
+        },
+        {
+          "sound": "transition_whoosh",
+          "frame": 300,
+          "volume": 0.1
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 360,
+          "volume": 0.08
+        }
       ]
     },
     {
@@ -55,11 +115,32 @@
       "audio_file": "scene3_bottleneck.mp3",
       "audio_duration_seconds": 23.06,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "data_flow", "frame": 90, "volume": 0.1, "duration_frames": 120},
-        {"sound": "warning_tone", "frame": 120, "volume": 0.1},
-        {"sound": "warning_tone", "frame": 240, "volume": 0.12},
-        {"sound": "ui_pop", "frame": 450, "volume": 0.08}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "data_flow",
+          "frame": 90,
+          "volume": 0.1,
+          "duration_frames": 120
+        },
+        {
+          "sound": "warning_tone",
+          "frame": 120,
+          "volume": 0.1
+        },
+        {
+          "sound": "warning_tone",
+          "frame": 240,
+          "volume": 0.12
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 450,
+          "volume": 0.08
+        }
       ]
     },
     {
@@ -69,14 +150,46 @@
       "audio_file": "scene4_attention.mp3",
       "audio_duration_seconds": 36.14,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 130, "volume": 0.08},
-        {"sound": "cache_click", "frame": 160, "volume": 0.08},
-        {"sound": "cache_click", "frame": 220, "volume": 0.08},
-        {"sound": "cache_click", "frame": 280, "volume": 0.08},
-        {"sound": "data_flow", "frame": 340, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 540, "volume": 0.08},
-        {"sound": "success_tone", "frame": 750, "volume": 0.1}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 130,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 160,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 220,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 280,
+          "volume": 0.08
+        },
+        {
+          "sound": "data_flow",
+          "frame": 340,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 540,
+          "volume": 0.08
+        },
+        {
+          "sound": "success_tone",
+          "frame": 750,
+          "volume": 0.1
+        }
       ]
     },
     {
@@ -86,11 +199,31 @@
       "audio_file": "scene5_redundancy.mp3",
       "audio_duration_seconds": 23.88,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "cache_click", "frame": 90, "volume": 0.08},
-        {"sound": "cache_click", "frame": 150, "volume": 0.08},
-        {"sound": "warning_tone", "frame": 300, "volume": 0.1},
-        {"sound": "ui_pop", "frame": 450, "volume": 0.08}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 90,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 150,
+          "volume": 0.08
+        },
+        {
+          "sound": "warning_tone",
+          "frame": 300,
+          "volume": 0.1
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 450,
+          "volume": 0.08
+        }
       ]
     },
     {
@@ -100,11 +233,31 @@
       "audio_file": "scene6_static_batching.mp3",
       "audio_duration_seconds": 25.7,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 120, "volume": 0.08},
-        {"sound": "lock_click", "frame": 180, "volume": 0.08},
-        {"sound": "warning_tone", "frame": 360, "volume": 0.1},
-        {"sound": "ui_pop", "frame": 480, "volume": 0.08}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 120,
+          "volume": 0.08
+        },
+        {
+          "sound": "lock_click",
+          "frame": 180,
+          "volume": 0.08
+        },
+        {
+          "sound": "warning_tone",
+          "frame": 360,
+          "volume": 0.1
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 480,
+          "volume": 0.08
+        }
       ]
     },
     {
@@ -114,11 +267,31 @@
       "audio_file": "scene7_memory_fragmentation.mp3",
       "audio_duration_seconds": 24.96,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "cache_click", "frame": 90, "volume": 0.08},
-        {"sound": "cache_click", "frame": 150, "volume": 0.08},
-        {"sound": "warning_tone", "frame": 300, "volume": 0.1},
-        {"sound": "ui_pop", "frame": 450, "volume": 0.08}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 90,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 150,
+          "volume": 0.08
+        },
+        {
+          "sound": "warning_tone",
+          "frame": 300,
+          "volume": 0.1
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 450,
+          "volume": 0.08
+        }
       ]
     },
     {
@@ -128,19 +301,71 @@
       "audio_file": "scene8_kvcache.mp3",
       "audio_duration_seconds": 36.0,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 100, "volume": 0.08},
-        {"sound": "cache_click", "frame": 160, "volume": 0.1},
-        {"sound": "lock_click", "frame": 200, "volume": 0.1},
-        {"sound": "ui_pop", "frame": 310, "volume": 0.08},
-        {"sound": "cache_click", "frame": 370, "volume": 0.1},
-        {"sound": "lock_click", "frame": 410, "volume": 0.1},
-        {"sound": "success_tone", "frame": 450, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 520, "volume": 0.08},
-        {"sound": "cache_click", "frame": 580, "volume": 0.1},
-        {"sound": "lock_click", "frame": 620, "volume": 0.1},
-        {"sound": "success_tone", "frame": 660, "volume": 0.08},
-        {"sound": "reveal_hit", "frame": 750, "volume": 0.12}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 100,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 160,
+          "volume": 0.1
+        },
+        {
+          "sound": "lock_click",
+          "frame": 200,
+          "volume": 0.1
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 310,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 370,
+          "volume": 0.1
+        },
+        {
+          "sound": "lock_click",
+          "frame": 410,
+          "volume": 0.1
+        },
+        {
+          "sound": "success_tone",
+          "frame": 450,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 520,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 580,
+          "volume": 0.1
+        },
+        {
+          "sound": "lock_click",
+          "frame": 620,
+          "volume": 0.1
+        },
+        {
+          "sound": "success_tone",
+          "frame": 660,
+          "volume": 0.08
+        },
+        {
+          "sound": "reveal_hit",
+          "frame": 750,
+          "volume": 0.12
+        }
       ]
     },
     {
@@ -150,11 +375,31 @@
       "audio_file": "scene9_mechanics.mp3",
       "audio_duration_seconds": 24.04,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "cache_click", "frame": 90, "volume": 0.08},
-        {"sound": "data_flow", "frame": 180, "volume": 0.08},
-        {"sound": "cache_click", "frame": 300, "volume": 0.08},
-        {"sound": "success_tone", "frame": 450, "volume": 0.1}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 90,
+          "volume": 0.08
+        },
+        {
+          "sound": "data_flow",
+          "frame": 180,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 300,
+          "volume": 0.08
+        },
+        {
+          "sound": "success_tone",
+          "frame": 450,
+          "volume": 0.1
+        }
       ]
     },
     {
@@ -164,19 +409,71 @@
       "audio_file": "scene10_continuous_batching.mp3",
       "audio_duration_seconds": 39.44,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 120, "volume": 0.08},
-        {"sound": "lock_click", "frame": 150, "volume": 0.08},
-        {"sound": "lock_click", "frame": 180, "volume": 0.08},
-        {"sound": "lock_click", "frame": 210, "volume": 0.08},
-        {"sound": "lock_click", "frame": 240, "volume": 0.08},
-        {"sound": "success_tone", "frame": 420, "volume": 0.1},
-        {"sound": "lock_click", "frame": 450, "volume": 0.1},
-        {"sound": "success_tone", "frame": 540, "volume": 0.1},
-        {"sound": "lock_click", "frame": 570, "volume": 0.1},
-        {"sound": "success_tone", "frame": 660, "volume": 0.1},
-        {"sound": "lock_click", "frame": 690, "volume": 0.1},
-        {"sound": "reveal_hit", "frame": 900, "volume": 0.12}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 120,
+          "volume": 0.08
+        },
+        {
+          "sound": "lock_click",
+          "frame": 150,
+          "volume": 0.08
+        },
+        {
+          "sound": "lock_click",
+          "frame": 180,
+          "volume": 0.08
+        },
+        {
+          "sound": "lock_click",
+          "frame": 210,
+          "volume": 0.08
+        },
+        {
+          "sound": "lock_click",
+          "frame": 240,
+          "volume": 0.08
+        },
+        {
+          "sound": "success_tone",
+          "frame": 420,
+          "volume": 0.1
+        },
+        {
+          "sound": "lock_click",
+          "frame": 450,
+          "volume": 0.1
+        },
+        {
+          "sound": "success_tone",
+          "frame": 540,
+          "volume": 0.1
+        },
+        {
+          "sound": "lock_click",
+          "frame": 570,
+          "volume": 0.1
+        },
+        {
+          "sound": "success_tone",
+          "frame": 660,
+          "volume": 0.1
+        },
+        {
+          "sound": "lock_click",
+          "frame": 690,
+          "volume": 0.1
+        },
+        {
+          "sound": "reveal_hit",
+          "frame": 900,
+          "volume": 0.12
+        }
       ]
     },
     {
@@ -186,14 +483,46 @@
       "audio_file": "scene11_paged_attention.mp3",
       "audio_duration_seconds": 27.96,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 60, "volume": 0.08},
-        {"sound": "cache_click", "frame": 150, "volume": 0.08},
-        {"sound": "cache_click", "frame": 200, "volume": 0.08},
-        {"sound": "cache_click", "frame": 250, "volume": 0.08},
-        {"sound": "cache_click", "frame": 300, "volume": 0.08},
-        {"sound": "success_tone", "frame": 450, "volume": 0.1},
-        {"sound": "reveal_hit", "frame": 600, "volume": 0.12}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 60,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 150,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 200,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 250,
+          "volume": 0.08
+        },
+        {
+          "sound": "cache_click",
+          "frame": 300,
+          "volume": 0.08
+        },
+        {
+          "sound": "success_tone",
+          "frame": 450,
+          "volume": 0.1
+        },
+        {
+          "sound": "reveal_hit",
+          "frame": 600,
+          "volume": 0.12
+        }
       ]
     },
     {
@@ -203,13 +532,41 @@
       "audio_file": "scene12_quantization.mp3",
       "audio_duration_seconds": 26.12,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 120, "volume": 0.08},
-        {"sound": "transition_whoosh", "frame": 130, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 300, "volume": 0.08},
-        {"sound": "transition_whoosh", "frame": 310, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 480, "volume": 0.08},
-        {"sound": "success_tone", "frame": 550, "volume": 0.1}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 120,
+          "volume": 0.08
+        },
+        {
+          "sound": "transition_whoosh",
+          "frame": 130,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 300,
+          "volume": 0.08
+        },
+        {
+          "sound": "transition_whoosh",
+          "frame": 310,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 480,
+          "volume": 0.08
+        },
+        {
+          "sound": "success_tone",
+          "frame": 550,
+          "volume": 0.1
+        }
       ]
     },
     {
@@ -219,12 +576,36 @@
       "audio_file": "scene13_speculative_decoding.mp3",
       "audio_duration_seconds": 25.32,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "counter_sweep", "frame": 120, "volume": 0.1},
-        {"sound": "lock_click", "frame": 240, "volume": 0.08},
-        {"sound": "success_tone", "frame": 360, "volume": 0.1},
-        {"sound": "warning_tone", "frame": 420, "volume": 0.08},
-        {"sound": "success_tone", "frame": 540, "volume": 0.1}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "counter_sweep",
+          "frame": 120,
+          "volume": 0.1
+        },
+        {
+          "sound": "lock_click",
+          "frame": 240,
+          "volume": 0.08
+        },
+        {
+          "sound": "success_tone",
+          "frame": 360,
+          "volume": 0.1
+        },
+        {
+          "sound": "warning_tone",
+          "frame": 420,
+          "volume": 0.08
+        },
+        {
+          "sound": "success_tone",
+          "frame": 540,
+          "volume": 0.1
+        }
       ]
     },
     {
@@ -234,11 +615,31 @@
       "audio_file": "scene14_scaling.mp3",
       "audio_duration_seconds": 26.02,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 120, "volume": 0.08},
-        {"sound": "counter_sweep", "frame": 200, "volume": 0.1},
-        {"sound": "data_flow", "frame": 300, "volume": 0.08},
-        {"sound": "reveal_hit", "frame": 480, "volume": 0.12}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 120,
+          "volume": 0.08
+        },
+        {
+          "sound": "counter_sweep",
+          "frame": 200,
+          "volume": 0.1
+        },
+        {
+          "sound": "data_flow",
+          "frame": 300,
+          "volume": 0.08
+        },
+        {
+          "sound": "reveal_hit",
+          "frame": 480,
+          "volume": 0.12
+        }
       ]
     },
     {
@@ -248,11 +649,31 @@
       "audio_file": "scene15_economics.mp3",
       "audio_duration_seconds": 27.62,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 120, "volume": 0.08},
-        {"sound": "counter_sweep", "frame": 240, "volume": 0.1},
-        {"sound": "success_tone", "frame": 420, "volume": 0.1},
-        {"sound": "reveal_hit", "frame": 540, "volume": 0.12}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 120,
+          "volume": 0.08
+        },
+        {
+          "sound": "counter_sweep",
+          "frame": 240,
+          "volume": 0.1
+        },
+        {
+          "sound": "success_tone",
+          "frame": 420,
+          "volume": 0.1
+        },
+        {
+          "sound": "reveal_hit",
+          "frame": 540,
+          "volume": 0.12
+        }
       ]
     },
     {
@@ -262,22 +683,66 @@
       "audio_file": "scene16_conclusion.mp3",
       "audio_duration_seconds": 45.0,
       "sfx_cues": [
-        {"sound": "ui_pop", "frame": 15, "volume": 0.08},
-        {"sound": "transition_whoosh", "frame": 90, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 180, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 270, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 360, "volume": 0.08},
-        {"sound": "ui_pop", "frame": 450, "volume": 0.08},
-        {"sound": "success_tone", "frame": 600, "volume": 0.1},
-        {"sound": "reveal_hit", "frame": 900, "volume": 0.15},
-        {"sound": "transition_whoosh", "frame": 960, "volume": 0.1},
-        {"sound": "ui_pop", "frame": 1020, "volume": 0.08}
+        {
+          "sound": "ui_pop",
+          "frame": 15,
+          "volume": 0.08
+        },
+        {
+          "sound": "transition_whoosh",
+          "frame": 90,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 180,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 270,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 360,
+          "volume": 0.08
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 450,
+          "volume": 0.08
+        },
+        {
+          "sound": "success_tone",
+          "frame": 600,
+          "volume": 0.1
+        },
+        {
+          "sound": "reveal_hit",
+          "frame": 900,
+          "volume": 0.15
+        },
+        {
+          "sound": "transition_whoosh",
+          "frame": 960,
+          "volume": 0.1
+        },
+        {
+          "sound": "ui_pop",
+          "frame": 1020,
+          "volume": 0.08
+        }
       ]
     }
   ],
   "audio": {
     "voiceover_dir": "voiceover",
-    "buffer_between_scenes_seconds": 1.0
+    "buffer_between_scenes_seconds": 1.0,
+    "background_music": {
+      "path": "music/background.mp3",
+      "volume": 0.3
+    }
   },
   "total_duration_seconds": 452.02
 }

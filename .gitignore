@@ -54,6 +54,9 @@ output/storyboards/*.yaml
 !output/**/.gitkeep
 output/
 
+# Generated music (can be regenerated with music CLI)
+projects/*/music/
+
 # Motion Canvas
 animations/node_modules/
 animations/output/

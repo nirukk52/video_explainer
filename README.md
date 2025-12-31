@@ -11,6 +11,7 @@ A system for generating high-quality explainer videos from technical documents. 
 - **Text-to-Speech**: Integration with ElevenLabs and Edge TTS (with mock mode for development)
 - **Manual Voiceover Support**: Import your own recordings with Whisper transcription
 - **Sound Design**: Automated SFX planning, music layering, and audio mixing
+- **AI Background Music**: Generate ambient background music using Meta's MusicGen model (MPS/CUDA/CPU)
 - **Remotion Animations**: React-based programmatic video generation
 - **CLI Pipeline**: Run each stage independently for easy iteration
 
@@ -87,6 +88,12 @@ python -m src.cli sound llm-inference library --list    # List available sounds
 python -m src.cli sound llm-inference library --download  # Generate sound library
 python -m src.cli sound llm-inference music --setup     # Show music setup instructions
 python -m src.cli sound llm-inference mix               # Mix voiceover + SFX + music
+
+# AI Background music generation (requires MusicGen model)
+python -m src.cli music llm-inference generate          # Generate background music
+python -m src.cli music llm-inference generate --duration 120  # Target 120s duration
+python -m src.cli music llm-inference generate --style "ambient electronic, minimal"
+python -m src.cli music llm-inference info              # Show device support info
 ```
 
 ### Resolution Options
@@ -113,6 +120,8 @@ video_explainer/
 │       │   └── *.mp3
 │       ├── storyboard/          # Storyboard definitions
 │       │   └── storyboard.json
+│       ├── music/               # AI-generated background music
+│       │   └── background.mp3
 │       ├── remotion/            # Video-specific React components
 │       │   └── scenes/
 │       └── output/              # Generated videos
@@ -125,6 +134,7 @@ video_explainer/
 │   ├── script/                  # Script generation
 │   ├── audio/                   # TTS providers + transcription
 │   ├── sound/                   # Sound design (SFX, music, mixing)
+│   ├── music/                   # AI background music generation (MusicGen)
 │   ├── voiceover/               # Voiceover generation
 │   ├── storyboard/              # Storyboard system
 │   ├── animation/               # Animation rendering
@@ -145,7 +155,7 @@ video_explainer/
 │   └── schema/
 │       └── storyboard.schema.json
 │
-├── tests/                       # Test suite (396+ Python tests + 45 JS tests)
+├── tests/                       # Test suite (425+ Python tests + 45 JS tests)
 ├── config.yaml                  # Global configuration
 └── pyproject.toml               # Python package configuration
 ```
@@ -213,7 +223,7 @@ video:
 
 ## Testing
 
-The project includes 441+ tests (396+ Python + 45 JavaScript).
+The project includes 470+ tests (425+ Python + 45 JavaScript).
 
 ### Python Tests
 
@@ -301,6 +311,8 @@ Typography: Inter/SF Pro for text, JetBrains Mono for code
 - pyyaml - Configuration
 - edge-tts - Microsoft Edge TTS
 - requests - HTTP client
+- transformers - MusicGen model for AI background music
+- torch - PyTorch backend (MPS/CUDA/CPU)
 
 ### Node.js (see remotion/package.json)
 
@@ -322,4 +334,5 @@ MIT License - see LICENSE file for details.
 
 - [Remotion](https://remotion.dev/) - React-based video generation
 - [ElevenLabs](https://elevenlabs.io/) - Text-to-Speech
+- [MusicGen](https://github.com/facebookresearch/audiocraft) - AI music generation (Meta)
 - [FFmpeg](https://ffmpeg.org/) - Video processing

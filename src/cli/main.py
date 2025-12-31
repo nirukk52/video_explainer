@@ -11,6 +11,7 @@ Usage:
     python -m src.cli sound <project> plan                    # Plan sound effects
     python -m src.cli sound <project> library --list          # List sound library
     python -m src.cli sound <project> mix                     # Mix audio
+    python -m src.cli music <project> generate                # Generate background music
     python -m src.cli render <project>                        # Render video
     python -m src.cli render <project> -r 4k                  # Render in 4K
     python -m src.cli feedback <project> add "<text>"         # Process feedback
@@ -22,8 +23,9 @@ Pipeline workflow:
     3. narration - Generate narrations for each scene
     4. voiceover - Generate audio files from narrations
     5. sound    - Plan and mix sound effects and music
-    6. render   - Render final video
-    7. feedback - Iterate on video with natural language feedback
+    6. music    - Generate AI background music (optional)
+    7. render   - Render final video
+    8. feedback - Iterate on video with natural language feedback
 """
 
 import argparse
@@ -877,6 +879,120 @@ def cmd_create(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_music(args: argparse.Namespace) -> int:
+    """Generate AI background music for a project."""
+    from ..project import load_project
+    from ..music import MusicGenerator, MusicConfig
+    from ..music.generator import generate_for_project, get_music_prompt
+
+    try:
+        project = load_project(Path(args.projects_dir) / args.project)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    if not args.music_command:
+        print("Usage: python -m src.cli music <project> <command>")
+        print("\nCommands:")
+        print("  generate    Generate background music using AI")
+        print("  info        Show music generation info")
+        return 1
+
+    if args.music_command == "generate":
+        print(f"Generating background music for {project.id}")
+        print()
+
+        # Determine target duration from storyboard
+        storyboard_path = project.get_path("storyboard")
+        target_duration = args.duration
+
+        if not target_duration and storyboard_path.exists():
+            try:
+                with open(storyboard_path) as f:
+                    storyboard = json.load(f)
+                target_duration = int(storyboard.get("total_duration_seconds", 60))
+                print(f"Duration from storyboard: {target_duration}s")
+            except (json.JSONDecodeError, KeyError):
+                target_duration = 60
+
+        if not target_duration:
+            target_duration = 60
+
+        # Determine topic
+        topic = args.topic or project.title
+        print(f"Topic: {topic}")
+
+        # Show music style
+        style = args.style or get_music_prompt(topic)
+        print(f"Style: {style}")
+        print()
+
+        # Generate music
+        result = generate_for_project(
+            project_dir=project.root_dir,
+            topic=topic,
+            target_duration=target_duration,
+            update_storyboard=not args.no_update,
+        )
+
+        if result.success:
+            print()
+            print(f"Generated: {result.output_path}")
+            print(f"Duration: {result.duration_seconds:.1f}s")
+            print(f"Segments: {result.segments_generated}")
+
+            if not args.no_update:
+                print()
+                print("Storyboard updated with background music config.")
+                print("Run render to include music in video.")
+            return 0
+        else:
+            print(f"Error: {result.error_message}", file=sys.stderr)
+            return 1
+
+    elif args.music_command == "info":
+        # Show music generation info
+        print("Music Generation Info")
+        print("=" * 40)
+        print()
+
+        # Check for existing music
+        music_path = project.root_dir / "music" / "background.mp3"
+        if music_path.exists():
+            import subprocess
+            result = subprocess.run(
+                ["ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", str(music_path)],
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                info = json.loads(result.stdout)
+                duration = float(info.get("format", {}).get("duration", 0))
+                print(f"Existing music: {music_path}")
+                print(f"Duration: {duration:.1f}s")
+            else:
+                print(f"Existing music: {music_path}")
+        else:
+            print("No background music generated yet.")
+
+        print()
+        print("Available style presets:")
+        from ..music.generator import MUSIC_STYLE_PRESETS
+        for name, desc in MUSIC_STYLE_PRESETS.items():
+            print(f"  {name}: {desc[:60]}...")
+
+        print()
+        print("Device support:")
+        import torch
+        print(f"  MPS (Apple Silicon): {'Available' if torch.backends.mps.is_available() else 'Not available'}")
+        print(f"  CUDA (NVIDIA GPU): {'Available' if torch.cuda.is_available() else 'Not available'}")
+        print(f"  CPU: Always available (slower)")
+
+        return 0
+
+    return 0
+
+
 def cmd_sound(args: argparse.Namespace) -> int:
     """Sound design commands: generate SFX library for Remotion."""
     from ..project import load_project
@@ -1130,6 +1246,50 @@ def main() -> int:
     )
 
     feedback_parser.set_defaults(func=cmd_feedback)
+
+    # music command
+    music_parser = subparsers.add_parser(
+        "music",
+        help="Generate AI background music using MusicGen",
+    )
+    music_parser.add_argument("project", help="Project ID")
+
+    music_subparsers = music_parser.add_subparsers(
+        dest="music_command",
+        help="Music commands",
+    )
+
+    # music generate
+    music_generate_parser = music_subparsers.add_parser(
+        "generate",
+        help="Generate background music using AI",
+    )
+    music_generate_parser.add_argument(
+        "--duration",
+        type=int,
+        help="Target duration in seconds (default: from storyboard)",
+    )
+    music_generate_parser.add_argument(
+        "--topic",
+        help="Topic for music style (default: project title)",
+    )
+    music_generate_parser.add_argument(
+        "--style",
+        help="Custom music style prompt",
+    )
+    music_generate_parser.add_argument(
+        "--no-update",
+        action="store_true",
+        help="Don't update storyboard.json with music config",
+    )
+
+    # music info
+    music_subparsers.add_parser(
+        "info",
+        help="Show music generation info and device support",
+    )
+
+    music_parser.set_defaults(func=cmd_music)
 
     # sound command
     sound_parser = subparsers.add_parser(

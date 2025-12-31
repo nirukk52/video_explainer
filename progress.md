@@ -15,20 +15,23 @@ Key context:
 - Progress: progress.md (current state and next steps)
 - README: README.md (setup and CLI usage)
 
-Current phase: Phase 4.5 - Feedback System
+Current phase: Phase 5.5 - AI Music Generation
 - Phase 1 MVP: COMPLETE (112 tests)
 - Phase 2 First Video: COMPLETE
 - Phase 3 Automated Animation: COMPLETE
 - Phase 3.5 Quality Focus: COMPLETE
 - Phase 4 Project Organization: COMPLETE
-- Phase 4.5 Feedback System: COMPLETE (397 tests: 352 Python + 45 JavaScript)
-  - Claude Code LLM Provider for intelligent file modifications
-  - Feedback CLI (add, list, show) for iterative improvements
-  - Preview branch workflow for safe changes
-  - Feedback history tracking with JSON persistence
+- Phase 4.5 Feedback System: COMPLETE
+- Phase 5 Sound Design: COMPLETE
+- Phase 5.5 AI Music Generation: COMPLETE (470 tests: 425 Python + 45 JavaScript)
+  - MusicGen integration for AI background music
+  - Apple Silicon (MPS), CUDA, and CPU support
+  - Topic-based style presets (tech, science, tutorial, dramatic)
+  - Auto-update storyboard.json with background_music config
+  - CLI commands: music generate, music info
 
 Key commands:
-  source .venv/bin/activate && pytest tests/ -v  # Run Python tests (352 passing)
+  source .venv/bin/activate && pytest tests/ -v  # Run Python tests (425 passing)
   cd remotion && npm test                         # Run JS tests (45 passing)
   python -m src.cli list                          # List projects
   python -m src.cli info llm-inference            # Show project info
@@ -36,6 +39,7 @@ Key commands:
   python -m src.cli render llm-inference          # Render video (1080p)
   python -m src.cli render llm-inference -r 4k    # Render in 4K for YouTube
   python -m src.cli feedback llm-inference add "..." # Process feedback
+  python -m src.cli music llm-inference generate  # Generate AI background music
   cd remotion && npm run dev                      # Start Remotion studio
 
 Key directories:
@@ -43,6 +47,7 @@ Key directories:
   src/cli/                                        # CLI commands
   src/project/                                    # Project loader
   src/feedback/                                   # Feedback system
+  src/music/                                      # AI music generation (MusicGen)
   remotion/                                       # Remotion React components
 
 Check "Next Actions" section below for current tasks.
@@ -153,6 +158,18 @@ Check "Next Actions" section below for current tasks.
 - [x] 21 sound module tests
 - [x] **402+ tests passing (357+ Python + 45 JavaScript)**
 
+### Completed (Phase 5.5 - AI Music Generation)
+- [x] MusicGen integration via HuggingFace Transformers
+- [x] Apple Silicon (MPS), CUDA, and CPU device support
+- [x] Topic-based style presets (tech, science, tutorial, dramatic)
+- [x] Auto-update storyboard.json with background_music config
+- [x] CLI commands (`music generate`, `music info`)
+- [x] Multi-segment generation with crossfade stitching
+- [x] Fade in/out and volume normalization
+- [x] 24 music module tests
+- [x] End-to-end tested: Generated 452s music for llm-inference video
+- [x] **470+ tests passing (425+ Python + 45 JavaScript)**
+
 ### Next Steps (Phase 6 - Production Ready)
 - [ ] Enable real LLM API (Anthropic/OpenAI) for dynamic content analysis
 - [ ] Add more animation components (code highlights, equations, diagrams)
@@ -187,13 +204,15 @@ Document → Parse → Analyze → Script → TTS → Storyboard → Animation �
 
 Key modules:
 ├── src/
-│   ├── cli/              # CLI commands (list, info, voiceover, render, feedback)
+│   ├── cli/              # CLI commands (list, info, voiceover, render, feedback, music)
 │   ├── project/          # Project loader module
 │   ├── feedback/         # Feedback system (models, store, processor)
 │   ├── ingestion/        # Document parsing
 │   ├── understanding/    # Content analysis (LLM providers)
 │   ├── script/           # Script generation
 │   ├── audio/            # TTS providers (ElevenLabs, Edge, Mock)
+│   ├── sound/            # Sound design (SFX generation)
+│   ├── music/            # AI background music (MusicGen)
 │   ├── voiceover/        # Voiceover generation with timestamps
 │   ├── storyboard/       # Storyboard system
 │   ├── animation/        # Animation rendering (Remotion)
@@ -208,7 +227,7 @@ Key modules:
 │       ├── render.mjs        # Headless rendering
 │       ├── render-utils.mjs  # Testable utility functions
 │       └── render-utils.test.mjs  # JavaScript tests
-└── tests/                    # 352 Python tests + 45 JS tests
+└── tests/                    # 425 Python tests + 45 JS tests
 ```
 
 ---
@@ -249,7 +268,7 @@ Animation: easeInOutCubic, 0.3-0.5s transitions
 # Activate virtual environment
 source .venv/bin/activate
 
-# Run Python tests (352 tests)
+# Run Python tests (425 tests)
 pytest tests/ -v
 
 # Run JavaScript tests (45 tests)
@@ -290,6 +309,15 @@ python -m src.cli feedback llm-inference list
 
 # Show details of a specific feedback item
 python -m src.cli feedback llm-inference show fb_0001_1234567890
+
+# Generate AI background music
+python -m src.cli music llm-inference generate
+
+# Generate music with custom duration
+python -m src.cli music llm-inference generate --duration 120
+
+# Show music device support info
+python -m src.cli music llm-inference info
 ```
 
 ---
@@ -302,6 +330,8 @@ python -m src.cli feedback llm-inference show fb_0001_1234567890
 - pyyaml - Configuration
 - edge-tts - Microsoft Edge TTS
 - requests - HTTP client
+- transformers - MusicGen AI model
+- torch - PyTorch backend (MPS/CUDA/CPU)
 
 ### Node.js (remotion/package.json)
 - remotion - Video rendering
@@ -339,7 +369,7 @@ python -m src.cli feedback llm-inference show fb_0001_1234567890
 ## Notes for Future Sessions
 
 - Always run tests before committing:
-  - Python: `pytest tests/ -v` (352 tests)
+  - Python: `pytest tests/ -v` (425 tests)
   - JavaScript: `cd remotion && npm test` (45 tests)
 - Projects are self-contained in `projects/` directory
 - Use CLI commands for independent pipeline execution
@@ -349,6 +379,7 @@ python -m src.cli feedback llm-inference show fb_0001_1234567890
 - Use `--resolution 720p` for faster development iterations
 - Use `feedback add --dry-run` to analyze feedback without applying changes
 - Feedback creates preview branches for safe review before merging
+- Music generation uses MusicGen (MPS on Apple Silicon, CUDA on NVIDIA, CPU fallback)
 
 ---
 
@@ -371,4 +402,4 @@ python -m src.cli feedback llm-inference show fb_0001_1234567890
 ---
 
 *Last Updated: December 2024*
-*Session: Phase 4.5 - Added Claude Code LLM Provider, Feedback System CLI (397 tests total)*
+*Session: Phase 5.5 - Added AI Background Music Generation with MusicGen (470 tests total)*
