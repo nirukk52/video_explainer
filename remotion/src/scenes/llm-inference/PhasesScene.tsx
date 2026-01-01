@@ -232,7 +232,7 @@ export const PhasesScene: React.FC<PhasesSceneProps> = ({ startFrame = 0 }) => {
                 />
                 <span
                   style={{
-                    fontSize: 14 * scale,
+                    fontSize: 18 * scale,
                     color: COLORS.prefill,
                     fontWeight: 600,
                     whiteSpace: "nowrap",
@@ -492,7 +492,7 @@ export const PhasesScene: React.FC<PhasesSceneProps> = ({ startFrame = 0 }) => {
             display: "flex",
             justifyContent: "space-between",
             marginTop: 8 * scale,
-            fontSize: 14 * scale,
+            fontSize: 18 * scale,
             color: COLORS.textDim,
           }}
         >

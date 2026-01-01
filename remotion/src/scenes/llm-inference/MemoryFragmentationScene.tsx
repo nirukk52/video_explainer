@@ -141,16 +141,16 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
           style={{
             display: "flex",
             alignItems: "center",
-            marginBottom: 20 * scale,
+            marginBottom: 24 * scale,
           }}
         >
           <div
             style={{
-              padding: `${8 * scale}px ${16 * scale}px`,
+              padding: `${10 * scale}px ${20 * scale}px`,
               backgroundColor: COLORS.surface,
               borderRadius: 8 * scale,
               border: "1px solid #444",
-              fontSize: 14 * scale,
+              fontSize: 18 * scale,
               color: COLORS.textDim,
             }}
           >
@@ -158,8 +158,8 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
           </div>
           <div
             style={{
-              marginLeft: 20 * scale,
-              fontSize: 14 * scale,
+              marginLeft: 24 * scale,
+              fontSize: 18 * scale,
               color: COLORS.textDim,
             }}
           >
@@ -187,7 +187,7 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 12 * scale,
+                  gap: 16 * scale,
                   opacity: showAllocation ? 1 : 0.3,
                   transition: "opacity 0.3s",
                 }}
@@ -195,10 +195,11 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
                 {/* Label */}
                 <div
                   style={{
-                    width: 60 * scale,
-                    fontSize: 14 * scale,
+                    width: 70 * scale,
+                    fontSize: 18 * scale,
                     color: COLORS.textDim,
                     textAlign: "right",
+                    fontWeight: 500,
                   }}
                 >
                   {seq.label}
@@ -208,12 +209,12 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
                 <div
                   style={{
                     flex: 1,
-                    height: 48 * scale,
+                    height: 64 * scale,
                     backgroundColor: COLORS.surface,
-                    borderRadius: 8 * scale,
+                    borderRadius: 10 * scale,
                     position: "relative",
                     overflow: "hidden",
-                    border: "1px solid #333",
+                    border: "2px solid #333",
                   }}
                 >
                   {/* Allocated (full bar) */}
@@ -247,7 +248,7 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
                     >
                       <span
                         style={{
-                          fontSize: 14 * scale,
+                          fontSize: 18 * scale,
                           fontWeight: 600,
                           color: COLORS.used,
                         }}
@@ -265,9 +266,10 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
                         top: "50%",
                         left: `${usedPercent + 2}%`,
                         transform: "translateY(-50%)",
-                        fontSize: 14 * scale,
+                        fontSize: 18 * scale,
                         color: COLORS.wasted,
-                        opacity: 0.8,
+                        fontWeight: 600,
+                        opacity: 0.9,
                       }}
                     >
                       {Math.round(100 - usedPercent)}% wasted
@@ -278,8 +280,8 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
                 {/* Size indicator */}
                 <div
                   style={{
-                    width: 100 * scale,
-                    fontSize: 14 * scale,
+                    width: 120 * scale,
+                    fontSize: 16 * scale,
                     color: COLORS.allocated,
                     fontFamily: "JetBrains Mono",
                   }}
@@ -298,36 +300,36 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
           style={{
             display: "flex",
             justifyContent: "center",
-            gap: 32 * scale,
-            marginBottom: 20 * scale,
+            gap: 48 * scale,
+            marginBottom: 24 * scale,
             opacity: usageRevealProgress,
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8 * scale }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 * scale }}>
             <div
               style={{
-                width: 20 * scale,
-                height: 20 * scale,
+                width: 24 * scale,
+                height: 24 * scale,
                 backgroundColor: COLORS.allocated + "30",
                 border: `${2 * scale}px solid ${COLORS.allocated}`,
                 borderRadius: 4 * scale,
               }}
             />
-            <span style={{ fontSize: 14 * scale, color: COLORS.allocated }}>
+            <span style={{ fontSize: 18 * scale, color: COLORS.allocated }}>
               Pre-allocated
             </span>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 * scale }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 * scale }}>
             <div
               style={{
-                width: 20 * scale,
-                height: 20 * scale,
+                width: 24 * scale,
+                height: 24 * scale,
                 backgroundColor: COLORS.used + "60",
                 border: `${2 * scale}px solid ${COLORS.used}`,
                 borderRadius: 4 * scale,
               }}
             />
-            <span style={{ fontSize: 14 * scale, color: COLORS.used }}>
+            <span style={{ fontSize: 18 * scale, color: COLORS.used }}>
               Actually Used
             </span>
           </div>
@@ -343,14 +345,14 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
           right: 0,
           display: "flex",
           justifyContent: "center",
-          gap: 80 * scale,
+          gap: 100 * scale,
           opacity: statsOpacity,
         }}
       >
         <div style={{ textAlign: "center" }}>
           <div
             style={{
-              fontSize: 56 * scale,
+              fontSize: 64 * scale,
               fontWeight: 700,
               fontFamily: "JetBrains Mono",
               color: COLORS.wasted,
@@ -358,7 +360,7 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
           >
             {wastePercentage}%
           </div>
-          <div style={{ fontSize: 16 * scale, color: COLORS.textDim }}>
+          <div style={{ fontSize: 20 * scale, color: COLORS.textDim }}>
             Memory Wasted
           </div>
         </div>
@@ -366,7 +368,7 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
         <div style={{ textAlign: "center" }}>
           <div
             style={{
-              fontSize: 56 * scale,
+              fontSize: 64 * scale,
               fontWeight: 700,
               fontFamily: "JetBrains Mono",
               color: COLORS.allocated,
@@ -374,7 +376,7 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
           >
             97
           </div>
-          <div style={{ fontSize: 16 * scale, color: COLORS.textDim }}>
+          <div style={{ fontSize: 20 * scale, color: COLORS.textDim }}>
             Max Sequences (could be 2000+)
           </div>
         </div>
@@ -396,7 +398,7 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
           ),
         }}
       >
-        <span style={{ fontSize: 22 * scale, color: COLORS.text }}>
+        <span style={{ fontSize: 26 * scale, color: COLORS.text }}>
           Pre-allocation causes{" "}
           <span style={{ color: COLORS.wasted, fontWeight: 700 }}>
             20x efficiency loss

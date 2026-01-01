@@ -96,7 +96,7 @@ const TokenWithKV: React.FC<{
             }}
           >
             <span style={{ fontSize: 16 * scale, fontWeight: 700, color: COLORS.key }}>K</span>
-            <span style={{ fontSize: 14 * scale, color: COLORS.key, opacity: 0.7 }}>_{index + 1}</span>
+            <span style={{ fontSize: 18 * scale, color: COLORS.key, opacity: 0.7 }}>_{index + 1}</span>
           </div>
           <div
             style={{
@@ -110,7 +110,7 @@ const TokenWithKV: React.FC<{
             }}
           >
             <span style={{ fontSize: 16 * scale, fontWeight: 700, color: COLORS.value }}>V</span>
-            <span style={{ fontSize: 14 * scale, color: COLORS.value, opacity: 0.7 }}>_{index + 1}</span>
+            <span style={{ fontSize: 18 * scale, color: COLORS.value, opacity: 0.7 }}>_{index + 1}</span>
           </div>
         </div>
       )}
@@ -540,7 +540,7 @@ export const AttentionScene: React.FC<AttentionSceneProps> = ({
             <span style={{ fontSize: 16 * scale, color: item.color, fontWeight: 600 }}>
               {item.label}
             </span>
-            <span style={{ fontSize: 14 * scale, color: COLORS.textDim }}>
+            <span style={{ fontSize: 18 * scale, color: COLORS.textDim }}>
               {item.desc}
             </span>
           </div>

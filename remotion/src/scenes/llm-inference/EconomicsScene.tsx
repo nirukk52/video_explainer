@@ -168,7 +168,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
             >
               {Math.round(usersCounter).toLocaleString()}
             </div>
-            <div style={{ fontSize: 14 * scale, color: COLORS.textDim }}>
+            <div style={{ fontSize: 18 * scale, color: COLORS.textDim }}>
               Concurrent Users
             </div>
           </div>
@@ -195,7 +195,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
             >
               50
             </div>
-            <div style={{ fontSize: 14 * scale, color: COLORS.textDim }}>
+            <div style={{ fontSize: 18 * scale, color: COLORS.textDim }}>
               tokens/sec each
             </div>
           </div>
@@ -223,7 +223,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
             >
               {Math.round(tokensCounter / 1000000)}M
             </div>
-            <div style={{ fontSize: 14 * scale, color: COLORS.textDim }}>
+            <div style={{ fontSize: 18 * scale, color: COLORS.textDim }}>
               tokens/sec total
             </div>
           </div>
@@ -328,7 +328,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
           >
             {/* Before */}
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 14 * scale, color: COLORS.textDim, marginBottom: 8 * scale }}>
+              <div style={{ fontSize: 18 * scale, color: COLORS.textDim, marginBottom: 8 * scale }}>
                 Before
               </div>
               <div
@@ -341,7 +341,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
               >
                 $36M/mo
               </div>
-              <div style={{ fontSize: 14 * scale, color: COLORS.textDim }}>
+              <div style={{ fontSize: 18 * scale, color: COLORS.textDim }}>
                 25,000 GPUs
               </div>
             </div>
@@ -360,7 +360,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
                   padding: `${8 * scale}px ${16 * scale}px`,
                   backgroundColor: COLORS.savings + "20",
                   borderRadius: 8 * scale,
-                  fontSize: 14 * scale,
+                  fontSize: 18 * scale,
                   fontWeight: 700,
                   color: COLORS.savings,
                 }}
@@ -372,7 +372,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
 
             {/* After */}
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 14 * scale, color: COLORS.textDim, marginBottom: 8 * scale }}>
+              <div style={{ fontSize: 18 * scale, color: COLORS.textDim, marginBottom: 8 * scale }}>
                 After
               </div>
               <div
@@ -385,7 +385,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
               >
                 $18M/mo
               </div>
-              <div style={{ fontSize: 14 * scale, color: COLORS.textDim }}>
+              <div style={{ fontSize: 18 * scale, color: COLORS.textDim }}>
                 12,500 GPUs
               </div>
             </div>
@@ -409,7 +409,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
               >
                 $18M
               </div>
-              <div style={{ fontSize: 14 * scale, color: COLORS.savings }}>
+              <div style={{ fontSize: 18 * scale, color: COLORS.savings }}>
                 Monthly Savings
               </div>
             </div>

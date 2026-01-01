@@ -181,7 +181,7 @@ export const RedundancyScene: React.FC<RedundancySceneProps> = ({
                 {/* Token index */}
                 <span
                   style={{
-                    fontSize: 14 * scale,
+                    fontSize: 18 * scale,
                     color: COLORS.textDim,
                   }}
                 >
@@ -196,7 +196,7 @@ export const RedundancyScene: React.FC<RedundancySceneProps> = ({
                       padding: `${4 * scale}px ${12 * scale}px`,
                       backgroundColor: COLORS.waste + "20",
                       borderRadius: 4 * scale,
-                      fontSize: 14 * scale,
+                      fontSize: 18 * scale,
                       color: COLORS.waste,
                     }}
                   >
@@ -210,7 +210,7 @@ export const RedundancyScene: React.FC<RedundancySceneProps> = ({
                       padding: `${4 * scale}px ${12 * scale}px`,
                       backgroundColor: COLORS.primary + "20",
                       borderRadius: 4 * scale,
-                      fontSize: 14 * scale,
+                      fontSize: 18 * scale,
                       color: COLORS.primary,
                     }}
                   >
@@ -279,7 +279,7 @@ export const RedundancyScene: React.FC<RedundancySceneProps> = ({
                   <span
                     style={{
                       width: 85 * scale,
-                      fontSize: 14 * scale,
+                      fontSize: 18 * scale,
                       color: COLORS.textDim,
                       textAlign: "right",
                       paddingRight: 8 * scale,
@@ -308,7 +308,7 @@ export const RedundancyScene: React.FC<RedundancySceneProps> = ({
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          fontSize: 14 * scale,
+                          fontSize: 18 * scale,
                           color: isNew ? COLORS.primary : COLORS.waste,
                         }}
                       >
@@ -341,7 +341,7 @@ export const RedundancyScene: React.FC<RedundancySceneProps> = ({
             >
               {totalComputations}
             </div>
-            <div style={{ fontSize: 14 * scale, color: COLORS.textDim }}>
+            <div style={{ fontSize: 18 * scale, color: COLORS.textDim }}>
               Total K,V computations
             </div>
           </div>
@@ -357,7 +357,7 @@ export const RedundancyScene: React.FC<RedundancySceneProps> = ({
             >
               {necessaryComputations}
             </div>
-            <div style={{ fontSize: 14 * scale, color: COLORS.textDim }}>
+            <div style={{ fontSize: 18 * scale, color: COLORS.textDim }}>
               Actually necessary
             </div>
           </div>
@@ -373,7 +373,7 @@ export const RedundancyScene: React.FC<RedundancySceneProps> = ({
             >
               {wastePercentage}%
             </div>
-            <div style={{ fontSize: 14 * scale, color: COLORS.textDim }}>
+            <div style={{ fontSize: 18 * scale, color: COLORS.textDim }}>
               Wasted computation
             </div>
           </div>

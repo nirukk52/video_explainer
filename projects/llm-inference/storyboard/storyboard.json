@@ -814,7 +814,7 @@
     "buffer_between_scenes_seconds": 1.0,
     "background_music": {
       "path": "music/background.mp3",
-      "volume": 0.45
+      "volume": 0.18
     }
   },
   "total_duration_seconds": 471.55

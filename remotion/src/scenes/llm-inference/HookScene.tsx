@@ -398,7 +398,7 @@ export const HookScene: React.FC<HookSceneProps> = ({ startFrame = 0 }) => {
               // Show streaming text
               <div
                 style={{
-                  fontSize: 15 * scale,
+                  fontSize: 18 * scale,
                   lineHeight: 1.5,
                   color: COLORS.text,
                   wordWrap: "break-word",
@@ -474,7 +474,7 @@ export const HookScene: React.FC<HookSceneProps> = ({ startFrame = 0 }) => {
             </span>
             <span
               style={{
-                fontSize: 14 * scale,
+                fontSize: 18 * scale,
                 color: COLORS.textDim,
               }}
             >
@@ -528,7 +528,7 @@ export const HookScene: React.FC<HookSceneProps> = ({ startFrame = 0 }) => {
             </span>
             <span
               style={{
-                fontSize: 14 * scale,
+                fontSize: 18 * scale,
                 color: showFastBar ? COLORS.success : COLORS.textDim,
                 fontWeight: showFastBar ? 700 : 400,
                 textShadow: showFastBar
@@ -589,7 +589,7 @@ export const HookScene: React.FC<HookSceneProps> = ({ startFrame = 0 }) => {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            fontSize: 12 * scale,
+            fontSize: 16 * scale,
             color: COLORS.textDim,
             marginTop: 10 * scale,
           }}

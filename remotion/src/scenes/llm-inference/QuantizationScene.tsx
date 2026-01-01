@@ -240,7 +240,7 @@ export const QuantizationScene: React.FC<QuantizationSceneProps> = ({
                   {/* Accuracy */}
                   <div
                     style={{
-                      fontSize: 15 * scale,
+                      fontSize: 18 * scale,
                       color: COLORS.textDim,
                       padding: `${4 * scale}px ${12 * scale}px`,
                       backgroundColor: "#222",
@@ -292,7 +292,7 @@ export const QuantizationScene: React.FC<QuantizationSceneProps> = ({
                 border: `1px solid ${COLORS.fp16}`,
               }}
             >
-              <div style={{ fontSize: 14 * scale, color: COLORS.fp16 }}>FP16</div>
+              <div style={{ fontSize: 18 * scale, color: COLORS.fp16 }}>FP16</div>
               <div
                 style={{
                   fontSize: 20 * scale,
@@ -315,7 +315,7 @@ export const QuantizationScene: React.FC<QuantizationSceneProps> = ({
                 border: `1px solid ${COLORS.int4}`,
               }}
             >
-              <div style={{ fontSize: 14 * scale, color: COLORS.int4 }}>INT4</div>
+              <div style={{ fontSize: 18 * scale, color: COLORS.int4 }}>INT4</div>
               <div
                 style={{
                   fontSize: 20 * scale,
@@ -338,7 +338,7 @@ export const QuantizationScene: React.FC<QuantizationSceneProps> = ({
                 border: `1px solid ${COLORS.primary}`,
               }}
             >
-              <div style={{ fontSize: 14 * scale, color: COLORS.primary }}>Result</div>
+              <div style={{ fontSize: 18 * scale, color: COLORS.primary }}>Result</div>
               <div
                 style={{
                   fontSize: 20 * scale,
@@ -400,7 +400,7 @@ export const QuantizationScene: React.FC<QuantizationSceneProps> = ({
                 <div
                   style={{
                     width: 60 * scale,
-                    fontSize: 14 * scale,
+                    fontSize: 18 * scale,
                     color: format.color,
                     fontWeight: 600,
                     textAlign: "right",
@@ -431,7 +431,7 @@ export const QuantizationScene: React.FC<QuantizationSceneProps> = ({
                   >
                     <span
                       style={{
-                        fontSize: 14 * scale,
+                        fontSize: 18 * scale,
                         fontWeight: 700,
                         color: "#000",
                       }}

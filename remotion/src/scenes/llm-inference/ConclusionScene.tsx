@@ -203,10 +203,10 @@ const TechniqueStackItem: React.FC<{
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 12 * scale,
+        gap: 16 * scale,
         opacity,
         transform: `translateX(${slideIn * scale}px) scale(${scaleAnim})`,
-        marginBottom: 8 * scale,
+        marginBottom: 12 * scale,
       }}
     >
       {/* Connection line */}
@@ -228,15 +228,15 @@ const TechniqueStackItem: React.FC<{
       {/* Icon container */}
       <div
         style={{
-          width: 44 * scale,
-          height: 44 * scale,
-          borderRadius: 10 * scale,
+          width: 72 * scale,
+          height: 72 * scale,
+          borderRadius: 14 * scale,
           backgroundColor: technique.color + "25",
-          border: `2px solid ${technique.color}`,
+          border: `3px solid ${technique.color}`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: 20 * scale,
+          fontSize: 34 * scale,
           boxShadow: itemProgress > 0.8 ? `0 0 ${15 * scale}px ${technique.color}50` : "none",
         }}
       >
@@ -246,7 +246,7 @@ const TechniqueStackItem: React.FC<{
       <div style={{ flex: 1 }}>
         <div
           style={{
-            fontSize: 15 * scale,
+            fontSize: 26 * scale,
             fontWeight: 700,
             color: technique.color,
           }}
@@ -255,7 +255,7 @@ const TechniqueStackItem: React.FC<{
         </div>
         <div
           style={{
-            fontSize: 11 * scale,
+            fontSize: 18 * scale,
             color: COLORS.textDim,
           }}
         >
@@ -440,15 +440,15 @@ const VisualSummary: React.FC<{
           >
             <div
               style={{
-                fontSize: 40 * scale,
-                marginBottom: 8 * scale,
+                fontSize: 48 * scale,
+                marginBottom: 10 * scale,
               }}
             >
               {item.icon}
             </div>
             <div
               style={{
-                fontSize: 14 * scale,
+                fontSize: 22 * scale,
                 fontWeight: 700,
                 color: COLORS.primary,
               }}
@@ -457,7 +457,7 @@ const VisualSummary: React.FC<{
             </div>
             <div
               style={{
-                fontSize: 11 * scale,
+                fontSize: 17 * scale,
                 color: COLORS.textDim,
               }}
             >
@@ -490,18 +490,18 @@ const RacingGraph: React.FC<{
         <div style={{
           display: "flex",
           justifyContent: "space-between",
-          marginBottom: 4 * scale,
+          marginBottom: 6 * scale,
         }}>
-          <span style={{ fontSize: 12 * scale, color: COLORS.textDim }}>Naive</span>
-          <span style={{ fontSize: 14 * scale, color: "#ff4757", fontWeight: 700, fontFamily: "JetBrains Mono" }}>
+          <span style={{ fontSize: 20 * scale, color: COLORS.textDim }}>Naive</span>
+          <span style={{ fontSize: 22 * scale, color: "#ff4757", fontWeight: 700, fontFamily: "JetBrains Mono" }}>
             {Math.round(slowSpeed)} tok/s
           </span>
         </div>
         <div
           style={{
-            height: 16 * scale,
+            height: 24 * scale,
             backgroundColor: "#1a1a2e",
-            borderRadius: 8 * scale,
+            borderRadius: 12 * scale,
             overflow: "hidden",
           }}
         >
@@ -521,11 +521,11 @@ const RacingGraph: React.FC<{
         <div style={{
           display: "flex",
           justifyContent: "space-between",
-          marginBottom: 4 * scale,
+          marginBottom: 6 * scale,
         }}>
-          <span style={{ fontSize: 12 * scale, color: COLORS.textDim }}>Optimized</span>
+          <span style={{ fontSize: 20 * scale, color: COLORS.textDim }}>Optimized</span>
           <span style={{
-            fontSize: 14 * scale,
+            fontSize: 22 * scale,
             color: COLORS.success,
             fontWeight: 700,
             fontFamily: "JetBrains Mono",
@@ -537,9 +537,9 @@ const RacingGraph: React.FC<{
         </div>
         <div
           style={{
-            height: 16 * scale,
+            height: 24 * scale,
             backgroundColor: "#1a1a2e",
-            borderRadius: 8 * scale,
+            borderRadius: 12 * scale,
             overflow: "hidden",
           }}
         >
@@ -735,12 +735,12 @@ export const ConclusionScene: React.FC<ConclusionSceneProps> = ({
         >
           <div
             style={{
-              fontSize: 16 * scale,
+              fontSize: 22 * scale,
               fontWeight: 700,
               color: COLORS.primary,
-              marginBottom: 16 * scale,
+              marginBottom: 20 * scale,
               textTransform: "uppercase",
-              letterSpacing: 2 * scale,
+              letterSpacing: 3 * scale,
             }}
           >
             Optimization Stack
@@ -824,7 +824,7 @@ export const ConclusionScene: React.FC<ConclusionSceneProps> = ({
             >
               <div
                 style={{
-                  fontSize: 20 * scale,
+                  fontSize: 24 * scale,
                   fontWeight: 700,
                   color: COLORS.success,
                   textAlign: "center",
@@ -834,9 +834,9 @@ export const ConclusionScene: React.FC<ConclusionSceneProps> = ({
               </div>
               <div
                 style={{
-                  fontSize: 14 * scale,
+                  fontSize: 18 * scale,
                   color: COLORS.textDim,
-                  marginTop: 6 * scale,
+                  marginTop: 8 * scale,
                   textAlign: "center",
                   letterSpacing: 4 * scale,
                 }}
