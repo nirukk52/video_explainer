@@ -6,6 +6,7 @@ Usage:
     python -m src.cli create <project_id>                     # Create new project
     python -m src.cli script <project>                        # Generate script from docs
     python -m src.cli narration <project>                     # Generate narrations
+    python -m src.cli scenes <project>                        # Generate Remotion scenes
     python -m src.cli voiceover <project>                     # Generate voiceovers
     python -m src.cli storyboard <project> --view             # View storyboard
     python -m src.cli sound <project> plan                    # Plan sound effects
@@ -18,14 +19,16 @@ Usage:
     python -m src.cli feedback <project> list                 # List feedback
 
 Pipeline workflow:
-    1. create   - Create new project with config
-    2. script   - Generate script from input documents (optional)
+    1. create    - Create new project with config
+    2. script    - Generate script from input documents
     3. narration - Generate narrations for each scene
-    4. voiceover - Generate audio files from narrations
-    5. sound    - Plan and mix sound effects and music
-    6. music    - Generate AI background music (optional)
-    7. render   - Render final video
-    8. feedback - Iterate on video with natural language feedback
+    4. scenes    - Generate Remotion scene components (React/TypeScript)
+    5. voiceover - Generate audio files from narrations
+    6. storyboard - Create storyboard linking scenes with audio
+    7. sound     - Plan and mix sound effects
+    8. music     - Generate AI background music (optional)
+    9. render    - Render final video
+    10. feedback - Iterate on video with natural language feedback
 """
 
 import argparse
@@ -508,7 +511,20 @@ def cmd_narration(args: argparse.Namespace) -> int:
     if script_path.exists():
         with open(script_path) as f:
             script_data = json.load(f)
-        script_context = f"\nExisting script to base narrations on:\n{json.dumps(script_data, indent=2)}"
+        script_context = f"\n## Existing Script Structure\n```json\n{json.dumps(script_data, indent=2)}\n```"
+
+    # Load input document for source content
+    input_context = ""
+    input_dir = project.input_dir
+    if input_dir.exists():
+        input_files = list(input_dir.glob("*.md"))
+        if input_files:
+            with open(input_files[0]) as f:
+                input_content = f.read()
+            # Truncate if too long
+            if len(input_content) > 30000:
+                input_content = input_content[:30000] + "\n... [truncated]"
+            input_context = f"\n## Source Document\n{input_content}"
 
     # If topic is provided, use it
     topic = args.topic or project.title
@@ -533,30 +549,85 @@ def cmd_narration(args: argparse.Namespace) -> int:
             timeout=300,
         )
 
-        prompt = f"""Generate narrations for a video about: {topic}
+        prompt = f"""# Task: Generate High-Quality Video Narrations
+
+You are an elite technical video scriptwriter creating narrations for a video about: **{topic}**
 
 {script_context}
+{input_context}
 
-Create a narrations.json file with the following structure:
+---
+
+## Your Writing Style
+
+**Voice**: Punchy, direct, confident. Short sentences that hit hard. No filler words, no hedging, no "basically" or "essentially." Every word earns its place.
+
+**Tone**: Like a brilliant friend explaining something they're genuinely excited about. Technical but never dry. Respect the audience's intelligence while making complex ideas accessible.
+
+**Structure**: Problem → Tension → Solution → Insight. Build curiosity, create stakes, deliver satisfying explanations.
+
+---
+
+## Core Principles
+
+1. **Lead with contrast or surprise**: Start with a striking comparison, counterintuitive fact, or provocative question.
+   - BAD: "Let's learn about vision transformers."
+   - GOOD: "One hundred fifty thousand pixels. That's what a single 224×224 image contains. Transformers were built for sequences of 2,000 tokens. How do we bridge that gap?"
+
+2. **Use concrete numbers**: Specific numbers create credibility and memorability.
+   - BAD: "This processes many patches"
+   - GOOD: "196 patches. Each one a 16×16 window into the image."
+
+3. **Show the problem before the solution**: Create tension. Make the viewer feel the pain before revealing the elegant fix.
+
+4. **Explain through mechanism**: Don't just say what something does—show HOW it works.
+   - BAD: "Patch embeddings convert images to tokens."
+   - GOOD: "Take a 16×16 patch. Flatten it to 768 values. Multiply by a learned projection matrix. Now you have a token—just like text."
+
+5. **End scenes with forward momentum**: Each scene should create anticipation for the next.
+
+---
+
+## Quality Examples
+
+**Strong Hook**:
+"Forty tokens per second. That's what you get with naive inference. The best production systems? Over three thousand. Same model, same hardware—eighty-seven times faster. The difference is purely software. Here's how they do it."
+
+**Clear Technical Explanation**:
+"Quick attention refresher. Each token produces Query, Key, and Value vectors. To predict the next token, we compute attention: Q times K-transpose, scaled, then softmax, then weighted sum of Values. Here's the key insight: Keys and Values for past tokens never change. So why recompute them every time?"
+
+**Problem Setup with Tension**:
+"Here's the first problem with naive decoding. For each new token, we recompute Keys and Values for ALL previous tokens. Token one? Compute once. Token two? Compute everything twice. Token one hundred? One hundred times the work. This is O of n squared complexity. Most of this computation is completely redundant."
+
+---
+
+## Output Requirements
+
+Create a narrations.json file with 12-18 scenes following this structure:
+- **Scene 1**: Hook (15-20s) - striking opening
+- **Scenes 2-3**: Context/Problem (40-60s) - establish stakes
+- **Scenes 4-12**: Core Explanation (3-5 min) - one concept per scene
+- **Scenes 13-15**: Advanced Insights (40-60s) - deeper implications
+- **Final Scene**: Conclusion (20-30s) - memorable takeaway
+
+Each scene narration should be 40-80 words (15-30 seconds when spoken).
+
+Write the JSON file to: {narration_path}
+
+Use this exact structure:
 {{
   "scenes": [
     {{
       "scene_id": "scene1_hook",
-      "title": "The Hook",
-      "narration": "The voiceover text for this scene..."
-    }},
-    ...
-  ]
+      "title": "The Hook Title",
+      "duration_seconds": 18,
+      "narration": "The actual narration text..."
+    }}
+  ],
+  "total_duration_seconds": 400
 }}
 
-Requirements:
-1. Write engaging, conversational narration (not academic)
-2. Each scene should be 15-30 seconds when spoken
-3. Include 8-12 scenes covering the topic comprehensively
-4. Start with a hook that creates curiosity
-5. End with a memorable conclusion
-
-Write the JSON to: {narration_path}
+Remember: Every sentence should either teach something, create curiosity, or move the narrative forward. Cut everything else.
 """
 
         try:
@@ -612,6 +683,81 @@ def _generate_mock_narrations(topic: str) -> dict:
             },
         ]
     }
+
+
+def cmd_scenes(args: argparse.Namespace) -> int:
+    """Generate Remotion scene components from script."""
+    from ..project import load_project
+    from ..scenes import SceneGenerator
+
+    try:
+        project = load_project(Path(args.projects_dir) / args.project)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    print(f"Generating scenes for {project.id}")
+
+    # Check for script
+    script_path = project.root_dir / "script" / "script.json"
+    if not script_path.exists():
+        print(f"Error: Script not found at {script_path}", file=sys.stderr)
+        print("Run 'script' command first to generate a script.")
+        return 1
+
+    # Check if scenes already exist
+    scenes_dir = project.root_dir / "scenes"
+    if scenes_dir.exists() and list(scenes_dir.glob("*.tsx")) and not args.force:
+        print(f"Scenes already exist in {scenes_dir}")
+        print("Use --force to regenerate.")
+        return 0
+
+    # Load script to show info
+    with open(script_path) as f:
+        script = json.load(f)
+
+    scene_count = len(script.get("scenes", []))
+    print(f"Script: {script.get('title', 'Untitled')}")
+    print(f"Scenes to generate: {scene_count}")
+    print()
+
+    # Generate scenes
+    generator = SceneGenerator(
+        working_dir=project.root_dir.parent.parent,  # Repo root
+        timeout=args.timeout,
+    )
+
+    try:
+        print("Generating scene components...")
+        results = generator.generate_all_scenes(
+            project_dir=project.root_dir,
+            script_path=script_path,
+            force=args.force,
+        )
+
+        # Report results
+        print()
+        print(f"Generated {len(results['scenes'])} scenes")
+        if results["errors"]:
+            print(f"Errors: {len(results['errors'])}")
+            for err in results["errors"]:
+                print(f"  Scene {err['scene_number']}: {err['error']}")
+
+        print(f"\nOutput directory: {results['scenes_dir']}")
+
+        if args.verbose:
+            print("\nGenerated files:")
+            for scene in results["scenes"]:
+                print(f"  {scene['filename']}: {scene['title']}")
+
+    except FileExistsError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Error generating scenes: {e}", file=sys.stderr)
+        return 1
+
+    return 0
 
 
 # Resolution presets
@@ -1185,6 +1331,30 @@ def main() -> int:
         help="Show detailed output",
     )
     narration_parser.set_defaults(func=cmd_narration)
+
+    # scenes command
+    scenes_parser = subparsers.add_parser(
+        "scenes",
+        help="Generate Remotion scene components from script",
+    )
+    scenes_parser.add_argument("project", help="Project ID")
+    scenes_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing scenes",
+    )
+    scenes_parser.add_argument(
+        "--timeout",
+        type=int,
+        default=300,
+        help="Timeout per scene generation in seconds (default: 300)",
+    )
+    scenes_parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Show detailed output",
+    )
+    scenes_parser.set_defaults(func=cmd_scenes)
 
     # render command
     render_parser = subparsers.add_parser("render", help="Render video")

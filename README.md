@@ -45,55 +45,137 @@ cd ..
 
 ### CLI Usage
 
+The CLI provides a complete pipeline for generating explainer videos:
+
 ```bash
-# List all projects
-python -m src.cli list
+# Project Management
+python -m src.cli list                    # List all projects
+python -m src.cli info <project>          # Show project info
+python -m src.cli create <project_id>     # Create new project
 
-# Show project information
-python -m src.cli info llm-inference
+# Content Generation Pipeline (run in order)
+python -m src.cli script <project>        # 1. Generate script from input docs
+python -m src.cli narration <project>     # 2. Generate narrations for scenes
+python -m src.cli scenes <project>        # 3. Generate Remotion scene components
+python -m src.cli voiceover <project>     # 4. Generate audio from narrations
+python -m src.cli storyboard <project>    # 5. Create storyboard linking scenes + audio
+python -m src.cli render <project>        # 6. Render final video
 
-# Generate voiceovers (with mock TTS for testing)
-python -m src.cli voiceover llm-inference --mock
+# Optional: Sound Design
+python -m src.cli sound <project> plan    # Plan SFX for scenes
+python -m src.cli sound <project> mix     # Mix voiceover + SFX + music
+python -m src.cli music <project> generate  # Generate AI background music
 
-# View storyboard
-python -m src.cli storyboard llm-inference --view
+# Iteration
+python -m src.cli feedback <project> add "Make text larger in scene 1"
+```
 
-# Render video (default 1080p)
-python -m src.cli render llm-inference
+#### Script Generation
 
-# Render in 4K for YouTube upload
-python -m src.cli render llm-inference --resolution 4k
+Generate a video script from input documents (Markdown files in `projects/<project>/input/`):
 
-# Render in lower resolution for faster development
-python -m src.cli render llm-inference -r 720p
+```bash
+python -m src.cli script llm-inference           # Uses Claude Code LLM
+python -m src.cli script llm-inference --mock    # Use mock for testing
+python -m src.cli script llm-inference --duration 300  # Target 5 min video
+python -m src.cli script llm-inference -v        # Verbose output
+```
 
-# Create a new project
-python -m src.cli create my-new-video --title "My New Video"
+Output: `projects/<project>/script/script.json`
 
-# Process feedback (uses Claude Code CLI for intelligent changes)
-python -m src.cli feedback llm-inference add "Make the text larger in scene 1"
+#### Narration Generation
 
-# Process feedback in dry-run mode (analyze without applying)
-python -m src.cli feedback llm-inference add "Fix the timing" --dry-run
+Generate scene narrations from the script:
 
-# List all feedback for a project
-python -m src.cli feedback llm-inference list
+```bash
+python -m src.cli narration llm-inference        # Uses Claude Code LLM
+python -m src.cli narration llm-inference --mock # Use mock for testing
+python -m src.cli narration llm-inference --force  # Overwrite existing
+python -m src.cli narration llm-inference --topic "Custom Topic"
+```
 
-# Show details of a specific feedback item
-python -m src.cli feedback llm-inference show fb_0001_1234567890
+Output: `projects/<project>/narration/narrations.json`
 
-# Sound design commands
-python -m src.cli sound llm-inference plan              # Plan SFX for all scenes
+#### Scene Generation (NEW)
+
+Generate Remotion scene components (React/TypeScript) from the script:
+
+```bash
+python -m src.cli scenes llm-inference           # Generate all scenes
+python -m src.cli scenes llm-inference --force   # Overwrite existing scenes
+python -m src.cli scenes llm-inference --timeout 600  # 10 min per scene
+python -m src.cli scenes llm-inference -v        # Verbose output
+```
+
+Output: `projects/<project>/scenes/*.tsx`, `styles.ts`, `index.ts`
+
+This uses Claude Code to generate animated React components with:
+- Remotion primitives (useCurrentFrame, interpolate, spring)
+- Consistent styling from shared styles.ts
+- Scene registry for dynamic loading
+
+#### Voiceover Generation
+
+Generate audio files from narrations:
+
+```bash
+python -m src.cli voiceover llm-inference        # Use configured TTS
+python -m src.cli voiceover llm-inference --mock # Mock audio for testing
+python -m src.cli voiceover llm-inference --force  # Regenerate all
+python -m src.cli voiceover llm-inference --scene scene1_hook  # Single scene
+```
+
+Output: `projects/<project>/voiceover/*.mp3`, `manifest.json`
+
+#### Storyboard
+
+View or generate storyboard linking scenes with audio:
+
+```bash
+python -m src.cli storyboard llm-inference --view  # View existing
+python -m src.cli storyboard llm-inference         # Generate new
+```
+
+Output: `projects/<project>/storyboard/storyboard.json`
+
+#### Rendering
+
+Render the final video:
+
+```bash
+python -m src.cli render llm-inference            # Default 1080p
+python -m src.cli render llm-inference -r 4k      # 4K for YouTube
+python -m src.cli render llm-inference -r 720p    # Quick preview
+python -m src.cli render llm-inference --preview  # Fast preview
+```
+
+Output: `projects/<project>/output/video.mp4`
+
+#### Sound Design
+
+```bash
+python -m src.cli sound llm-inference plan        # Plan SFX for all scenes
 python -m src.cli sound llm-inference library --list    # List available sounds
-python -m src.cli sound llm-inference library --download  # Generate sound library
-python -m src.cli sound llm-inference music --setup     # Show music setup instructions
-python -m src.cli sound llm-inference mix               # Mix voiceover + SFX + music
+python -m src.cli sound llm-inference library --download  # Generate library
+python -m src.cli sound llm-inference mix         # Mix voiceover + SFX + music
+```
 
-# AI Background music generation (requires MusicGen model)
-python -m src.cli music llm-inference generate          # Generate background music
-python -m src.cli music llm-inference generate --duration 120  # Target 120s duration
-python -m src.cli music llm-inference generate --style "ambient electronic, minimal"
-python -m src.cli music llm-inference info              # Show device support info
+#### AI Background Music
+
+```bash
+python -m src.cli music llm-inference generate    # Generate background music
+python -m src.cli music llm-inference generate --duration 120  # 120s target
+python -m src.cli music llm-inference generate --style "ambient electronic"
+python -m src.cli music llm-inference info        # Show device support
+```
+
+#### Feedback Processing
+
+```bash
+python -m src.cli feedback llm-inference add "Make text larger in scene 1"
+python -m src.cli feedback llm-inference add "Fix timing" --dry-run
+python -m src.cli feedback llm-inference list
+python -m src.cli feedback llm-inference show fb_0001_1234567890
 ```
 
 ### Resolution Options
@@ -113,8 +195,16 @@ video_explainer/
 ├── projects/                    # Self-contained video projects
 │   └── llm-inference/           # Example: LLM Inference video
 │       ├── config.json          # Project configuration
+│       ├── input/               # Source documents (Markdown)
+│       │   └── *.md
+│       ├── script/              # Generated scripts
+│       │   └── script.json
 │       ├── narration/           # Scene narration scripts
 │       │   └── narrations.json
+│       ├── scenes/              # Generated Remotion components
+│       │   ├── index.ts         # Scene registry
+│       │   ├── styles.ts        # Shared styles
+│       │   └── *Scene.tsx       # Scene components
 │       ├── voiceover/           # Generated audio files
 │       │   ├── manifest.json
 │       │   └── *.mp3
@@ -122,8 +212,6 @@ video_explainer/
 │       │   └── storyboard.json
 │       ├── music/               # AI-generated background music
 │       │   └── background.mp3
-│       ├── remotion/            # Video-specific React components
-│       │   └── scenes/
 │       └── output/              # Generated videos
 │
 ├── src/                         # Core pipeline code
@@ -132,6 +220,7 @@ video_explainer/
 │   ├── ingestion/               # Document parsing
 │   ├── understanding/           # Content analysis (LLM)
 │   ├── script/                  # Script generation
+│   ├── scenes/                  # Scene component generation (NEW)
 │   ├── audio/                   # TTS providers + transcription
 │   ├── sound/                   # Sound design (SFX, music, mixing)
 │   ├── music/                   # AI background music generation (MusicGen)
@@ -202,7 +291,7 @@ TTS generation happens BEFORE storyboard creation because we need audio timing (
 
 ```yaml
 llm:
-  provider: mock  # mock | anthropic | openai
+  provider: claude-code  # claude-code | mock | anthropic | openai
   model: claude-sonnet-4-20250514
 
 tts:
@@ -214,6 +303,8 @@ video:
   height: 1080
   fps: 30
 ```
+
+Note: The default LLM provider is `claude-code`, which uses the Claude Code CLI for generation. Use `--mock` flag for testing without API calls.
 
 ### Environment Variables
 
