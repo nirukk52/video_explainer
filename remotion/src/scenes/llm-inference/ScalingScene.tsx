@@ -85,7 +85,7 @@ export const ScalingScene: React.FC<ScalingSceneProps> = ({
     >
       {/* Scene indicator */}
       <div style={{ ...getSceneIndicatorStyle(scale), opacity: introOpacity }}>
-        <span style={getSceneIndicatorTextStyle(scale)}>14</span>
+        <span style={getSceneIndicatorTextStyle(scale)}>16</span>
       </div>
 
       {/* Title */}

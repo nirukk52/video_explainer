@@ -100,7 +100,7 @@ export const MemoryFragmentationScene: React.FC<MemoryFragmentationSceneProps> =
     >
       {/* Scene indicator */}
       <div style={{ ...getSceneIndicatorStyle(scale), opacity: introOpacity }}>
-        <span style={getSceneIndicatorTextStyle(scale)}>10</span>
+        <span style={getSceneIndicatorTextStyle(scale)}>7</span>
       </div>
 
       {/* Title */}

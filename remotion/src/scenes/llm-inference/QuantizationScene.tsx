@@ -96,7 +96,7 @@ export const QuantizationScene: React.FC<QuantizationSceneProps> = ({
     >
       {/* Scene indicator */}
       <div style={{ ...getSceneIndicatorStyle(scale), opacity: introOpacity }}>
-        <span style={getSceneIndicatorTextStyle(scale)}>12</span>
+        <span style={getSceneIndicatorTextStyle(scale)}>14</span>
       </div>
 
       {/* Title */}

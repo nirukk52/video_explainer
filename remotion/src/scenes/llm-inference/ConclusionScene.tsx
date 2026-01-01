@@ -392,83 +392,6 @@ const ImpactReveal: React.FC<{
   );
 };
 
-// Visual Summary Component
-const VisualSummary: React.FC<{
-  progress: number;
-  scale: number;
-  frame: number;
-}> = ({ progress, scale, frame }) => {
-  const summaryItems = [
-    { icon: "🔋", label: "Memory-Bound", sublabel: "Not Compute" },
-    { icon: "📦", label: "Batch Smart", sublabel: "Max Throughput" },
-    { icon: "🧠", label: "Cache Everything", sublabel: "Zero Waste" },
-    { icon: "⚡", label: "Scale Infinitely", sublabel: "Any Load" },
-  ];
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "center",
-        gap: 32 * scale,
-        opacity: interpolate(progress, [0, 0.3], [0, 1], { extrapolateRight: "clamp" }),
-      }}
-    >
-      {summaryItems.map((item, i) => {
-        const itemDelay = i * 0.15;
-        const itemProgress = interpolate(
-          progress,
-          [itemDelay, itemDelay + 0.2],
-          [0, 1],
-          { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-        );
-
-        const bounce = spring({
-          frame: frame - Math.round(itemDelay * 60),
-          fps: 30,
-          config: { damping: 8, stiffness: 200 },
-        });
-
-        return (
-          <div
-            key={i}
-            style={{
-              textAlign: "center",
-              opacity: itemProgress,
-              transform: `scale(${bounce}) translateY(${(1 - itemProgress) * 20}px)`,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 48 * scale,
-                marginBottom: 10 * scale,
-              }}
-            >
-              {item.icon}
-            </div>
-            <div
-              style={{
-                fontSize: 22 * scale,
-                fontWeight: 700,
-                color: COLORS.primary,
-              }}
-            >
-              {item.label}
-            </div>
-            <div
-              style={{
-                fontSize: 17 * scale,
-                color: COLORS.textDim,
-              }}
-            >
-              {item.sublabel}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
 
 // Racing Graph Component
 const RacingGraph: React.FC<{
@@ -603,14 +526,6 @@ export const ConclusionScene: React.FC<ConclusionSceneProps> = ({
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
 
-  // Visual summary progress
-  const summaryProgress = interpolate(
-    localFrame,
-    [phase3End + Math.round(durationInFrames * 0.08), phase4End],
-    [0, 1],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
-  );
-
   // Animations
   const introOpacity = interpolate(localFrame, [0, Math.round(durationInFrames * 0.02)], [0, 1], {
     extrapolateRight: "clamp",
@@ -654,7 +569,7 @@ export const ConclusionScene: React.FC<ConclusionSceneProps> = ({
 
       {/* Scene indicator */}
       <div style={{ ...getSceneIndicatorStyle(scale), opacity: introOpacity }}>
-        <span style={getSceneIndicatorTextStyle(scale)}>16</span>
+        <span style={getSceneIndicatorTextStyle(scale)}>18</span>
       </div>
 
       {/* Title */}
@@ -779,7 +694,7 @@ export const ConclusionScene: React.FC<ConclusionSceneProps> = ({
           )}
         </div>
 
-        {/* Bottom: Visual Summary */}
+        {/* Bottom: Final CTA */}
         <div
           style={{
             gridColumn: "1 / 3",
@@ -787,26 +702,19 @@ export const ConclusionScene: React.FC<ConclusionSceneProps> = ({
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: 16 * scale,
+            justifyContent: "center",
           }}
         >
-          <VisualSummary
-            progress={summaryProgress}
-            scale={scale}
-            frame={localFrame}
-          />
-
-          {/* Final CTA */}
           <div
             style={{
               opacity: interpolate(
                 localFrame,
-                [phase4End - Math.round(durationInFrames * 0.1), phase4End - Math.round(durationInFrames * 0.05)],
+                [phase3End + Math.round(durationInFrames * 0.05), phase3End + Math.round(durationInFrames * 0.12)],
                 [0, 1],
                 { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
               ),
               transform: `scale(${spring({
-                frame: localFrame - (phase4End - Math.round(durationInFrames * 0.1)),
+                frame: localFrame - (phase3End + Math.round(durationInFrames * 0.05)),
                 fps,
                 config: { damping: 12, stiffness: 200 },
               })})`,
@@ -818,30 +726,19 @@ export const ConclusionScene: React.FC<ConclusionSceneProps> = ({
                 background: `linear-gradient(135deg, ${COLORS.success}20, ${COLORS.primary}20)`,
                 border: `2px solid ${COLORS.success}`,
                 borderRadius: 16 * scale,
-                padding: `${16 * scale}px ${32 * scale}px`,
+                padding: `${20 * scale}px ${40 * scale}px`,
                 boxShadow: `0 0 ${40 * scale}px ${COLORS.success}30`,
               }}
             >
               <div
                 style={{
-                  fontSize: 24 * scale,
+                  fontSize: 28 * scale,
                   fontWeight: 700,
                   color: COLORS.success,
                   textAlign: "center",
                 }}
               >
                 These techniques power every major AI service
-              </div>
-              <div
-                style={{
-                  fontSize: 18 * scale,
-                  color: COLORS.textDim,
-                  marginTop: 8 * scale,
-                  textAlign: "center",
-                  letterSpacing: 4 * scale,
-                }}
-              >
-                GPT-4 • Claude • Gemini • LLaMA • Mistral
               </div>
             </div>
           </div>

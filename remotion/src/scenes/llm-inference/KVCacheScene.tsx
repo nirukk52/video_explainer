@@ -97,7 +97,7 @@ export const KVCacheScene: React.FC<KVCacheSceneProps> = ({
     >
       {/* Scene indicator */}
       <div style={{ ...getSceneIndicatorStyle(scale), opacity: titleOpacity }}>
-        <span style={getSceneIndicatorTextStyle(scale)}>8</span>
+        <span style={getSceneIndicatorTextStyle(scale)}>9</span>
       </div>
 
       {/* Title */}

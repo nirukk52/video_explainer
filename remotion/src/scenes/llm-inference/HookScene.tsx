@@ -303,14 +303,14 @@ export const HookScene: React.FC<HookSceneProps> = ({ startFrame = 0 }) => {
         </p>
       </div>
 
-      {/* Chat interface - smaller and positioned higher */}
+      {/* Chat interface - positioned higher */}
       <div
         style={{
           position: "absolute",
           top: 150 * scale,
           left: "50%",
           transform: "translateX(-50%)",
-          width: Math.min(700 * scale, width * 0.75),
+          width: Math.min(900 * scale, width * 0.85),
         }}
       >
         {/* User prompt */}
@@ -364,11 +364,11 @@ export const HookScene: React.FC<HookSceneProps> = ({ startFrame = 0 }) => {
               border: `1px solid ${showingFast ? COLORS.success + '40' : '#333'}`,
               borderRadius: 12 * scale,
               borderBottomLeftRadius: 4 * scale,
-              padding: `${12 * scale}px ${18 * scale}px`,
-              minWidth: 150 * scale,
-              maxWidth: "85%",
-              minHeight: 40 * scale,
-              maxHeight: 220 * scale,
+              padding: `${14 * scale}px ${20 * scale}px`,
+              minWidth: 200 * scale,
+              maxWidth: "90%",
+              minHeight: 50 * scale,
+              maxHeight: 280 * scale,
               overflow: "hidden",
               transition: "border-color 0.3s ease",
             }}

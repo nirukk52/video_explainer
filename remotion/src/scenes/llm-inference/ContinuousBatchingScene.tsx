@@ -180,7 +180,7 @@ export const ContinuousBatchingScene: React.FC<ContinuousBatchingSceneProps> = (
     >
       {/* Scene indicator */}
       <div style={{ ...getSceneIndicatorStyle(scale), opacity: titleOpacity }}>
-        <span style={getSceneIndicatorTextStyle(scale)}>9</span>
+        <span style={getSceneIndicatorTextStyle(scale)}>11</span>
       </div>
 
       {/* Title */}

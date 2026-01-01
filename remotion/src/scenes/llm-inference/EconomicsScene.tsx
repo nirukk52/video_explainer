@@ -100,7 +100,7 @@ export const EconomicsScene: React.FC<EconomicsSceneProps> = ({
     >
       {/* Scene indicator */}
       <div style={{ ...getSceneIndicatorStyle(scale), opacity: introOpacity }}>
-        <span style={getSceneIndicatorTextStyle(scale)}>15</span>
+        <span style={getSceneIndicatorTextStyle(scale)}>17</span>
       </div>
 
       {/* Title */}

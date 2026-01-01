@@ -82,7 +82,7 @@ export const MechanicsScene: React.FC<MechanicsSceneProps> = ({
     >
       {/* Scene indicator */}
       <div style={{ ...getSceneIndicatorStyle(scale), opacity: titleOpacity }}>
-        <span style={getSceneIndicatorTextStyle(scale)}>9</span>
+        <span style={getSceneIndicatorTextStyle(scale)}>10</span>
       </div>
 
       {/* Title */}

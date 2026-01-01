@@ -169,7 +169,7 @@ export const StaticBatchingScene: React.FC<StaticBatchingSceneProps> = ({
     >
       {/* Scene indicator */}
       <div style={{ ...getSceneIndicatorStyle(scale), opacity: introOpacity }}>
-        <span style={getSceneIndicatorTextStyle(scale)}>8</span>
+        <span style={getSceneIndicatorTextStyle(scale)}>6</span>
       </div>
 
       {/* Title */}

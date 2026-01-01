@@ -102,7 +102,7 @@ export const SpeculativeDecodingScene: React.FC<SpeculativeDecodingSceneProps> =
     >
       {/* Scene indicator */}
       <div style={{ ...getSceneIndicatorStyle(scale), opacity: introOpacity }}>
-        <span style={getSceneIndicatorTextStyle(scale)}>13</span>
+        <span style={getSceneIndicatorTextStyle(scale)}>15</span>
       </div>
 
       {/* Title */}

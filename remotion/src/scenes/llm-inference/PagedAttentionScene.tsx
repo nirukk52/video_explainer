@@ -141,7 +141,7 @@ export const PagedAttentionScene: React.FC<PagedAttentionSceneProps> = ({
     >
       {/* Scene indicator */}
       <div style={{ ...getSceneIndicatorStyle(scale), opacity: introOpacity }}>
-        <span style={getSceneIndicatorTextStyle(scale)}>11</span>
+        <span style={getSceneIndicatorTextStyle(scale)}>12</span>
       </div>
 
       {/* Title */}
