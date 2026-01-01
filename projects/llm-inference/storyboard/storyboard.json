@@ -20,7 +20,7 @@
       "type": "llm-inference/hook",
       "title": "The Speed Problem",
       "audio_file": "scene1_hook.mp3",
-      "audio_duration_seconds": 18.96,
+      "audio_duration_seconds": 16.6,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -79,7 +79,7 @@
       "type": "llm-inference/phases",
       "title": "The Two Phases",
       "audio_file": "scene2_phases.mp3",
-      "audio_duration_seconds": 22.24,
+      "audio_duration_seconds": 20.56,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -113,7 +113,7 @@
       "type": "llm-inference/bottleneck",
       "title": "The Decode Bottleneck",
       "audio_file": "scene3_bottleneck.mp3",
-      "audio_duration_seconds": 24.8,
+      "audio_duration_seconds": 21.5,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -148,7 +148,7 @@
       "type": "llm-inference/attention",
       "title": "Understanding Attention",
       "audio_file": "scene4_attention.mp3",
-      "audio_duration_seconds": 22.18,
+      "audio_duration_seconds": 23.88,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -197,7 +197,7 @@
       "type": "llm-inference/redundancy",
       "title": "The Redundancy Problem",
       "audio_file": "scene5_redundancy.mp3",
-      "audio_duration_seconds": 26.86,
+      "audio_duration_seconds": 21.88,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -231,7 +231,7 @@
       "type": "llm-inference/static_batching",
       "title": "The Static Batching Problem",
       "audio_file": "scene6_static_batching.mp3",
-      "audio_duration_seconds": 23.98,
+      "audio_duration_seconds": 27.6,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -265,7 +265,7 @@
       "type": "llm-inference/memory_fragmentation",
       "title": "Memory Fragmentation",
       "audio_file": "scene7_memory_fragmentation.mp3",
-      "audio_duration_seconds": 23.38,
+      "audio_duration_seconds": 22.56,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -299,7 +299,7 @@
       "type": "llm-inference/vllm_intro",
       "title": "Introducing vLLM",
       "audio_file": "scene8_vllm_intro.mp3",
-      "audio_duration_seconds": 17.18,
+      "audio_duration_seconds": 20.18,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -441,7 +441,7 @@
       "type": "llm-inference/continuous_batching",
       "title": "Continuous Batching",
       "audio_file": "scene11_continuous_batching.mp3",
-      "audio_duration_seconds": 40.85,
+      "audio_duration_seconds": 38.16,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -515,7 +515,7 @@
       "type": "llm-inference/paged_attention",
       "title": "PagedAttention",
       "audio_file": "scene12_paged_attention.mp3",
-      "audio_duration_seconds": 27.96,
+      "audio_duration_seconds": 28.8,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -564,7 +564,7 @@
       "type": "llm-inference/more_optimizations",
       "title": "More Optimizations Coming",
       "audio_file": "scene13_more_optimizations.mp3",
-      "audio_duration_seconds": 12.03,
+      "audio_duration_seconds": 13.42,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -603,7 +603,7 @@
       "type": "llm-inference/quantization",
       "title": "Quantization",
       "audio_file": "scene14_quantization.mp3",
-      "audio_duration_seconds": 24.76,
+      "audio_duration_seconds": 27.46,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -647,7 +647,7 @@
       "type": "llm-inference/speculative_decoding",
       "title": "Speculative Decoding",
       "audio_file": "scene15_speculative_decoding.mp3",
-      "audio_duration_seconds": 24.29,
+      "audio_duration_seconds": 24.96,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -686,7 +686,7 @@
       "type": "llm-inference/scaling",
       "title": "Scaling to Millions",
       "audio_file": "scene16_scaling.mp3",
-      "audio_duration_seconds": 25.02,
+      "audio_duration_seconds": 27.68,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -720,7 +720,7 @@
       "type": "llm-inference/economics",
       "title": "The Economics of Scale",
       "audio_file": "scene17_economics.mp3",
-      "audio_duration_seconds": 29.16,
+      "audio_duration_seconds": 31.04,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -754,7 +754,7 @@
       "type": "llm-inference/conclusion",
       "title": "The Full Picture",
       "audio_file": "scene18_conclusion.mp3",
-      "audio_duration_seconds": 48.8,
+      "audio_duration_seconds": 48.04,
       "sfx_cues": [
         {
           "sound": "ui_pop",
@@ -817,5 +817,5 @@
       "volume": 0.45
     }
   },
-  "total_duration_seconds": 469.68
+  "total_duration_seconds": 471.55
 }
