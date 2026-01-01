@@ -135,11 +135,11 @@ class TestIndexTemplate:
             project_title="Test Project",
             imports='import { TestScene } from "./TestScene";',
             exports='export { TestScene } from "./TestScene";',
-            registry_name="TEST_SCENES",
             registry_entries='  test: TestScene,',
         )
         assert "TestScene" in content
-        assert "TEST_SCENES" in content
+        assert "PROJECT_SCENES" in content  # Standard export name
+        assert "SCENE_REGISTRY" in content  # Internal registry
         assert "getScene" in content
         assert "getAvailableSceneTypes" in content
 
@@ -236,7 +236,10 @@ export const TestScene: React.FC = () => {
         content = index_path.read_text()
         assert "HookScene" in content
         assert "ExplanationScene" in content
-        assert "TEST_VIDEO_SCENES" in content
+        assert "PROJECT_SCENES" in content  # Standard export name
+        # Registry keys should match scene_type
+        assert "hook: HookScene" in content
+        assert "explanation: ExplanationScene" in content
 
     @patch("src.scenes.generator.ClaudeCodeLLMProvider")
     def test_generate_scene_creates_file(self, mock_llm_class, temp_project_dir, mock_llm_response):

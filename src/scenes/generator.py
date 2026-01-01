@@ -258,6 +258,7 @@ INDEX_TEMPLATE = '''/**
  * {project_title} Scene Registry
  *
  * Exports all scene components for the video.
+ * Keys match scene_id suffixes in storyboard.json (e.g., "scene1_hook" -> "hook")
  */
 
 import React from "react";
@@ -266,18 +267,25 @@ import React from "react";
 
 export type SceneComponent = React.FC<{{ startFrame?: number }}>;
 
-export const {registry_name}: Record<string, SceneComponent> = {{
+/**
+ * Scene registry mapping storyboard scene types to components.
+ * Keys must match the scene_id suffix in storyboard.json
+ */
+const SCENE_REGISTRY: Record<string, SceneComponent> = {{
 {registry_entries}
 }};
+
+// Standard export name for the build system (required by remotion/src/scenes/index.ts)
+export const PROJECT_SCENES = SCENE_REGISTRY;
 
 {exports}
 
 export function getScene(type: string): SceneComponent | undefined {{
-  return {registry_name}[type];
+  return SCENE_REGISTRY[type];
 }}
 
 export function getAvailableSceneTypes(): string[] {{
-  return Object.keys({registry_name});
+  return Object.keys(SCENE_REGISTRY);
 }}
 '''
 
@@ -493,20 +501,18 @@ Write the complete component code to the file: {output_path}
         for scene in scenes:
             name = scene["component_name"]
             filename = scene["filename"].replace(".tsx", "")
-            scene_type = self._component_to_registry_key(name)
+            # Use scene_type as registry key - this matches the storyboard scene type
+            # (which is derived from scene_id suffix, e.g., "scene1_hook" -> "hook")
+            scene_type = scene["scene_type"]
 
             imports.append(f'import {{ {name} }} from "./{filename}";')
             exports.append(f"export {{ {name} }} from \"./{filename}\";")
             registry_entries.append(f'  {scene_type}: {name},')
 
-        # Create registry name from project title
-        registry_name = self._title_to_registry_name(project_title)
-
         content = INDEX_TEMPLATE.format(
             project_title=project_title,
             imports="\n".join(imports),
             exports="\n".join(exports),
-            registry_name=registry_name,
             registry_entries="\n".join(registry_entries),
         )
 

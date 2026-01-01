@@ -3,20 +3,21 @@
  *
  * Imports scenes from the project directory via webpack alias.
  * The alias is configured at build time by render.mjs.
+ *
+ * Projects must export:
+ * - PROJECT_SCENES: Record<string, SceneComponent> - scene registry
+ * - SceneComponent: type for scene components
  */
 
 import React from "react";
 
 // Import project scenes via webpack alias (configured at build time in render.mjs)
 // @ts-ignore - alias is configured dynamically at build time
-import { LLM_INFERENCE_SCENES, SceneComponent as ProjectSceneComponent } from "@project-scenes";
+import { PROJECT_SCENES, SceneComponent as ProjectSceneComponent } from "@project-scenes";
 
 // Re-export types and scenes
 export type SceneComponent = ProjectSceneComponent;
-export { LLM_INFERENCE_SCENES };
-
-// Alias for generic access
-export const PROJECT_SCENES = LLM_INFERENCE_SCENES;
+export { PROJECT_SCENES };
 
 /**
  * Get a scene component by full path (e.g., "llm-inference/hook")
