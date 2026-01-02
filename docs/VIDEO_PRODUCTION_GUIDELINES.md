@@ -267,9 +267,11 @@ When referencing technical concepts, cite naturally:
 | Issue | Prevention |
 |-------|------------|
 | Elements out of bounds | Test all animation keyframes |
-| Overlapping components | Calculate final positions, add margins |
-| Too much empty space | Increase component sizes, fill layout |
+| Overlapping components | Calculate exact positions; fade out old elements before showing new ones |
+| Too much empty space | Make components LARGE (200-400px); use 60-70% of canvas |
 | Text too small to read | Minimum 14px scaled for any text |
+| Content spilling from boxes | Calculate content size first, add padding, use overflow:hidden |
+| Broken arrows/connections | Ensure arrows connect fully from source to destination |
 
 ### Animation Issues
 | Issue | Prevention |
@@ -278,6 +280,8 @@ When referencing technical concepts, cite naturally:
 | Elements overlap at end | Calculate final positions carefully |
 | Too fast/slow | Scale timing to durationInFrames |
 | Chaotic motion | Keep animations purposeful and smooth |
+| Incomplete sequences | Ensure loops complete for ALL items (e.g., all pixels flatten) |
+| Narration/visual mismatch | Align phase timings with when concepts are mentioned in voiceover |
 
 ### Content Issues
 | Issue | Prevention |
@@ -286,6 +290,8 @@ When referencing technical concepts, cite naturally:
 | Inconsistent styling | Use constants from styles.ts |
 | Audio mismatch | Verify scene IDs match audio files |
 | Font weight issues | Always use 400 for handwritten fonts |
+| Text placeholders for images | Use emoji, colored boxes, or visual representations |
+| Brand names in examples | Use generic descriptions instead of company names |
 
 ---
 
@@ -298,7 +304,10 @@ Before rendering any scene, verify the following:
 - [ ] No unintentional overlapping elements
 - [ ] Consistent margins (60-80px from edges)
 - [ ] Scene indicator visible in top-left
-- [ ] Main content uses adequate canvas space (60%+)
+- [ ] Main content uses adequate canvas space (60-70%)
+- [ ] Components are LARGE, not tiny with wasted whitespace
+- [ ] Content fits within container boxes (no spilling)
+- [ ] Arrows/connections complete from source to destination
 
 ### Citations
 - [ ] Citations present for all technical concepts
@@ -317,6 +326,13 @@ Before rendering any scene, verify the following:
 - [ ] Phase timings proportional to durationInFrames
 - [ ] No elements leave canvas during animation
 - [ ] Stagger delays appropriate (10-20 frames)
+- [ ] Sequences complete for ALL items (no partial animations)
+- [ ] Visuals sync with narration timing (show when mentioned)
+
+### Content
+- [ ] No text placeholders for images (use visuals/emoji instead)
+- [ ] No brand names (use generic descriptions)
+- [ ] Visual representations instead of text descriptions
 
 ### Style Consistency
 - [ ] Color scheme consistent with COLORS constants

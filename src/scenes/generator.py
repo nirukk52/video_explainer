@@ -47,15 +47,24 @@ Example citation element:
 ### 2. Layout Requirements (MANDATORY)
 
 - **No overflow**: ALL elements must stay within 1920x1080 bounds at ALL frames
-- **No overlapping**: Unless intentional, elements must not overlap
-- **Fill the space**: Main content should use at least 60% of canvas
+- **No overlapping**: Elements must NEVER overlap unless intentionally layered
+  - Calculate exact positions for all elements before placing them
+  - When showing new content, either: (a) position it in empty space, or (b) fade out/remove previous elements first
+  - Stack elements vertically or horizontally with proper gaps (20-40px scaled)
+- **Fill the space**: Main content should use at least 60-70% of canvas - AVOID empty/wasted space
 - **Consistent margins**: Use 60-80px scaled margins from edges
-- **Component sizing**: Make elements large enough to be visible (minimum 14px scaled text)
+- **Component sizing**: Make elements LARGE and readable
+  - Boxes, diagrams, images should be substantial (at least 200-400px scaled)
+  - Don't make elements tiny with lots of whitespace around them
+- **Container overflow prevention**: Content inside boxes must fit within the box bounds
+  - Calculate content size before setting container size
+  - Add padding inside containers (15-20px scaled)
+  - Use overflow: "hidden" if needed, but prefer proper sizing
 
 Layout zones:
 - Top-left: Scene indicator (required)
 - Top area: Title
-- Center: Main content (largest area)
+- Center: Main content (largest area, USE THIS SPACE FULLY)
 - Bottom-right: Citations
 
 ### 3. Animation Requirements (MANDATORY)
@@ -65,6 +74,18 @@ Layout zones:
 - **Proportional timing**: Phase durations scale with durationInFrames
 - **Stagger delays**: 10-20 frames between sequential elements
 - **Bounded motion**: Ensure animated elements stay within canvas
+- **Complete animations**: If animating a sequence (e.g., flattening pixels), ensure it completes for ALL items
+- **Narration sync**: Visual phases MUST align with voiceover timing
+  - When narration mentions something, it should be visible on screen at that moment
+  - Don't show visuals too early or too late relative to narration
+  - Calculate phase timings based on when concepts are mentioned in the voiceover
+
+### 3.1 Arrows and Connections (MANDATORY)
+
+- **Complete paths**: Arrows must connect from source to destination without breaks
+- **Proper endpoints**: Arrow heads should touch their target elements
+- **Visibility**: Arrows should be visible (2-3px stroke, contrasting color)
+- **Animation**: Animate arrows drawing from source to destination using strokeDasharray/strokeDashoffset
 
 ### 4. Typography Requirements (MANDATORY)
 
@@ -76,6 +97,15 @@ Layout zones:
   - Body: 18-22px scaled
   - Labels: 14-18px scaled
   - Citations: 14-16px scaled
+
+### 5. Visual Content Requirements (MANDATORY)
+
+- **Use real visuals, not placeholders**:
+  - Instead of "[CAT]" or "cat picture" text, use actual image elements or colored rectangles representing images
+  - Use emoji or unicode symbols where appropriate (🐱, 🚗, 🏥) instead of text labels
+  - Create visual representations (colored boxes, icons, shapes) rather than text descriptions
+- **No brand names**: Don't use specific company names (Tesla, Google, etc.) - use generic descriptions
+- **Representational images**: When showing "an image of X", render a stylized visual representation, not just text
 
 ## Animation Principles
 
