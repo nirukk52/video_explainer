@@ -5,6 +5,8 @@ Usage:
     python -m src.cli info <project>                          # Show project info
     python -m src.cli create <project_id>                     # Create new project
     python -m src.cli script <project>                        # Generate script from docs
+    python -m src.cli script <project> --url <url>            # Generate script from URL
+    python -m src.cli script <project> -i doc.pdf             # Generate script from PDF
     python -m src.cli narration <project>                     # Generate narrations
     python -m src.cli scenes <project>                        # Generate Remotion scenes
     python -m src.cli voiceover <project>                     # Generate voiceovers
@@ -18,9 +20,14 @@ Usage:
     python -m src.cli feedback <project> add "<text>"         # Process feedback
     python -m src.cli feedback <project> list                 # List feedback
 
+Input formats supported:
+    - Markdown files (.md, .markdown)
+    - PDF files (.pdf)
+    - Web URLs (https://...)
+
 Pipeline workflow:
     1. create    - Create new project with config
-    2. script    - Generate script from input documents
+    2. script    - Generate script from input documents (MD, PDF, or URL)
     3. narration - Generate narrations for each scene
     4. scenes    - Generate Remotion scene components (React/TypeScript)
     5. voiceover - Generate audio files from narrations
@@ -555,7 +562,7 @@ def cmd_storyboard(args: argparse.Namespace) -> int:
 def cmd_script(args: argparse.Namespace) -> int:
     """Generate a script from input documents."""
     from ..project import load_project
-    from ..ingestion import parse_markdown
+    from ..ingestion import parse_document
     from ..understanding import ContentAnalyzer
     from ..script import ScriptGenerator
     from ..config import Config
@@ -568,26 +575,72 @@ def cmd_script(args: argparse.Namespace) -> int:
 
     print(f"Generating script for {project.id}")
 
-    # Find input documents
-    input_dir = project.input_dir
-    if not input_dir.exists():
-        print(f"Error: Input directory not found: {input_dir}", file=sys.stderr)
-        print("Add source documents to the input/ directory first.")
-        return 1
-
-    input_files = list(input_dir.glob("*.md"))
-    if not input_files:
-        print(f"Error: No markdown files found in {input_dir}", file=sys.stderr)
-        return 1
-
-    print(f"Found {len(input_files)} input file(s)")
-
-    # Parse documents
     documents = []
-    for f in input_files:
-        print(f"  Parsing: {f.name}")
-        doc = parse_markdown(f)
-        documents.append(doc)
+
+    # Handle URL input
+    if args.url:
+        print(f"Fetching content from URL: {args.url}")
+        try:
+            doc = parse_document(args.url)
+            documents.append(doc)
+            print(f"  Parsed: {doc.title}")
+        except Exception as e:
+            print(f"Error fetching URL: {e}", file=sys.stderr)
+            return 1
+
+    # Handle file input (--input option)
+    if args.input:
+        input_path = Path(args.input)
+        if not input_path.exists():
+            print(f"Error: Input file not found: {input_path}", file=sys.stderr)
+            return 1
+
+        print(f"Parsing input file: {input_path}")
+        try:
+            doc = parse_document(input_path)
+            documents.append(doc)
+            print(f"  Parsed: {doc.title}")
+        except Exception as e:
+            print(f"Error parsing file: {e}", file=sys.stderr)
+            return 1
+
+    # If no explicit input, look for files in input directory
+    if not documents:
+        input_dir = project.input_dir
+        if not input_dir.exists():
+            print(f"Error: Input directory not found: {input_dir}", file=sys.stderr)
+            print("Add source documents to the input/ directory, or use --url or --input.")
+            return 1
+
+        # Find all supported input files (markdown and PDF)
+        input_files = []
+        for pattern in ["*.md", "*.markdown", "*.pdf"]:
+            input_files.extend(input_dir.glob(pattern))
+
+        if not input_files:
+            print(f"Error: No supported files found in {input_dir}", file=sys.stderr)
+            print("Supported formats: .md, .markdown, .pdf")
+            print("You can also use --url to fetch from a web page.")
+            return 1
+
+        print(f"Found {len(input_files)} input file(s)")
+
+        # Parse documents
+        for f in input_files:
+            print(f"  Parsing: {f.name}")
+            try:
+                doc = parse_document(f)
+                documents.append(doc)
+            except Exception as e:
+                print(f"    Error: {e}", file=sys.stderr)
+                if not args.continue_on_error:
+                    return 1
+
+    if not documents:
+        print("Error: No documents were successfully parsed.", file=sys.stderr)
+        return 1
+
+    print(f"\nSuccessfully parsed {len(documents)} document(s)")
 
     # Analyze content
     print("\nAnalyzing content...")
@@ -1453,6 +1506,14 @@ def main() -> int:
     script_parser = subparsers.add_parser("script", help="Generate script from input documents")
     script_parser.add_argument("project", help="Project ID")
     script_parser.add_argument(
+        "--url",
+        help="URL to fetch content from (web page)",
+    )
+    script_parser.add_argument(
+        "--input", "-i",
+        help="Path to input file (PDF or Markdown)",
+    )
+    script_parser.add_argument(
         "--mock",
         action="store_true",
         help="Use mock LLM (for testing)",
@@ -1461,6 +1522,11 @@ def main() -> int:
         "--duration",
         type=int,
         help="Target duration in seconds",
+    )
+    script_parser.add_argument(
+        "--continue-on-error",
+        action="store_true",
+        help="Continue even if some files fail to parse",
     )
     script_parser.add_argument(
         "-v", "--verbose",

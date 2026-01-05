@@ -218,11 +218,12 @@ class TestParseDocument:
         doc = parse_document(md_file)
         assert doc.title == "From File"
 
-    def test_raises_for_unsupported_pdf(self, tmp_path):
+    def test_raises_for_invalid_pdf(self, tmp_path):
+        """Should raise ValueError for invalid PDF content."""
         pdf_file = tmp_path / "doc.pdf"
         pdf_file.write_text("fake pdf content")
 
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(ValueError, match="Failed to open PDF"):
             parse_document(pdf_file)
 
 

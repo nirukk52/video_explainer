@@ -5,7 +5,7 @@ A system for generating high-quality explainer videos from technical documents. 
 ## Features
 
 - **Project-Based Organization**: Self-contained projects with all files in one place
-- **Document Parsing**: Parse Markdown documents with code blocks, equations, and images
+- **Multi-Format Input**: Parse Markdown, PDF documents, and web URLs with code blocks, equations, and images
 - **Content Analysis**: Automatically extract key concepts and structure content for video
 - **Script Generation**: Generate video scripts with visual cues and voiceover text
 - **Text-to-Speech**: Integration with ElevenLabs and Edge TTS (with mock mode for development)
@@ -72,12 +72,28 @@ python -m src.cli feedback <project> add "Make text larger in scene 1"
 
 #### Script Generation
 
-Generate a video script from input documents (Markdown files in `projects/<project>/input/`):
+Generate a video script from input documents. Supports multiple input formats:
+
+**Supported Formats:**
+- Markdown files (`.md`, `.markdown`)
+- PDF documents (`.pdf`)
+- Web URLs (`https://...`)
 
 ```bash
+# From files in input/ directory (auto-detects .md and .pdf)
 python -m src.cli script llm-inference           # Uses Claude Code LLM
 python -m src.cli script llm-inference --mock    # Use mock for testing
+
+# From a specific file (PDF or Markdown)
+python -m src.cli script llm-inference --input /path/to/paper.pdf
+python -m src.cli script llm-inference -i ~/docs/article.md
+
+# From a web URL
+python -m src.cli script llm-inference --url https://example.com/blog-post
+
+# Additional options
 python -m src.cli script llm-inference --duration 300  # Target 5 min video
+python -m src.cli script llm-inference --continue-on-error  # Skip failed files
 python -m src.cli script llm-inference -v        # Verbose output
 ```
 
@@ -202,8 +218,9 @@ video_explainer/
 ├── projects/                    # Self-contained video projects
 │   └── llm-inference/           # Example: LLM Inference video
 │       ├── config.json          # Project configuration
-│       ├── input/               # Source documents (Markdown)
-│       │   └── *.md
+│       ├── input/               # Source documents (Markdown, PDF)
+│       │   ├── *.md
+│       │   └── *.pdf
 │       ├── script/              # Generated scripts
 │       │   └── script.json
 │       ├── narration/           # Scene narration scripts
@@ -321,7 +338,7 @@ Note: The default LLM provider is `claude-code`, which uses the Claude Code CLI 
 
 ## Testing
 
-The project includes 470+ tests (425+ Python + 45 JavaScript).
+The project includes 560+ tests (515+ Python + 45 JavaScript).
 
 ### Python Tests
 
@@ -408,7 +425,9 @@ Typography: Inter/SF Pro for text, JetBrains Mono for code
 - rich - CLI interface
 - pyyaml - Configuration
 - edge-tts - Microsoft Edge TTS
-- requests - HTTP client
+- httpx - HTTP client
+- pymupdf - PDF parsing
+- beautifulsoup4 - HTML parsing (for URL content)
 - transformers - MusicGen model for AI background music
 - torch - PyTorch backend (MPS/CUDA/CPU)
 

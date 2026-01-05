@@ -4,6 +4,8 @@ from pathlib import Path
 
 from ..models import ParsedDocument, SourceType
 from .markdown import parse_markdown
+from .pdf import parse_pdf
+from .url import parse_url
 
 
 def detect_source_type(source: str | Path) -> SourceType:
@@ -58,9 +60,9 @@ def parse_document(source: str | Path) -> ParsedDocument:
     if source_type == SourceType.MARKDOWN:
         return parse_markdown(source)
     elif source_type == SourceType.PDF:
-        raise NotImplementedError("PDF parsing not yet implemented")
+        return parse_pdf(source)
     elif source_type == SourceType.URL:
-        raise NotImplementedError("URL parsing not yet implemented")
+        return parse_url(source)
     elif source_type == SourceType.TEXT:
         # Treat as markdown
         return parse_markdown(source)

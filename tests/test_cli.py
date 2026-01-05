@@ -15,6 +15,7 @@ from src.cli.main import (
     cmd_voiceover,
     cmd_storyboard,
     cmd_render,
+    cmd_script,
     main,
     RESOLUTION_PRESETS,
 )
@@ -517,6 +518,324 @@ class TestCmdStoryboard:
             storyboard = json.load(f)
         assert len(storyboard["scenes"]) == 1
         assert storyboard["scenes"][0]["id"] == "scene1_new"
+
+
+class TestCmdScript:
+    """Tests for the script command."""
+
+    @pytest.fixture
+    def project_with_inputs(self, tmp_path):
+        """Create a project with input files."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        config = {
+            "id": "test-project",
+            "title": "Test Project",
+            "video": {
+                "resolution": {"width": 1920, "height": 1080},
+                "fps": 30,
+                "target_duration_seconds": 120,
+            },
+        }
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        # Create input directory with markdown file
+        input_dir = project_dir / "input"
+        input_dir.mkdir()
+        md_content = "# Test Document\n\nThis is a test document for script generation."
+        with open(input_dir / "source.md", "w") as f:
+            f.write(md_content)
+
+        return project_dir
+
+    @pytest.fixture
+    def project_with_pdf(self, tmp_path):
+        """Create a project with a PDF input file."""
+        import fitz  # PyMuPDF
+
+        project_dir = tmp_path / "pdf-project"
+        project_dir.mkdir()
+
+        config = {
+            "id": "pdf-project",
+            "title": "PDF Test Project",
+            "video": {
+                "resolution": {"width": 1920, "height": 1080},
+                "fps": 30,
+                "target_duration_seconds": 120,
+            },
+        }
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        # Create input directory with PDF file
+        input_dir = project_dir / "input"
+        input_dir.mkdir()
+
+        pdf_path = input_dir / "source.pdf"
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), "PDF Test Document\n\nThis is content from a PDF file.")
+        doc.set_metadata({"title": "PDF Test Document"})
+        doc.save(str(pdf_path))
+        doc.close()
+
+        return project_dir
+
+    def test_script_parses_markdown_from_input_dir(self, project_with_inputs, tmp_path, capsys):
+        """Test script command parses markdown files from input directory."""
+        args = MagicMock()
+        args.projects_dir = str(tmp_path)
+        args.project = "test-project"
+        args.url = None
+        args.input = None
+        args.mock = True
+        args.duration = None
+        args.verbose = False
+        args.continue_on_error = False
+
+        result = cmd_script(args)
+        assert result == 0
+
+        captured = capsys.readouterr()
+        assert "Found 1 input file(s)" in captured.out
+        assert "Parsing: source.md" in captured.out
+
+    def test_script_parses_pdf_from_input_dir(self, project_with_pdf, tmp_path, capsys):
+        """Test script command parses PDF files from input directory."""
+        args = MagicMock()
+        args.projects_dir = str(tmp_path)
+        args.project = "pdf-project"
+        args.url = None
+        args.input = None
+        args.mock = True
+        args.duration = None
+        args.verbose = False
+        args.continue_on_error = False
+
+        result = cmd_script(args)
+        assert result == 0
+
+        captured = capsys.readouterr()
+        assert "Found 1 input file(s)" in captured.out
+        assert "Parsing: source.pdf" in captured.out
+
+    def test_script_with_explicit_input_file(self, project_with_inputs, tmp_path, capsys):
+        """Test script command with explicit --input file."""
+        # Create a separate markdown file outside input directory
+        external_md = tmp_path / "external.md"
+        external_md.write_text("# External Document\n\nThis is external content.")
+
+        args = MagicMock()
+        args.projects_dir = str(tmp_path)
+        args.project = "test-project"
+        args.url = None
+        args.input = str(external_md)
+        args.mock = True
+        args.duration = None
+        args.verbose = False
+        args.continue_on_error = False
+
+        result = cmd_script(args)
+        assert result == 0
+
+        captured = capsys.readouterr()
+        assert "Parsing input file: " in captured.out
+        assert "external.md" in captured.out
+
+    def test_script_with_explicit_pdf_input(self, project_with_inputs, tmp_path, capsys):
+        """Test script command with explicit PDF --input file."""
+        import fitz
+
+        # Create a separate PDF file
+        external_pdf = tmp_path / "external.pdf"
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((72, 72), "External PDF Content")
+        doc.set_metadata({"title": "External PDF"})
+        doc.save(str(external_pdf))
+        doc.close()
+
+        args = MagicMock()
+        args.projects_dir = str(tmp_path)
+        args.project = "test-project"
+        args.url = None
+        args.input = str(external_pdf)
+        args.mock = True
+        args.duration = None
+        args.verbose = False
+        args.continue_on_error = False
+
+        result = cmd_script(args)
+        assert result == 0
+
+        captured = capsys.readouterr()
+        assert "Parsing input file: " in captured.out
+        assert "external.pdf" in captured.out
+
+    @patch("src.ingestion.url.fetch_url_content")
+    def test_script_with_url_input(self, mock_fetch, project_with_inputs, tmp_path, capsys):
+        """Test script command with --url input."""
+        mock_fetch.return_value = """
+        <html>
+            <head><title>Web Page Title</title></head>
+            <body>
+                <main>
+                    <h1>Web Document</h1>
+                    <p>This is content from a web page.</p>
+                </main>
+            </body>
+        </html>
+        """
+
+        args = MagicMock()
+        args.projects_dir = str(tmp_path)
+        args.project = "test-project"
+        args.url = "https://example.com/article"
+        args.input = None
+        args.mock = True
+        args.duration = None
+        args.verbose = False
+        args.continue_on_error = False
+
+        result = cmd_script(args)
+        assert result == 0
+
+        captured = capsys.readouterr()
+        assert "Fetching content from URL: https://example.com/article" in captured.out
+        assert "Parsed: Web Page Title" in captured.out
+
+    def test_script_nonexistent_input_file(self, project_with_inputs, tmp_path, capsys):
+        """Test script command fails with nonexistent --input file."""
+        args = MagicMock()
+        args.projects_dir = str(tmp_path)
+        args.project = "test-project"
+        args.url = None
+        args.input = "/nonexistent/file.pdf"
+        args.mock = True
+        args.duration = None
+        args.verbose = False
+        args.continue_on_error = False
+
+        result = cmd_script(args)
+        assert result == 1
+
+        captured = capsys.readouterr()
+        assert "Input file not found" in captured.err
+
+    def test_script_empty_input_dir(self, tmp_path, capsys):
+        """Test script command fails with empty input directory."""
+        project_dir = tmp_path / "empty-project"
+        project_dir.mkdir()
+
+        config = {"id": "empty-project", "title": "Empty Project"}
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        # Create empty input directory
+        input_dir = project_dir / "input"
+        input_dir.mkdir()
+
+        args = MagicMock()
+        args.projects_dir = str(tmp_path)
+        args.project = "empty-project"
+        args.url = None
+        args.input = None
+        args.mock = True
+        args.duration = None
+        args.verbose = False
+        args.continue_on_error = False
+
+        result = cmd_script(args)
+        assert result == 1
+
+        captured = capsys.readouterr()
+        assert "No supported files found" in captured.err
+        # Help message goes to stdout
+        assert "Supported formats: .md, .markdown, .pdf" in captured.out
+
+    def test_script_no_input_dir(self, tmp_path, capsys):
+        """Test script command fails when input directory doesn't exist."""
+        project_dir = tmp_path / "no-input-project"
+        project_dir.mkdir()
+
+        config = {"id": "no-input-project", "title": "No Input Project"}
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        args = MagicMock()
+        args.projects_dir = str(tmp_path)
+        args.project = "no-input-project"
+        args.url = None
+        args.input = None
+        args.mock = True
+        args.duration = None
+        args.verbose = False
+        args.continue_on_error = False
+
+        result = cmd_script(args)
+        assert result == 1
+
+        captured = capsys.readouterr()
+        assert "Input directory not found" in captured.err
+        # Help message goes to stdout
+        assert "--url or --input" in captured.out
+
+    def test_script_nonexistent_project(self, tmp_path, capsys):
+        """Test script command fails with nonexistent project."""
+        args = MagicMock()
+        args.projects_dir = str(tmp_path)
+        args.project = "nonexistent"
+        args.url = None
+        args.input = None
+        args.mock = True
+        args.duration = None
+        args.verbose = False
+        args.continue_on_error = False
+
+        result = cmd_script(args)
+        assert result == 1
+
+        captured = capsys.readouterr()
+        assert "Error" in captured.err
+
+    def test_script_continue_on_error(self, tmp_path, capsys):
+        """Test script command continues on error with --continue-on-error."""
+        project_dir = tmp_path / "mixed-project"
+        project_dir.mkdir()
+
+        config = {"id": "mixed-project", "title": "Mixed Project"}
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        input_dir = project_dir / "input"
+        input_dir.mkdir()
+
+        # Create a valid markdown file
+        (input_dir / "good.md").write_text("# Good Document\n\nValid content.")
+
+        # Create an invalid PDF file (just text, not a real PDF)
+        (input_dir / "bad.pdf").write_text("This is not a valid PDF")
+
+        args = MagicMock()
+        args.projects_dir = str(tmp_path)
+        args.project = "mixed-project"
+        args.url = None
+        args.input = None
+        args.mock = True
+        args.duration = None
+        args.verbose = False
+        args.continue_on_error = True
+
+        result = cmd_script(args)
+        # Should succeed because valid markdown was parsed
+        assert result == 0
+
+        captured = capsys.readouterr()
+        assert "Error" in captured.err  # The bad.pdf error
+        assert "Successfully parsed 1 document(s)" in captured.out
 
 
 class TestCmdRender:
