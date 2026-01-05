@@ -926,7 +926,7 @@ def cmd_scenes(args: argparse.Namespace) -> int:
     print(f"Scenes to generate: {scene_count}")
     print()
 
-    # Generate scenes
+    # Generate scenes (validation is internal - generator retries on validation failure)
     generator = SceneGenerator(
         working_dir=project.root_dir.parent.parent,  # Repo root
         timeout=args.timeout,
@@ -944,9 +944,10 @@ def cmd_scenes(args: argparse.Namespace) -> int:
         print()
         print(f"Generated {len(results['scenes'])} scenes")
         if results["errors"]:
-            print(f"Errors: {len(results['errors'])}")
+            print(f"Failed scenes: {len(results['errors'])}")
             for err in results["errors"]:
                 print(f"  Scene {err['scene_number']}: {err['error']}")
+            return 1
 
         print(f"\nOutput directory: {results['scenes_dir']}")
 

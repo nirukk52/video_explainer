@@ -112,7 +112,7 @@ python -m src.cli narration llm-inference --topic "Custom Topic"
 
 Output: `projects/<project>/narration/narrations.json`
 
-#### Scene Generation (NEW)
+#### Scene Generation
 
 Generate Remotion scene components (React/TypeScript) from the script:
 
@@ -129,6 +129,7 @@ This uses Claude Code to generate animated React components with:
 - Remotion primitives (useCurrentFrame, interpolate, spring)
 - Consistent styling from shared styles.ts
 - Scene registry for dynamic loading
+- **Automatic validation and self-correction**: The generator validates each scene and automatically retries with error feedback if validation fails
 
 #### Voiceover Generation
 

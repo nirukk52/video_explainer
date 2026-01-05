@@ -152,35 +152,65 @@ class TestEdgeTTS:
         assert "british_male" in EdgeTTS.DEFAULT_VOICES
         assert "british_female" in EdgeTTS.DEFAULT_VOICES
 
-    @pytest.mark.slow
     def test_generate_creates_audio_file(self, edge_tts, tmp_path):
-        """Test that generate creates an audio file (requires network)."""
+        """Test that generate creates an audio file."""
         output_path = tmp_path / "test.mp3"
-        result = edge_tts.generate("Hello, this is a test.", output_path)
+
+        # Mock communicate.save to write fake audio data
+        async def mock_save(path):
+            Path(path).write_bytes(b"\xff\xfb\x90\x00" + b"\x00" * 100)
+
+        mock_communicate = MagicMock()
+        mock_communicate.save = mock_save
+
+        with patch("edge_tts.Communicate", return_value=mock_communicate):
+            result = edge_tts.generate("Hello, this is a test.", output_path)
 
         assert result == output_path
         assert output_path.exists()
         assert output_path.stat().st_size > 0
 
-    @pytest.mark.slow
     def test_generate_with_timestamps_returns_result(self, edge_tts, tmp_path):
-        """Test generate_with_timestamps returns TTSResult (requires network)."""
+        """Test generate_with_timestamps returns TTSResult."""
         output_path = tmp_path / "test.mp3"
-        result = edge_tts.generate_with_timestamps("Hello world!", output_path)
+
+        async def mock_stream():
+            yield {"type": "WordBoundary", "text": "Hello", "offset": 0, "duration": 5_000_000}
+            yield {"type": "audio", "data": b"\xff\xfb\x90\x00" + b"\x00" * 100}
+
+        mock_communicate = MagicMock()
+        mock_communicate.stream = mock_stream
+
+        with patch("edge_tts.Communicate", return_value=mock_communicate):
+            result = edge_tts.generate_with_timestamps("Hello world!", output_path)
 
         assert isinstance(result, TTSResult)
         assert result.audio_path == output_path
         assert result.audio_path.exists()
         assert result.duration_seconds > 0
 
-    @pytest.mark.slow
     def test_generate_with_timestamps_has_words(self, edge_tts, tmp_path):
-        """Test that word timestamps are returned (requires network)."""
+        """Test that word timestamps are returned."""
         output_path = tmp_path / "test.mp3"
-        text = "Hello world, this is a test."
-        result = edge_tts.generate_with_timestamps(text, output_path)
+        text = "Hello world"
 
-        assert len(result.word_timestamps) > 0
+        # Mock the edge_tts.Communicate class to avoid network calls
+        async def mock_stream():
+            # Yield word boundaries
+            yield {"type": "WordBoundary", "text": "Hello", "offset": 0, "duration": 5_000_000}
+            yield {"type": "WordBoundary", "text": "world", "offset": 6_000_000, "duration": 5_000_000}
+            # Yield audio data (minimal valid MP3 header)
+            yield {"type": "audio", "data": b"\xff\xfb\x90\x00" + b"\x00" * 100}
+
+        mock_communicate = MagicMock()
+        mock_communicate.stream = mock_stream
+
+        with patch("edge_tts.Communicate", return_value=mock_communicate):
+            result = edge_tts.generate_with_timestamps(text, output_path)
+
+        assert len(result.word_timestamps) == 2
+        assert result.word_timestamps[0].word == "Hello"
+        assert result.word_timestamps[1].word == "world"
         # Check words are in order
         for i in range(1, len(result.word_timestamps)):
             assert (
@@ -188,32 +218,89 @@ class TestEdgeTTS:
                 >= result.word_timestamps[i - 1].start_seconds
             )
 
-    @pytest.mark.slow
     def test_generate_stream_yields_bytes(self, edge_tts):
-        """Test that generate_stream yields audio bytes (requires network)."""
-        chunks = list(edge_tts.generate_stream("Hello"))
+        """Test that generate_stream yields audio bytes."""
+        async def mock_stream():
+            yield {"type": "audio", "data": b"\xff\xfb\x90\x00" + b"\x00" * 50}
+            yield {"type": "audio", "data": b"\x00" * 60}
+
+        mock_communicate = MagicMock()
+        mock_communicate.stream = mock_stream
+
+        with patch("edge_tts.Communicate", return_value=mock_communicate):
+            chunks = list(edge_tts.generate_stream("Hello"))
+
         assert len(chunks) > 0
         assert all(isinstance(chunk, bytes) for chunk in chunks)
         # Total audio data should be substantial
         total_bytes = sum(len(chunk) for chunk in chunks)
         assert total_bytes > 100
 
-    @pytest.mark.slow
     def test_get_available_voices(self, edge_tts):
-        """Test getting available voices (requires network)."""
-        voices = edge_tts.get_available_voices()
-        assert len(voices) > 0
+        """Test getting available voices."""
+        mock_voices = [
+            {
+                "ShortName": "en-US-GuyNeural",
+                "FriendlyName": "Microsoft Guy Online (Natural)",
+                "Locale": "en-US",
+                "Gender": "Male",
+                "VoiceTag": {"VoicePersonalities": ["Friendly"]},
+            },
+            {
+                "ShortName": "en-US-AriaNeural",
+                "FriendlyName": "Microsoft Aria Online (Natural)",
+                "Locale": "en-US",
+                "Gender": "Female",
+                "VoiceTag": {"VoicePersonalities": ["Cheerful"]},
+            },
+        ]
+
+        async def mock_list_voices():
+            return mock_voices
+
+        with patch("edge_tts.list_voices", mock_list_voices):
+            voices = edge_tts.get_available_voices()
+
+        assert len(voices) == 2
         # Check structure
         assert "voice_id" in voices[0]
         assert "name" in voices[0]
         assert "locale" in voices[0]
         assert "gender" in voices[0]
 
-    @pytest.mark.slow
     def test_get_english_voices(self, edge_tts):
-        """Test filtering English voices (requires network)."""
-        english_voices = edge_tts.get_english_voices()
-        assert len(english_voices) > 0
+        """Test filtering English voices."""
+        mock_voices = [
+            {
+                "ShortName": "en-US-GuyNeural",
+                "FriendlyName": "Microsoft Guy Online (Natural)",
+                "Locale": "en-US",
+                "Gender": "Male",
+                "VoiceTag": {"VoicePersonalities": ["Friendly"]},
+            },
+            {
+                "ShortName": "fr-FR-DeniseNeural",
+                "FriendlyName": "Microsoft Denise Online (Natural)",
+                "Locale": "fr-FR",
+                "Gender": "Female",
+                "VoiceTag": {"VoicePersonalities": ["Friendly"]},
+            },
+            {
+                "ShortName": "en-GB-SoniaNeural",
+                "FriendlyName": "Microsoft Sonia Online (Natural)",
+                "Locale": "en-GB",
+                "Gender": "Female",
+                "VoiceTag": {"VoicePersonalities": ["Cheerful"]},
+            },
+        ]
+
+        async def mock_list_voices():
+            return mock_voices
+
+        with patch("edge_tts.list_voices", mock_list_voices):
+            english_voices = edge_tts.get_english_voices()
+
+        assert len(english_voices) == 2
         # All should be English
         for voice in english_voices:
             assert voice["locale"].startswith("en-")

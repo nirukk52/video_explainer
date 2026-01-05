@@ -201,9 +201,8 @@ class TestVoiceoverGenerator:
         gen = VoiceoverGenerator(voice="en-US-AriaNeural")
         assert gen.voice == "en-US-AriaNeural"
 
-    @pytest.mark.slow
     def test_generate_scene_voiceover(self, generator, tmp_path):
-        """Test generating voiceover for a single scene (requires network)."""
+        """Test generating voiceover for a single scene."""
         narration = SceneNarration(
             scene_id="test",
             title="Test",
@@ -211,16 +210,27 @@ class TestVoiceoverGenerator:
             narration="This is a short test.",
         )
 
-        result = generator.generate_scene_voiceover(narration, tmp_path)
+        async def mock_stream():
+            yield {"type": "WordBoundary", "text": "This", "offset": 0, "duration": 3_000_000}
+            yield {"type": "WordBoundary", "text": "is", "offset": 4_000_000, "duration": 2_000_000}
+            yield {"type": "WordBoundary", "text": "a", "offset": 7_000_000, "duration": 1_000_000}
+            yield {"type": "WordBoundary", "text": "short", "offset": 9_000_000, "duration": 4_000_000}
+            yield {"type": "WordBoundary", "text": "test", "offset": 14_000_000, "duration": 4_000_000}
+            yield {"type": "audio", "data": b"\xff\xfb\x90\x00" + b"\x00" * 100}
+
+        mock_communicate = MagicMock()
+        mock_communicate.stream = mock_stream
+
+        with patch("edge_tts.Communicate", return_value=mock_communicate):
+            result = generator.generate_scene_voiceover(narration, tmp_path)
 
         assert result.scene_id == "test"
         assert result.audio_path.exists()
         assert result.duration_seconds > 0
         assert len(result.word_timestamps) > 0
 
-    @pytest.mark.slow
     def test_generate_all_voiceovers(self, generator, tmp_path):
-        """Test generating all voiceovers (requires network)."""
+        """Test generating all voiceovers."""
         # Use short test narrations
         test_narrations = [
             SceneNarration(
@@ -237,7 +247,15 @@ class TestVoiceoverGenerator:
             ),
         ]
 
-        result = generator.generate_all_voiceovers(tmp_path, narrations=test_narrations)
+        async def mock_stream():
+            yield {"type": "WordBoundary", "text": "Test", "offset": 0, "duration": 5_000_000}
+            yield {"type": "audio", "data": b"\xff\xfb\x90\x00" + b"\x00" * 100}
+
+        mock_communicate = MagicMock()
+        mock_communicate.stream = mock_stream
+
+        with patch("edge_tts.Communicate", return_value=mock_communicate):
+            result = generator.generate_all_voiceovers(tmp_path, narrations=test_narrations)
 
         assert len(result.scenes) == 2
         assert result.total_duration_seconds > 0

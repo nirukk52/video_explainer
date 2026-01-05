@@ -7,6 +7,7 @@ from typing import Any
 
 from ..config import Config, LLMConfig, load_config
 from ..understanding.llm_provider import ClaudeCodeLLMProvider
+from .validator import SceneValidator, ValidationResult
 
 
 # System prompt for scene generation
@@ -605,6 +606,8 @@ export function getAvailableSceneTypes(): string[] {{
 class SceneGenerator:
     """Generates Remotion scene components from scripts using Claude Code."""
 
+    MAX_RETRIES = 3  # Maximum attempts to generate a valid scene
+
     def __init__(
         self,
         config: Config | None = None,
@@ -621,6 +624,7 @@ class SceneGenerator:
         self.config = config or load_config()
         self.working_dir = working_dir or Path.cwd()
         self.timeout = timeout
+        self.validator = SceneValidator()
 
     def generate_all_scenes(
         self,
@@ -685,11 +689,12 @@ class SceneGenerator:
                     example_scene=example_scene,
                 )
                 results["scenes"].append(result)
-                print(f"  Generated scene {scene_num}: {result['component_name']}")
+                print(f"  ✓ Generated scene {scene_num}: {result['component_name']}")
+
             except Exception as e:
                 error = {"scene_number": scene_num, "error": str(e)}
                 results["errors"].append(error)
-                print(f"  Error generating scene {scene_num}: {e}")
+                print(f"  ✗ Failed to generate scene {scene_num}: {e}")
 
         # Generate index.ts
         self._generate_index(scenes_dir, results["scenes"], script.get("title", "Untitled"))
@@ -703,7 +708,10 @@ class SceneGenerator:
         scenes_dir: Path,
         example_scene: str,
     ) -> dict:
-        """Generate a single scene component.
+        """Generate a single scene component with validation and auto-correction.
+
+        Generates the scene, validates it, and if validation fails, regenerates
+        with feedback about the errors. Retries up to MAX_RETRIES times.
 
         Args:
             scene: Scene data from script
@@ -713,6 +721,9 @@ class SceneGenerator:
 
         Returns:
             Dict with scene generation result
+
+        Raises:
+            RuntimeError: If scene generation fails after all retries
         """
         # Extract scene info
         title = scene.get("title", f"Scene {scene_number}")
@@ -720,8 +731,7 @@ class SceneGenerator:
         duration = scene.get("duration_seconds", 20)
         voiceover = scene.get("voiceover", "")
 
-        # Derive scene key from title - this must match how storyboard extracts keys
-        # from narration scene_ids (e.g., "scene1_hook" -> "hook")
+        # Derive scene key from title
         scene_key = self._title_to_scene_key(title)
 
         # Handle both old and new visual formats
@@ -740,8 +750,8 @@ class SceneGenerator:
         # Format elements list
         elements_str = "\n".join(f"- {e}" for e in elements) if elements else "- General scene elements"
 
-        # Build prompt
-        prompt = SCENE_GENERATION_PROMPT.format(
+        # Build base prompt
+        base_prompt = SCENE_GENERATION_PROMPT.format(
             scene_number=scene_number,
             title=title,
             scene_type=scene_type,
@@ -751,11 +761,87 @@ class SceneGenerator:
             visual_description=visual_desc,
             elements=elements_str,
             component_name=component_name,
-            example_scene=example_scene[:4000],  # Limit example size
+            example_scene=example_scene[:4000],
             output_path=output_path,
         )
 
-        # Generate using Claude Code
+        validation_feedback = ""
+        last_error = None
+
+        for attempt in range(self.MAX_RETRIES):
+            try:
+                # Generate the scene
+                self._generate_scene_file(
+                    base_prompt=base_prompt,
+                    output_path=output_path,
+                    validation_feedback=validation_feedback,
+                )
+
+                # Validate the generated scene
+                validation = self.validator.validate_single_scene(output_path)
+
+                if not validation.errors:
+                    # Success - scene is valid
+                    if validation.warnings:
+                        # Log warnings but don't fail
+                        for warning in validation.warnings:
+                            print(f"    ⚡ Warning: {warning.message}")
+                    return {
+                        "scene_number": scene_number,
+                        "title": title,
+                        "component_name": component_name,
+                        "filename": filename,
+                        "path": str(output_path),
+                        "scene_type": scene_type,
+                        "scene_key": scene_key,
+                    }
+
+                # Validation failed - build feedback for retry
+                error_messages = []
+                for error in validation.errors:
+                    msg = f"- Line {error.line}: {error.message}"
+                    if error.suggestion:
+                        msg += f" (Fix: {error.suggestion})"
+                    error_messages.append(msg)
+
+                validation_feedback = f"""
+
+## IMPORTANT: The previous attempt had validation errors. Fix these issues:
+
+{chr(10).join(error_messages)}
+
+Read the existing file at {output_path} and fix only the issues listed above.
+Do not rewrite the entire file - just fix the specific errors.
+"""
+                last_error = f"Validation errors: {'; '.join(e.message for e in validation.errors)}"
+                print(f"    ⚠ Attempt {attempt + 1}/{self.MAX_RETRIES}: {len(validation.errors)} error(s), retrying...")
+
+            except Exception as e:
+                last_error = str(e)
+                print(f"    ⚠ Attempt {attempt + 1}/{self.MAX_RETRIES} failed: {e}")
+                validation_feedback = f"""
+
+## IMPORTANT: The previous attempt failed with an error: {e}
+
+Please fix this issue and try again.
+"""
+
+        # All retries exhausted
+        raise RuntimeError(f"Failed to generate valid scene after {self.MAX_RETRIES} attempts. Last error: {last_error}")
+
+    def _generate_scene_file(
+        self,
+        base_prompt: str,
+        output_path: Path,
+        validation_feedback: str = "",
+    ) -> None:
+        """Generate a scene file using Claude Code.
+
+        Args:
+            base_prompt: The base generation prompt
+            output_path: Path to write the scene file
+            validation_feedback: Optional feedback from previous validation failure
+        """
         llm_config = LLMConfig(provider="claude-code", model="claude-sonnet-4-20250514")
         llm = ClaudeCodeLLMProvider(
             llm_config,
@@ -763,38 +849,26 @@ class SceneGenerator:
             timeout=self.timeout,
         )
 
-        # Use file write capability
         full_prompt = f"""{SCENE_SYSTEM_PROMPT}
 
-{prompt}
-
+{base_prompt}
+{validation_feedback}
 Write the complete component code to the file: {output_path}
 """
 
         result = llm.generate_with_file_access(full_prompt, allow_writes=True)
 
         if not result.success:
-            raise RuntimeError(f"Failed to generate scene: {result.error_message}")
+            raise RuntimeError(f"LLM generation failed: {result.error_message}")
 
         # Verify file was created
         if not output_path.exists():
-            # Try to extract code from response and write manually
             code = self._extract_code(result.response)
             if code:
                 with open(output_path, "w") as f:
                     f.write(code)
             else:
                 raise RuntimeError(f"Scene file not created: {output_path}")
-
-        return {
-            "scene_number": scene_number,
-            "title": title,
-            "component_name": component_name,
-            "filename": filename,
-            "path": str(output_path),
-            "scene_type": scene_type,
-            "scene_key": scene_key,  # Derived from title, used as registry key
-        }
 
     def _generate_styles(self, scenes_dir: Path, project_title: str) -> None:
         """Generate the styles.ts file."""
