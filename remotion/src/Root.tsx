@@ -1,12 +1,10 @@
 import { Composition } from "remotion";
-import { loadFont as loadNeucha } from "@remotion/google-fonts/Neucha";
-import { loadFont as loadCaveat } from "@remotion/google-fonts/Caveat";
+import { loadFont as loadOutfit } from "@remotion/google-fonts/Outfit";
 import { ExplainerVideo } from "./scenes/ExplainerVideo";
 import { StoryboardPlayer } from "./scenes/StoryboardPlayer";
 
-// Load handwritten fonts globally - this makes them available to all scenes
-loadNeucha();
-loadCaveat();
+// Load Outfit font globally - modern geometric sans-serif for tech content
+loadOutfit();
 import {
   SceneStoryboardPlayer,
   DynamicStoryboardPlayer,
