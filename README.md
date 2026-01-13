@@ -171,7 +171,13 @@ python -m src.cli render llm-inference            # Default 1080p
 python -m src.cli render llm-inference -r 4k      # 4K for YouTube
 python -m src.cli render llm-inference -r 720p    # Quick preview
 python -m src.cli render llm-inference --preview  # Fast preview
+python -m src.cli render llm-inference --fast     # Faster encoding (lower quality)
+python -m src.cli render llm-inference --concurrency 8  # Custom thread count
 ```
+
+**Performance options:**
+- `--fast` - Uses faster x264 preset and lower JPEG quality for quicker renders
+- `--concurrency N` - Override auto-detected thread count (default: 75% of CPU cores)
 
 Output: `projects/<project>/output/video.mp4`
 

@@ -878,6 +878,8 @@ class TestCmdRender:
         args.project = "nonexistent"
         args.preview = False
         args.resolution = "1080p"
+        args.fast = False
+        args.concurrency = None
 
         result = cmd_render(args)
         assert result == 1
@@ -898,6 +900,8 @@ class TestCmdRender:
         args.project = "no-storyboard"
         args.preview = False
         args.resolution = "1080p"
+        args.fast = False
+        args.concurrency = None
 
         result = cmd_render(args)
         assert result == 1
@@ -911,6 +915,8 @@ class TestCmdRender:
         args.project = "render-project"
         args.preview = False
         args.resolution = "4k"
+        args.fast = False
+        args.concurrency = None
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
@@ -931,6 +937,8 @@ class TestCmdRender:
         args.project = "render-project"
         args.preview = True
         args.resolution = "720p"
+        args.fast = False
+        args.concurrency = None
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
@@ -946,6 +954,8 @@ class TestCmdRender:
         args.project = "render-project"
         args.preview = False
         args.resolution = "4k"
+        args.fast = False
+        args.concurrency = None
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
@@ -965,6 +975,8 @@ class TestCmdRender:
         args.project = "render-project"
         args.preview = False
         args.resolution = "1080p"
+        args.fast = False
+        args.concurrency = None
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
@@ -984,6 +996,8 @@ class TestCmdRender:
         args.project = "render-project"
         args.preview = False
         args.resolution = "1080p"
+        args.fast = False
+        args.concurrency = None
 
         with patch("subprocess.run") as mock_run:
             mock_run.side_effect = FileNotFoundError("node not found")
@@ -1000,6 +1014,8 @@ class TestCmdRender:
         args.project = "render-project"
         args.preview = False
         args.resolution = "1080p"
+        args.fast = False
+        args.concurrency = None
 
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=1)
@@ -1068,6 +1084,75 @@ class TestCLIArgumentParsing:
                 cmd = call_args[0][0]
                 assert "1280" in cmd  # 720p width
 
+    def test_render_fast_flag(self, tmp_path):
+        """Test --fast flag is passed to render command."""
+        project_dir = tmp_path / "test-proj"
+        project_dir.mkdir()
+        config = {"id": "test-proj", "title": "Test"}
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        # Create storyboard
+        storyboard_dir = project_dir / "storyboard"
+        storyboard_dir.mkdir()
+        with open(storyboard_dir / "storyboard.json", "w") as f:
+            json.dump({"title": "Test", "scenes": []}, f)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            with patch("sys.argv", ["cli", "--projects-dir", str(tmp_path), "render", "test-proj", "--fast"]):
+                result = main()
+                call_args = mock_run.call_args
+                cmd = call_args[0][0]
+                assert "--fast" in cmd
+
+    def test_render_concurrency_flag(self, tmp_path):
+        """Test --concurrency flag is passed to render command."""
+        project_dir = tmp_path / "test-proj"
+        project_dir.mkdir()
+        config = {"id": "test-proj", "title": "Test"}
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        # Create storyboard
+        storyboard_dir = project_dir / "storyboard"
+        storyboard_dir.mkdir()
+        with open(storyboard_dir / "storyboard.json", "w") as f:
+            json.dump({"title": "Test", "scenes": []}, f)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            with patch("sys.argv", ["cli", "--projects-dir", str(tmp_path), "render", "test-proj", "--concurrency", "8"]):
+                result = main()
+                call_args = mock_run.call_args
+                cmd = call_args[0][0]
+                assert "--concurrency" in cmd
+                assert "8" in cmd
+
+    def test_render_fast_and_concurrency_combined(self, tmp_path):
+        """Test --fast and --concurrency flags work together."""
+        project_dir = tmp_path / "test-proj"
+        project_dir.mkdir()
+        config = {"id": "test-proj", "title": "Test"}
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        # Create storyboard
+        storyboard_dir = project_dir / "storyboard"
+        storyboard_dir.mkdir()
+        with open(storyboard_dir / "storyboard.json", "w") as f:
+            json.dump({"title": "Test", "scenes": []}, f)
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            with patch("sys.argv", ["cli", "--projects-dir", str(tmp_path), "render", "test-proj", "--fast", "--concurrency", "12"]):
+                result = main()
+                call_args = mock_run.call_args
+                cmd = call_args[0][0]
+                assert "--fast" in cmd
+                assert "--concurrency" in cmd
+                assert "12" in cmd
+
 
 class TestCLIIntegration:
     """Integration tests for CLI with real projects."""
@@ -1101,7 +1186,7 @@ class TestCLIIntegration:
         assert "llm-inference" in result.stdout
 
     def test_render_help(self):
-        """Test render --help shows resolution options."""
+        """Test render --help shows resolution and performance options."""
         result = subprocess.run(
             [sys.executable, "-m", "src.cli", "render", "--help"],
             capture_output=True,
@@ -1112,3 +1197,5 @@ class TestCLIIntegration:
         assert "1080p" in result.stdout
         assert "720p" in result.stdout
         assert "--resolution" in result.stdout
+        assert "--fast" in result.stdout
+        assert "--concurrency" in result.stdout

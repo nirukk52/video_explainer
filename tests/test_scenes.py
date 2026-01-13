@@ -131,13 +131,13 @@ class TestStylesTemplate:
         """Test that styles template includes colors."""
         content = STYLES_TEMPLATE.format(project_title="Test Project")
         assert "COLORS" in content
-        assert "#00d9ff" in content  # primary
-        assert "#ff6b35" in content  # secondary
+        assert "#0066FF" in content  # primary
+        assert "#FF6600" in content  # secondary
 
     def test_styles_template_has_typography(self):
-        """Test that styles template includes typography."""
+        """Test that styles template includes fonts."""
         content = STYLES_TEMPLATE.format(project_title="Test Project")
-        assert "TYPOGRAPHY" in content
+        assert "FONTS" in content
         assert "fontSize" in content
 
     def test_styles_template_has_helpers(self):

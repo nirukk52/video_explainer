@@ -18,6 +18,9 @@ export function parseArgs(args) {
     voiceoverBasePath: "voiceover",
     width: null,
     height: null,
+    // Performance options
+    concurrency: null,
+    fast: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -45,6 +48,11 @@ export function parseArgs(args) {
     } else if (args[i] === "--height" && args[i + 1]) {
       config.height = parseInt(args[i + 1], 10);
       i++;
+    } else if (args[i] === "--concurrency" && args[i + 1]) {
+      config.concurrency = parseInt(args[i + 1], 10);
+      i++;
+    } else if (args[i] === "--fast") {
+      config.fast = true;
     }
   }
 

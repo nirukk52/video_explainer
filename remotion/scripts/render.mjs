@@ -20,6 +20,7 @@ import { renderMedia, selectComposition } from "@remotion/renderer";
 import { fileURLToPath } from "url";
 import { dirname, resolve } from "path";
 import { readFileSync, existsSync } from "fs";
+import os from "os";
 
 import {
   parseArgs,
@@ -189,7 +190,14 @@ async function main() {
   console.log(`Resolution: ${resolution.width}x${resolution.height}${resolution.isCustom ? " (custom)" : ""}`);
 
   // Render the video
+  // Performance options - can be overridden via CLI flags
+  const concurrency = config.concurrency || Math.max(4, Math.floor(os.cpus().length * 0.75));
+  const x264Preset = config.fast ? "faster" : "medium"; // "faster" trades some quality for speed
+
   console.log(`\nRendering to ${config.outputPath}...`);
+  console.log(`  Concurrency: ${concurrency} threads`);
+  console.log(`  Encoding preset: ${x264Preset}`);
+
   await renderMedia({
     composition: {
       ...composition,
@@ -200,6 +208,9 @@ async function main() {
     codec: "h264",
     outputLocation: config.outputPath,
     inputProps: props,
+    concurrency,
+    x264Preset,
+    jpegQuality: config.fast ? 80 : 90, // Lower quality = faster frame generation
     onProgress: ({ progress }) => {
       const percent = Math.round(progress * 100);
       if (percent % 10 === 0) {

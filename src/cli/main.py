@@ -1043,6 +1043,12 @@ def cmd_render(args: argparse.Namespace) -> int:
         "--voiceover-path", audio_dir,
     ]
 
+    # Performance options
+    if args.fast:
+        cmd.append("--fast")
+    if args.concurrency:
+        cmd.extend(["--concurrency", str(args.concurrency)])
+
     print(f"Project: {project.root_dir}")
     print(f"Audio: {audio_dir}")
     print(f"Resolution: {resolution_name} ({width}x{height})")
@@ -1696,6 +1702,16 @@ def main() -> int:
         choices=["4k", "1440p", "1080p", "720p", "480p"],
         default="1080p",
         help="Output resolution (default: 1080p)",
+    )
+    render_parser.add_argument(
+        "--fast",
+        action="store_true",
+        help="Faster encoding (trades some quality for speed)",
+    )
+    render_parser.add_argument(
+        "--concurrency",
+        type=int,
+        help="Number of parallel threads for rendering",
     )
     render_parser.set_defaults(func=cmd_render)
 

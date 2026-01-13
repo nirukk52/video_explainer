@@ -26,6 +26,8 @@ describe("parseArgs", () => {
     expect(config.voiceoverBasePath).toBe("voiceover");
     expect(config.width).toBeNull();
     expect(config.height).toBeNull();
+    expect(config.concurrency).toBeNull();
+    expect(config.fast).toBe(false);
   });
 
   it("should parse --project flag", () => {
@@ -92,6 +94,48 @@ describe("parseArgs", () => {
     const config = parseArgs(["--width", "3840", "--height", "2160"]);
     expect(config.width).toBe(3840);
     expect(config.height).toBe(2160);
+  });
+
+  it("should parse --fast flag", () => {
+    const config = parseArgs(["--fast"]);
+    expect(config.fast).toBe(true);
+  });
+
+  it("should parse --concurrency flag", () => {
+    const config = parseArgs(["--concurrency", "8"]);
+    expect(config.concurrency).toBe(8);
+  });
+
+  it("should parse --concurrency with different values", () => {
+    const config = parseArgs(["--concurrency", "16"]);
+    expect(config.concurrency).toBe(16);
+  });
+
+  it("should handle --fast with other flags", () => {
+    const config = parseArgs([
+      "--project", "/projects/test",
+      "--fast",
+      "--output", "/output/test.mp4",
+    ]);
+    expect(config.projectDir).toBe("/projects/test");
+    expect(config.fast).toBe(true);
+    expect(config.outputPath).toBe("/output/test.mp4");
+  });
+
+  it("should handle --concurrency with other flags", () => {
+    const config = parseArgs([
+      "--project", "/projects/test",
+      "--concurrency", "12",
+      "--fast",
+    ]);
+    expect(config.projectDir).toBe("/projects/test");
+    expect(config.concurrency).toBe(12);
+    expect(config.fast).toBe(true);
+  });
+
+  it("should ignore --concurrency without value", () => {
+    const config = parseArgs(["--concurrency"]);
+    expect(config.concurrency).toBeNull();
   });
 });
 
@@ -362,5 +406,19 @@ describe("Integration: Full argument parsing scenarios", () => {
     expect(config.compositionId).toBe("StoryboardPlayer");
     expect(config.propsPath).toBe("./props.json");
     expect(validateConfig(config).valid).toBe(true);
+  });
+
+  it("should handle fast render with concurrency", () => {
+    const config = parseArgs([
+      "--project", "../projects/test",
+      "--output", "./fast-render.mp4",
+      "--fast",
+      "--concurrency", "8",
+    ]);
+
+    expect(config.projectDir).toBe("../projects/test");
+    expect(config.outputPath).toBe("./fast-render.mp4");
+    expect(config.fast).toBe(true);
+    expect(config.concurrency).toBe(8);
   });
 });
