@@ -80,8 +80,19 @@ export const RemotionRoot: React.FC = () => {
               durationInFrames: Math.ceil(duration * 30),
             };
           }
-          // For dynamic loading (dev preview), use a long default
-          // The actual content will be clipped to storyboard duration
+          // For dynamic loading (dev preview), try to get injected storyboard
+          try {
+            const injected = process.env.__STORYBOARD_JSON__;
+            if (injected && typeof injected === "object") {
+              const duration = calculateStoryboardDuration(injected as unknown as SceneStoryboard);
+              return {
+                durationInFrames: Math.ceil(duration * 30),
+              };
+            }
+          } catch {
+            // Fallback to default
+          }
+          // Fallback for dev preview without storyboard
           return {
             durationInFrames: 30 * 1800, // 30 min max
           };
