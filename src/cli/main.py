@@ -959,6 +959,16 @@ def cmd_scenes(args: argparse.Namespace) -> int:
     scene_count = len(script.get("scenes", []))
     print(f"Script: {script.get('title', 'Untitled')}")
     print(f"Scenes to generate: {scene_count}")
+
+    # Check for voiceover manifest (for animation-to-narration timing sync)
+    voiceover_manifest_path = project.root_dir / "voiceover" / "manifest.json"
+    if voiceover_manifest_path.exists():
+        print(f"Voiceover manifest found - will use word timestamps for animation timing")
+    else:
+        print(f"Note: No voiceover manifest found at {voiceover_manifest_path}")
+        print("  Animation timing will use percentage-based estimation.")
+        print("  Run 'voiceover' command first for precise animation-to-narration sync.")
+        voiceover_manifest_path = None
     print()
 
     # Generate scenes (validation is internal - generator retries on validation failure)
@@ -972,6 +982,7 @@ def cmd_scenes(args: argparse.Namespace) -> int:
         results = generator.generate_all_scenes(
             project_dir=project.root_dir,
             script_path=script_path,
+            voiceover_manifest_path=voiceover_manifest_path,
             force=args.force,
         )
 

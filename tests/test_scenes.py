@@ -386,6 +386,7 @@ class TestScenePrompts:
             component_name="TestScene",
             example_scene="// Example code",
             output_path="/path/to/scene.tsx",
+            word_timestamps_section="## Word Timestamps (test section)",
         )
         assert "Test Scene" in formatted
         assert "TestScene" in formatted
@@ -485,6 +486,500 @@ class TestSceneGeneratorOldFormat:
         call_args = mock_llm.generate_with_file_access.call_args
         prompt = call_args[0][0]
         assert "Old format visual description" in prompt
+
+
+class TestWordTimestampFormatting:
+    """Tests for word timestamp formatting for animation-to-narration sync."""
+
+    @pytest.fixture
+    def generator(self):
+        return SceneGenerator()
+
+    @pytest.fixture
+    def sample_word_timestamps(self):
+        """Sample word timestamps like those from voiceover manifest."""
+        return [
+            {"word": "You", "start_seconds": 0.0, "end_seconds": 0.28},
+            {"word": "type", "start_seconds": 0.28, "end_seconds": 0.54},
+            {"word": "a", "start_seconds": 0.54, "end_seconds": 0.7},
+            {"word": "question,", "start_seconds": 0.7, "end_seconds": 1.06},
+            {"word": "a", "start_seconds": 1.72, "end_seconds": 1.88},
+            {"word": "quarter", "start_seconds": 1.88, "end_seconds": 2.1},
+            {"word": "second", "start_seconds": 2.1, "end_seconds": 2.46},
+            {"word": "later,", "start_seconds": 2.46, "end_seconds": 2.84},
+            {"word": "and", "start_seconds": 3.18, "end_seconds": 3.3},
+            {"word": "answer.", "start_seconds": 3.3, "end_seconds": 3.64},
+        ]
+
+    def test_format_with_timestamps_includes_critical_header(self, generator, sample_word_timestamps):
+        """Test that formatted output includes critical timing header."""
+        result = generator._format_word_timestamps_for_prompt(
+            sample_word_timestamps, "You type a question", 6.0
+        )
+        assert "USE THESE FOR ANIMATION TIMING" in result
+        assert "CRITICAL" in result
+
+    def test_format_with_timestamps_includes_frame_numbers(self, generator, sample_word_timestamps):
+        """Test that frame numbers are calculated correctly (30fps)."""
+        result = generator._format_word_timestamps_for_prompt(
+            sample_word_timestamps, "You type a question", 6.0
+        )
+        # "You" at 0.0s should be frame 0
+        assert "frame 0" in result
+        # "type" at 0.28s should be frame 8 (0.28 * 30 = 8.4 -> 8)
+        assert "frame 8" in result
+
+    def test_format_with_timestamps_includes_word_timeline(self, generator, sample_word_timestamps):
+        """Test that word timeline is included."""
+        result = generator._format_word_timestamps_for_prompt(
+            sample_word_timestamps, "You type a question", 6.0
+        )
+        assert '"You"' in result
+        assert '"type"' in result
+        assert '"question,"' in result
+
+    def test_format_with_timestamps_includes_scene_duration(self, generator, sample_word_timestamps):
+        """Test that scene duration is included."""
+        result = generator._format_word_timestamps_for_prompt(
+            sample_word_timestamps, "You type a question", 6.0
+        )
+        assert "6.00s" in result
+        assert "180 frames" in result  # 6 * 30 = 180
+
+    def test_format_with_timestamps_includes_do_not_guidance(self, generator, sample_word_timestamps):
+        """Test that DO NOT guidance is included."""
+        result = generator._format_word_timestamps_for_prompt(
+            sample_word_timestamps, "You type a question", 6.0
+        )
+        assert "DO NOT" in result
+        assert "percentage-based timing" in result.lower()
+
+    def test_format_with_empty_timestamps_fallback(self, generator):
+        """Test fallback when no word timestamps available."""
+        result = generator._format_word_timestamps_for_prompt(
+            [], "Some voiceover text", 10.0
+        )
+        assert "NOT AVAILABLE" in result
+        assert "percentage-based timing as a fallback" in result
+        assert "phase1:" in result
+        assert "phase2:" in result
+
+    def test_format_with_long_timestamps_truncates(self, generator):
+        """Test that very long word lists are truncated."""
+        # Create 50 word timestamps
+        long_timestamps = [
+            {"word": f"word{i}", "start_seconds": i * 0.5, "end_seconds": i * 0.5 + 0.4}
+            for i in range(50)
+        ]
+        result = generator._format_word_timestamps_for_prompt(
+            long_timestamps, "Long narration", 25.0
+        )
+        # Should show first 20 and last 10, with ellipsis
+        assert "..." in result
+        assert "more words" in result
+
+    def test_format_preserves_word_order(self, generator, sample_word_timestamps):
+        """Test that words appear in chronological order."""
+        result = generator._format_word_timestamps_for_prompt(
+            sample_word_timestamps, "You type a question", 6.0
+        )
+        # Find positions of key words
+        you_pos = result.find('"You"')
+        type_pos = result.find('"type"')
+        question_pos = result.find('"question,"')
+
+        assert you_pos < type_pos < question_pos
+
+    def test_format_with_special_characters_in_words(self, generator):
+        """Test handling of punctuation in words."""
+        timestamps = [
+            {"word": "What's", "start_seconds": 0.0, "end_seconds": 0.5},
+            {"word": "next?", "start_seconds": 0.5, "end_seconds": 1.0},
+        ]
+        result = generator._format_word_timestamps_for_prompt(
+            timestamps, "What's next?", 2.0
+        )
+        assert "What's" in result
+        assert "next?" in result
+
+
+class TestGenerateAllScenesWithManifest:
+    """Tests for generate_all_scenes with voiceover manifest integration."""
+
+    @pytest.fixture
+    def temp_project_with_manifest(self, tmp_path):
+        """Create a temporary project with script and voiceover manifest."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        # Create script directory and file
+        script_dir = project_dir / "script"
+        script_dir.mkdir()
+
+        script_data = {
+            "title": "Test Video",
+            "total_duration_seconds": 60,
+            "scenes": [
+                {
+                    "scene_id": "scene1_hook",
+                    "scene_type": "hook",
+                    "title": "The Opening Hook",
+                    "voiceover": "This is the opening narration for the hook.",
+                    "visual_description": "Show an animated title card.",
+                    "key_elements": ["title", "animation"],
+                    "duration_seconds": 20,
+                },
+                {
+                    "scene_id": "scene2_explanation",
+                    "scene_type": "explanation",
+                    "title": "Core Concept",
+                    "voiceover": "Here is how it works step by step.",
+                    "visual_description": "Diagram showing the process.",
+                    "key_elements": ["diagram", "arrows"],
+                    "duration_seconds": 40,
+                },
+            ],
+        }
+
+        with open(script_dir / "script.json", "w") as f:
+            json.dump(script_data, f)
+
+        # Create voiceover directory and manifest
+        voiceover_dir = project_dir / "voiceover"
+        voiceover_dir.mkdir()
+
+        manifest_data = {
+            "scenes": [
+                {
+                    "scene_id": "scene1_hook",
+                    "audio_path": str(voiceover_dir / "scene1_hook.mp3"),
+                    "duration_seconds": 20.0,
+                    "word_timestamps": [
+                        {"word": "This", "start_seconds": 0.0, "end_seconds": 0.3},
+                        {"word": "is", "start_seconds": 0.3, "end_seconds": 0.5},
+                        {"word": "the", "start_seconds": 0.5, "end_seconds": 0.7},
+                        {"word": "opening", "start_seconds": 0.7, "end_seconds": 1.1},
+                        {"word": "narration", "start_seconds": 1.1, "end_seconds": 1.6},
+                    ],
+                },
+                {
+                    "scene_id": "scene2_explanation",
+                    "audio_path": str(voiceover_dir / "scene2_explanation.mp3"),
+                    "duration_seconds": 40.0,
+                    "word_timestamps": [
+                        {"word": "Here", "start_seconds": 0.0, "end_seconds": 0.3},
+                        {"word": "is", "start_seconds": 0.3, "end_seconds": 0.5},
+                        {"word": "how", "start_seconds": 0.5, "end_seconds": 0.8},
+                        {"word": "it", "start_seconds": 0.8, "end_seconds": 1.0},
+                        {"word": "works", "start_seconds": 1.0, "end_seconds": 1.4},
+                    ],
+                },
+            ]
+        }
+
+        with open(voiceover_dir / "manifest.json", "w") as f:
+            json.dump(manifest_data, f)
+
+        return project_dir
+
+    @pytest.fixture
+    def mock_llm_response(self):
+        """Mock LLM response with scene code."""
+        return MagicMock(
+            success=True,
+            response='''import React from "react";
+import { AbsoluteFill, useCurrentFrame } from "remotion";
+
+export const TestScene: React.FC = () => {
+  const frame = useCurrentFrame();
+  return <AbsoluteFill>Test</AbsoluteFill>;
+};''',
+            modified_files=[],
+        )
+
+    @patch("src.scenes.generator.ClaudeCodeLLMProvider")
+    def test_generate_with_manifest_passes_timestamps(
+        self, mock_llm_class, temp_project_with_manifest, mock_llm_response
+    ):
+        """Test that word timestamps from manifest are passed to scene generation."""
+        mock_llm = MagicMock()
+        mock_llm.generate_with_file_access.return_value = mock_llm_response
+        mock_llm_class.return_value = mock_llm
+
+        generator = SceneGenerator()
+        manifest_path = temp_project_with_manifest / "voiceover" / "manifest.json"
+
+        results = generator.generate_all_scenes(
+            project_dir=temp_project_with_manifest,
+            voiceover_manifest_path=manifest_path,
+            force=True,
+        )
+
+        assert len(results["scenes"]) == 2
+        assert len(results["errors"]) == 0
+
+        # Verify the prompts included word timestamp information
+        calls = mock_llm.generate_with_file_access.call_args_list
+        assert len(calls) == 2
+
+        # First scene prompt should include timestamps
+        first_prompt = calls[0][0][0]
+        assert "USE THESE FOR ANIMATION TIMING" in first_prompt
+        assert '"This"' in first_prompt or '"opening"' in first_prompt
+
+        # Second scene prompt should include timestamps
+        second_prompt = calls[1][0][0]
+        assert "USE THESE FOR ANIMATION TIMING" in second_prompt
+        assert '"Here"' in second_prompt or '"works"' in second_prompt
+
+    @patch("src.scenes.generator.ClaudeCodeLLMProvider")
+    def test_generate_without_manifest_uses_fallback(
+        self, mock_llm_class, temp_project_with_manifest, mock_llm_response
+    ):
+        """Test that generation works without manifest using fallback timing."""
+        mock_llm = MagicMock()
+        mock_llm.generate_with_file_access.return_value = mock_llm_response
+        mock_llm_class.return_value = mock_llm
+
+        generator = SceneGenerator()
+
+        # Don't pass manifest path
+        results = generator.generate_all_scenes(
+            project_dir=temp_project_with_manifest,
+            voiceover_manifest_path=None,
+            force=True,
+        )
+
+        assert len(results["scenes"]) == 2
+
+        # Prompts should use fallback timing
+        calls = mock_llm.generate_with_file_access.call_args_list
+        first_prompt = calls[0][0][0]
+        assert "NOT AVAILABLE" in first_prompt or "percentage-based timing as a fallback" in first_prompt
+
+    @patch("src.scenes.generator.ClaudeCodeLLMProvider")
+    def test_generate_with_nonexistent_manifest(
+        self, mock_llm_class, temp_project_with_manifest, mock_llm_response
+    ):
+        """Test that generation works when manifest path doesn't exist."""
+        mock_llm = MagicMock()
+        mock_llm.generate_with_file_access.return_value = mock_llm_response
+        mock_llm_class.return_value = mock_llm
+
+        generator = SceneGenerator()
+        nonexistent_path = temp_project_with_manifest / "nonexistent" / "manifest.json"
+
+        results = generator.generate_all_scenes(
+            project_dir=temp_project_with_manifest,
+            voiceover_manifest_path=nonexistent_path,
+            force=True,
+        )
+
+        # Should still work, just without timestamps
+        assert len(results["scenes"]) == 2
+
+    @patch("src.scenes.generator.ClaudeCodeLLMProvider")
+    def test_generate_with_missing_scene_in_manifest(
+        self, mock_llm_class, temp_project_with_manifest, mock_llm_response
+    ):
+        """Test handling when manifest doesn't have timestamps for all scenes."""
+        mock_llm = MagicMock()
+        mock_llm.generate_with_file_access.return_value = mock_llm_response
+        mock_llm_class.return_value = mock_llm
+
+        # Modify manifest to only have one scene
+        manifest_path = temp_project_with_manifest / "voiceover" / "manifest.json"
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+        manifest["scenes"] = [manifest["scenes"][0]]  # Only keep first scene
+        with open(manifest_path, "w") as f:
+            json.dump(manifest, f)
+
+        generator = SceneGenerator()
+
+        results = generator.generate_all_scenes(
+            project_dir=temp_project_with_manifest,
+            voiceover_manifest_path=manifest_path,
+            force=True,
+        )
+
+        assert len(results["scenes"]) == 2
+
+        # First scene should have timestamps, second should use fallback
+        calls = mock_llm.generate_with_file_access.call_args_list
+        first_prompt = calls[0][0][0]
+        second_prompt = calls[1][0][0]
+
+        assert "USE THESE FOR ANIMATION TIMING" in first_prompt
+        assert "NOT AVAILABLE" in second_prompt
+
+
+class TestGenerateSceneWithWordTimestamps:
+    """Tests for _generate_scene method with word timestamps."""
+
+    @pytest.fixture
+    def generator(self):
+        return SceneGenerator()
+
+    @pytest.fixture
+    def sample_scene(self):
+        return {
+            "title": "Test Scene",
+            "scene_type": "explanation",
+            "duration_seconds": 30,
+            "voiceover": "This explains the concept clearly.",
+            "visual_description": "Animated diagram",
+            "key_elements": ["diagram", "labels"],
+        }
+
+    @pytest.fixture
+    def sample_timestamps(self):
+        return [
+            {"word": "This", "start_seconds": 0.0, "end_seconds": 0.3},
+            {"word": "explains", "start_seconds": 0.3, "end_seconds": 0.7},
+            {"word": "the", "start_seconds": 0.7, "end_seconds": 0.9},
+            {"word": "concept", "start_seconds": 0.9, "end_seconds": 1.4},
+            {"word": "clearly.", "start_seconds": 1.4, "end_seconds": 1.9},
+        ]
+
+    @pytest.fixture
+    def mock_llm_response(self):
+        return MagicMock(
+            success=True,
+            response='''import React from "react";
+import { AbsoluteFill } from "remotion";
+export const TestSceneScene: React.FC = () => <AbsoluteFill>Test</AbsoluteFill>;''',
+            modified_files=[],
+        )
+
+    @patch("src.scenes.generator.ClaudeCodeLLMProvider")
+    def test_generate_scene_includes_timestamps_in_prompt(
+        self, mock_llm_class, generator, sample_scene, sample_timestamps, mock_llm_response, tmp_path
+    ):
+        """Test that _generate_scene includes word timestamps in the prompt."""
+        mock_llm = MagicMock()
+        mock_llm.generate_with_file_access.return_value = mock_llm_response
+        mock_llm_class.return_value = mock_llm
+
+        scenes_dir = tmp_path / "scenes"
+        scenes_dir.mkdir()
+
+        generator._generate_scene(
+            scene=sample_scene,
+            scene_number=1,
+            scenes_dir=scenes_dir,
+            example_scene="// Example",
+            word_timestamps=sample_timestamps,
+        )
+
+        # Verify prompt included timestamps
+        call_args = mock_llm.generate_with_file_access.call_args
+        prompt = call_args[0][0]
+        assert "USE THESE FOR ANIMATION TIMING" in prompt
+        assert '"This"' in prompt
+        assert '"concept"' in prompt
+
+    @patch("src.scenes.generator.ClaudeCodeLLMProvider")
+    def test_generate_scene_without_timestamps_uses_fallback(
+        self, mock_llm_class, generator, sample_scene, mock_llm_response, tmp_path
+    ):
+        """Test that _generate_scene uses fallback when no timestamps provided."""
+        mock_llm = MagicMock()
+        mock_llm.generate_with_file_access.return_value = mock_llm_response
+        mock_llm_class.return_value = mock_llm
+
+        scenes_dir = tmp_path / "scenes"
+        scenes_dir.mkdir()
+
+        generator._generate_scene(
+            scene=sample_scene,
+            scene_number=1,
+            scenes_dir=scenes_dir,
+            example_scene="// Example",
+            word_timestamps=None,
+        )
+
+        # Verify prompt used fallback
+        call_args = mock_llm.generate_with_file_access.call_args
+        prompt = call_args[0][0]
+        assert "NOT AVAILABLE" in prompt
+
+    @patch("src.scenes.generator.ClaudeCodeLLMProvider")
+    def test_generate_scene_with_empty_timestamps_uses_fallback(
+        self, mock_llm_class, generator, sample_scene, mock_llm_response, tmp_path
+    ):
+        """Test that _generate_scene uses fallback when timestamps list is empty."""
+        mock_llm = MagicMock()
+        mock_llm.generate_with_file_access.return_value = mock_llm_response
+        mock_llm_class.return_value = mock_llm
+
+        scenes_dir = tmp_path / "scenes"
+        scenes_dir.mkdir()
+
+        generator._generate_scene(
+            scene=sample_scene,
+            scene_number=1,
+            scenes_dir=scenes_dir,
+            example_scene="// Example",
+            word_timestamps=[],
+        )
+
+        # Verify prompt used fallback
+        call_args = mock_llm.generate_with_file_access.call_args
+        prompt = call_args[0][0]
+        assert "NOT AVAILABLE" in prompt
+
+
+class TestScenePromptWithTimestamps:
+    """Tests for SCENE_GENERATION_PROMPT with word_timestamps_section placeholder."""
+
+    def test_prompt_has_word_timestamps_placeholder(self):
+        """Test that prompt template includes word_timestamps_section placeholder."""
+        assert "{word_timestamps_section}" in SCENE_GENERATION_PROMPT
+
+    def test_prompt_can_be_formatted_with_timestamps_section(self):
+        """Test that prompt can be formatted with timestamps section."""
+        timestamps_section = """
+## Word Timestamps (USE THESE FOR ANIMATION TIMING)
+- "test" at 0.0s (frame 0)
+"""
+        formatted = SCENE_GENERATION_PROMPT.format(
+            scene_number=1,
+            title="Test Scene",
+            scene_type="hook",
+            duration=20,
+            total_frames=600,
+            voiceover="Test narration",
+            visual_description="Test visual",
+            elements="- element1",
+            component_name="TestScene",
+            example_scene="// Example",
+            output_path="/path/to/scene.tsx",
+            word_timestamps_section=timestamps_section,
+        )
+        assert "USE THESE FOR ANIMATION TIMING" in formatted
+
+    def test_prompt_step1_references_word_timestamps(self):
+        """Test that STEP 1 guidance references word timestamps."""
+        assert "Sync Animations to Narration" in SCENE_GENERATION_PROMPT
+        assert "word timestamps" in SCENE_GENERATION_PROMPT.lower()
+
+    def test_prompt_warns_against_percentage_timing(self):
+        """Test that prompt warns against percentage-based timing."""
+        assert "DON'T DO THIS" in SCENE_GENERATION_PROMPT or "NEVER DO THIS" in SCENE_GENERATION_PROMPT
+        assert "percentage" in SCENE_GENERATION_PROMPT.lower()
+
+    def test_prompt_shows_correct_timing_example(self):
+        """Test that prompt shows correct timing approach."""
+        assert "// GOOD:" in SCENE_GENERATION_PROMPT
+        assert "// BAD:" in SCENE_GENERATION_PROMPT
+
+    def test_prompt_requirement_9_updated(self):
+        """Test that requirement 9 mentions word timestamps, not percentages."""
+        # Requirement 9 should say timestamps, not "proportional to durationInFrames"
+        assert "word timestamps" in SCENE_GENERATION_PROMPT.lower()
+        # The old guidance should be gone
+        assert "proportional to durationInFrames" not in SCENE_GENERATION_PROMPT
 
 
 class TestSceneKeyConsistency:

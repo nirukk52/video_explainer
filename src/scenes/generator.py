@@ -763,20 +763,26 @@ SCENE_GENERATION_PROMPT = """Generate a Remotion scene component for the followi
 **Key Elements to Animate**:
 {elements}
 
-## STEP 1: Analyze the Narration (CRITICAL)
+{word_timestamps_section}
 
-Before writing code, mentally parse the voiceover to identify:
-1. When each concept is first mentioned (calculate as % of duration)
-2. Key transition words ("But", "However", "The solution", "This means")
-3. The emotional arc (problem → insight → solution)
+## STEP 1: Sync Animations to Narration (CRITICAL)
 
-Create phase timings based on this analysis:
-- phase1: When the first key concept appears (~8-15% into scene)
-- phase2: Second concept or development (~20-30%)
-- phase3: Main point or transition (~35-45%)
-- phase4: Key insight revelation (~55-65%)
-- phase5: Building to conclusion (~75-85%)
-- phase6: Final message (~90-95%)
+Before writing code, analyze the voiceover and word timestamps above:
+1. Identify key visual concepts mentioned in the narration
+2. Find the EXACT frame when each concept is spoken (from Word Timestamps section)
+3. Set animation triggers to those frame numbers (or 10-15 frames earlier for anticipation)
+
+**Example of CORRECT timing approach**:
+```typescript
+// GOOD: Using exact frame from word timestamps
+// "silicon" spoken at frame 394 (13.14s)
+const siliconAppears = 380;  // Start 14 frames early for anticipation
+
+// BAD: Using percentage-based timing (NEVER DO THIS)
+const siliconAppears = Math.floor(durationInFrames * 0.15);  // DON'T DO THIS
+```
+
+The emotional arc should follow the narration's natural timing, NOT arbitrary percentages.
 
 ## STEP 2: Choose Visual Patterns Based on Scene Type
 
@@ -823,7 +829,7 @@ For "{scene_type}" scenes, use these patterns:
 6. Scene indicators are OPTIONAL - skip them for cleaner visuals
 7. Make all sizes responsive using the scale factor
 8. Import styles from "./styles" (COLORS, FONTS, LAYOUT)
-9. Phase timings should be proportional to durationInFrames
+9. Phase timings should be based on word timestamps (NOT percentages of durationInFrames)
 10. Add a detailed comment block at the top explaining the visual flow and the narration text
 
 ## CRITICAL Layout & Style Requirements (PREVENTING OVERFLOW)
@@ -1296,6 +1302,7 @@ class SceneGenerator:
         project_dir: Path,
         script_path: Path | None = None,
         example_scenes_dir: Path | None = None,
+        voiceover_manifest_path: Path | None = None,
         force: bool = False,
     ) -> dict[str, Any]:
         """Generate all scene components for a project.
@@ -1304,6 +1311,7 @@ class SceneGenerator:
             project_dir: Path to the project directory
             script_path: Path to script.json (defaults to project_dir/script/script.json)
             example_scenes_dir: Directory with example scenes for reference
+            voiceover_manifest_path: Path to voiceover manifest.json with word timestamps
             force: Overwrite existing scenes
 
         Returns:
@@ -1328,6 +1336,15 @@ class SceneGenerator:
         with open(script_path) as f:
             script = json.load(f)
 
+        # Load voiceover manifest for word timestamps (if available)
+        word_timestamps_by_scene: dict[str, list[dict]] = {}
+        if voiceover_manifest_path and voiceover_manifest_path.exists():
+            with open(voiceover_manifest_path) as f:
+                manifest = json.load(f)
+            for scene_data in manifest.get("scenes", []):
+                scene_id = scene_data.get("scene_id", "")
+                word_timestamps_by_scene[scene_id] = scene_data.get("word_timestamps", [])
+
         # Create scenes directory
         scenes_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1346,12 +1363,16 @@ class SceneGenerator:
 
         for idx, scene in enumerate(script.get("scenes", [])):
             scene_num = idx + 1
+            # Get word timestamps for this scene (if available)
+            scene_id = scene.get("scene_id", f"scene{scene_num}")
+            word_timestamps = word_timestamps_by_scene.get(scene_id, [])
             try:
                 result = self._generate_scene(
                     scene=scene,
                     scene_number=scene_num,
                     scenes_dir=scenes_dir,
                     example_scene=example_scene,
+                    word_timestamps=word_timestamps,
                 )
                 results["scenes"].append(result)
                 print(f"  ✓ Generated scene {scene_num}: {result['component_name']}")
@@ -1372,6 +1393,7 @@ class SceneGenerator:
         scene_number: int,
         scenes_dir: Path,
         example_scene: str,
+        word_timestamps: list[dict] | None = None,
     ) -> dict:
         """Generate a single scene component with validation and auto-correction.
 
@@ -1383,6 +1405,7 @@ class SceneGenerator:
             scene_number: Scene number (1-indexed)
             scenes_dir: Output directory for scenes
             example_scene: Example scene code for reference
+            word_timestamps: Word-level timestamps from voiceover for precise animation timing
 
         Returns:
             Dict with scene generation result
@@ -1415,6 +1438,11 @@ class SceneGenerator:
         # Format elements list
         elements_str = "\n".join(f"- {e}" for e in elements) if elements else "- General scene elements"
 
+        # Format word timestamps for precise animation timing
+        word_timestamps_section = self._format_word_timestamps_for_prompt(
+            word_timestamps or [], voiceover, duration
+        )
+
         # Build base prompt
         base_prompt = SCENE_GENERATION_PROMPT.format(
             scene_number=scene_number,
@@ -1428,6 +1456,7 @@ class SceneGenerator:
             component_name=component_name,
             example_scene=example_scene[:4000],
             output_path=output_path,
+            word_timestamps_section=word_timestamps_section,
         )
 
         validation_feedback = ""
@@ -1626,6 +1655,103 @@ Write the complete component code to the file: {output_path}
                     return f.read()
 
         return "// No example scene available"
+
+    def _format_word_timestamps_for_prompt(
+        self, word_timestamps: list[dict], voiceover: str, duration: float
+    ) -> str:
+        """Format word timestamps into a useful prompt section for animation timing.
+
+        This extracts key phrases from the voiceover and maps them to their timestamps,
+        helping the LLM sync animations precisely to the narration.
+
+        Args:
+            word_timestamps: List of {word, start_seconds, end_seconds} dicts
+            voiceover: The voiceover text
+            duration: Scene duration in seconds
+
+        Returns:
+            Formatted string for inclusion in the prompt
+        """
+        if not word_timestamps:
+            return """
+## Word Timestamps (NOT AVAILABLE)
+No voiceover timestamps available. Use percentage-based timing as a fallback:
+- phase1: ~10% into scene
+- phase2: ~25% into scene
+- phase3: ~40% into scene
+- phase4: ~60% into scene
+- phase5: ~80% into scene
+- phase6: ~95% into scene
+"""
+
+        # Build a timeline string showing words at their timestamps
+        timeline_entries = []
+        for i, wt in enumerate(word_timestamps):
+            word = wt.get("word", "")
+            start = wt.get("start_seconds", 0)
+            frame = int(start * 30)  # Convert to frame number
+            timeline_entries.append(f'  - "{word}" at {start:.2f}s (frame {frame})')
+
+        # Group timeline entries (show first 20 and last 10 for long narrations)
+        if len(timeline_entries) > 35:
+            timeline_str = "\n".join(timeline_entries[:20])
+            timeline_str += f"\n  ... ({len(timeline_entries) - 30} more words) ...\n"
+            timeline_str += "\n".join(timeline_entries[-10:])
+        else:
+            timeline_str = "\n".join(timeline_entries)
+
+        # Find key transition words and their timestamps
+        key_phrases = []
+        transition_words = ["but", "however", "the", "this", "that", "so", "now", "finally", "first", "second", "third", "next", "then"]
+
+        for i, wt in enumerate(word_timestamps):
+            word = wt.get("word", "").lower().rstrip(",.!?")
+            start = wt.get("start_seconds", 0)
+            frame = int(start * 30)
+
+            # Collect all words with their timing for context
+            if word in transition_words or len(word) > 6:
+                # Get surrounding context (2 words before and after)
+                context_words = []
+                for j in range(max(0, i - 2), min(len(word_timestamps), i + 3)):
+                    context_words.append(word_timestamps[j].get("word", ""))
+                context = " ".join(context_words)
+                key_phrases.append(f'  - "{context}" → frame {frame} ({start:.2f}s)')
+
+        # Limit key phrases shown
+        key_phrases_str = "\n".join(key_phrases[:15]) if key_phrases else "  - (analyze the word timeline above to identify key moments)"
+
+        total_frames = int(duration * 30)
+
+        return f"""
+## Word Timestamps (USE THESE FOR ANIMATION TIMING)
+
+**CRITICAL**: DO NOT use percentage-based timing. Use the exact timestamps below to sync animations with narration.
+
+**Scene Duration**: {duration:.2f}s = {total_frames} frames at 30fps
+
+### Full Word Timeline:
+{timeline_str}
+
+### Key Moments (potential animation triggers):
+{key_phrases_str}
+
+### How to Use These Timestamps:
+1. Read the voiceover and identify when key visual concepts are mentioned
+2. Find that word/phrase in the timeline above
+3. Set your animation phase to start AT or SLIGHTLY BEFORE that frame
+4. Example: If narration says "the solution" at frame 150, set solutionAppears = 145
+
+**DO NOT**:
+- Use percentage-based timing (e.g., durationInFrames * 0.2)
+- Guess when concepts are mentioned
+- Ignore these timestamps
+
+**DO**:
+- Match animations to specific frame numbers from the timeline
+- Start visuals 0-15 frames BEFORE the corresponding word is spoken
+- Reference these timestamps in comments (e.g., // "solution" spoken at frame 150)
+"""
 
     def _title_to_component_name(self, title: str) -> str:
         """Convert a scene title to a component name."""
