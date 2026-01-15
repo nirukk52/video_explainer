@@ -1004,7 +1004,13 @@ def cmd_scenes(args: argparse.Namespace) -> int:
         if results["errors"]:
             print(f"Failed scenes: {len(results['errors'])}")
             for err in results["errors"]:
-                print(f"  Scene {err['scene_number']}: {err['error']}")
+                scene_num = err['scene_number']
+                title = err.get('title', f'Scene {scene_num}')
+                print(f"  Scene {scene_num} ({title}): {err['error']}")
+            print()
+            print("To regenerate failed scenes individually:")
+            for err in results["errors"]:
+                print(f"  python -m src.cli scenes {args.project} --scene {err['scene_number']}")
             return 1
 
         print(f"\nOutput directory: {results['scenes_dir']}")

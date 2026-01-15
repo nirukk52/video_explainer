@@ -1483,7 +1483,8 @@ class SceneGenerator:
                 print(f"  ✓ Generated scene {scene_num}: {result['component_name']}")
 
             except Exception as e:
-                error = {"scene_number": scene_num, "error": str(e)}
+                title = scene.get("title", f"Scene {scene_num}")
+                error = {"scene_number": scene_num, "title": title, "error": str(e)}
                 results["errors"].append(error)
                 print(f"  ✗ Failed to generate scene {scene_num}: {e}")
 
