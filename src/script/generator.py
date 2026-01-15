@@ -70,11 +70,33 @@ Key papers to cite (when relevant):
 ## Narration Guidelines
 
 - Write for spoken delivery: read it aloud, ensure natural rhythm
-- 15-30 seconds per scene (roughly 40-80 words)
 - Vary sentence length: short punchy sentences mixed with longer explanatory ones
 - Use rhetorical questions to create engagement
 - Pause points: use periods strategically for dramatic effect
 - Include natural paper citations when introducing technical concepts
+
+### Word Count Guidelines by Scene Type (FOLLOW STRICTLY)
+
+Different scene types need different pacing for optimal visual matching:
+
+| Scene Type | Words | Duration | Pacing |
+|------------|-------|----------|--------|
+| **Hook** | 30-50 words | 10-20s | Punchy, fast. Grab attention immediately. |
+| **Context** | 50-70 words | 20-30s | Build tension. Show the problem. |
+| **Explanation** | 60-80 words | 25-35s | Clear, methodical. One concept at a time. |
+| **Insight** | 40-60 words | 15-25s | Emphasis on the key revelation. |
+| **Conclusion** | 30-50 words | 10-20s | Memorable takeaway. End strong. |
+
+**WHY THIS MATTERS**: Shorter narrations (30-50 words) work better for hooks and conclusions because they need quick, impactful visuals. Longer narrations work for explanations where we can show step-by-step animations.
+
+### Visual Beats (REQUIRED)
+
+For each scene, identify 2-4 "visual beats" - moments where a new visual element should appear. Structure your narration with natural pauses between these beats.
+
+**Example for an explanation scene (4 visual beats)**:
+"[BEAT 1: Show token grid] Each token produces Query, Key, and Value vectors. [BEAT 2: Highlight Q,K,V] The attention mechanism multiplies Query by Key-transpose. [BEAT 3: Show attention matrix] Then softmax normalizes the scores. [BEAT 4: Show final output] Finally, we compute a weighted sum of Values."
+
+Mark visual beats in your mind when writing - the narration should have natural breath points where visuals can transition.
 
 ## Visual Thinking
 
@@ -152,8 +174,10 @@ Respond with JSON matching this schema:
       "scene_id": "string - format: scene1_hook, scene2_context, etc.",
       "scene_type": "hook|context|explanation|insight|conclusion",
       "title": "string - short descriptive title",
-      "voiceover": "string - the exact narration text (40-80 words per scene)",
+      "voiceover": "string - the exact narration text (follow word count guidelines!)",
+      "word_count": number - count of words in voiceover (hook: 30-50, context: 50-70, explanation: 60-80, insight: 40-60, conclusion: 30-50),
       "visual_description": "string - detailed description of what appears on screen and how it animates",
+      "visual_beats": ["string - list of 2-4 key visual moments with descriptions"],
       "key_elements": ["string - list of visual elements to animate"],
       "duration_seconds": number,
       "builds_to": "string - what concept or scene this sets up (optional)"

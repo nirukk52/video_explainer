@@ -863,6 +863,42 @@ For "{scene_type}" scenes, use these patterns:
 31. **LARGE VISUALIZATIONS**: Main visual elements should be substantial (200-400px scaled), not tiny with whitespace
 32. **VISUAL METAPHORS**: Translate abstract concepts into concrete visuals (e.g., "memory" → pulsing grid cells)
 
+## STEP 0: Layout Planning (DO THIS FIRST - BEFORE WRITING CODE)
+
+Before writing any code, mentally plan your layout to prevent overflow:
+
+1. **Identify your elements**: List all visual elements (title, subtitle, main visual, labels, etc.)
+2. **Choose a layout type**:
+   - `single_centered` - One main element, centered (best for simple concepts)
+   - `title_with_visual` - Title at top, large visual below (most common)
+   - `side_by_side` - Two columns for comparison (use 55%/45% split, not 50/50)
+   - `grid_2x2` - Four quadrants (use uneven rows: 1.2fr/0.8fr)
+   - `stacked_vertical` - Multiple items stacked (limit to 3-4 items max)
+
+3. **Calculate available space**:
+   - Total canvas: 1920 x 1080
+   - Header reserved: top 120px (LAYOUT.header.height)
+   - Content area: starts at y=150, height ~880px
+   - Safe margins: 60px on each side
+
+4. **Size your elements** (scaled values):
+   - Title: 50px height
+   - Subtitle: 30px height
+   - Main visual: remaining height minus 100px buffer
+   - For grid layouts: divide available height by rows, subtract gaps
+
+5. **Verify before coding**:
+   - Does total height of elements + gaps + padding fit in 880px?
+   - Do widths fit in 1800px (1920 - 2*60 margins)?
+   - Is there breathing room (at least 20px between elements)?
+
+**Common overflow causes to AVOID**:
+- Using equal row heights in grids (use 1.2fr/0.8fr instead of 1fr/1fr)
+- Large gaps (24px+) - use 12-16px instead
+- Thick borders/padding (24px+) - use 12-16px instead
+- Multiple large SVGs without size limits
+- Forgetting to account for animation expansion (elements that scale up)
+
 ## Output
 
 Return ONLY the TypeScript/React code. No markdown code blocks, no explanation - just the code.

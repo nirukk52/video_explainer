@@ -947,3 +947,274 @@ export const TestScene: React.FC = () => {
         # Should have warnings about hardcoded pixel values
         hardcoded_warnings = [w for w in result.warnings if "Hardcoded" in w.message]
         assert len(hardcoded_warnings) >= 1
+
+
+class TestVisualBoundaryCheck:
+    """Tests for visual boundary overflow detection."""
+
+    def test_detects_position_exceeding_canvas_height(self, tmp_path: Path):
+        """Test detection of top/bottom positions exceeding canvas height."""
+        scene_content = '''
+import React from "react";
+import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { COLORS } from "./styles";
+
+export const TestScene: React.FC = () => {
+  const frame = useCurrentFrame();
+  const glowPulse = 0.7 + 0.3 * Math.sin(frame * 0.1);
+  return (
+    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
+      <div style={{ position: "absolute", top: 1200 }}>{glowPulse}</div>
+    </AbsoluteFill>
+  );
+};
+'''
+        scene_file = tmp_path / "OverflowScene.tsx"
+        scene_file.write_text(scene_content)
+        (tmp_path / "styles.ts").write_text("export const COLORS = { background: '#fff' };")
+
+        validator = SceneValidator()
+        result = validator.validate_single_scene(scene_file)
+
+        # Should have error about position exceeding canvas
+        position_errors = [e for e in result.errors if "exceeds canvas height" in e.message]
+        assert len(position_errors) > 0
+
+    def test_detects_position_exceeding_canvas_width(self, tmp_path: Path):
+        """Test detection of left/right positions exceeding canvas width."""
+        scene_content = '''
+import React from "react";
+import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { COLORS } from "./styles";
+
+export const TestScene: React.FC = () => {
+  const frame = useCurrentFrame();
+  const glowPulse = 0.7 + 0.3 * Math.sin(frame * 0.1);
+  return (
+    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
+      <div style={{ position: "absolute", left: 2000 }}>{glowPulse}</div>
+    </AbsoluteFill>
+  );
+};
+'''
+        scene_file = tmp_path / "OverflowScene.tsx"
+        scene_file.write_text(scene_content)
+        (tmp_path / "styles.ts").write_text("export const COLORS = { background: '#fff' };")
+
+        validator = SceneValidator()
+        result = validator.validate_single_scene(scene_file)
+
+        # Should have error about position exceeding canvas
+        position_errors = [e for e in result.errors if "exceeds canvas width" in e.message]
+        assert len(position_errors) > 0
+
+    def test_warns_on_equal_grid_row_heights(self, tmp_path: Path):
+        """Test warning for equal grid row heights (1fr 1fr)."""
+        scene_content = '''
+import React from "react";
+import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { COLORS } from "./styles";
+
+export const TestScene: React.FC = () => {
+  const frame = useCurrentFrame();
+  const glowPulse = 0.7 + 0.3 * Math.sin(frame * 0.1);
+  return (
+    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
+      <div style={{
+        display: "grid",
+        gridTemplateRows: "1fr 1fr",
+      }}>{glowPulse}</div>
+    </AbsoluteFill>
+  );
+};
+'''
+        scene_file = tmp_path / "EqualGridScene.tsx"
+        scene_file.write_text(scene_content)
+        (tmp_path / "styles.ts").write_text("export const COLORS = { background: '#fff' };")
+
+        validator = SceneValidator()
+        result = validator.validate_single_scene(scene_file)
+
+        # Should have warning about equal grid rows
+        grid_warnings = [w for w in result.warnings if "1fr 1fr" in w.message]
+        assert len(grid_warnings) > 0
+
+    def test_warns_on_large_gap_values(self, tmp_path: Path):
+        """Test warning for large gap values without scale."""
+        scene_content = '''
+import React from "react";
+import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { COLORS } from "./styles";
+
+export const TestScene: React.FC = () => {
+  const frame = useCurrentFrame();
+  const glowPulse = 0.7 + 0.3 * Math.sin(frame * 0.1);
+  return (
+    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
+      <div style={{ display: "flex", gap: 30 }}>{glowPulse}</div>
+    </AbsoluteFill>
+  );
+};
+'''
+        scene_file = tmp_path / "LargeGapScene.tsx"
+        scene_file.write_text(scene_content)
+        (tmp_path / "styles.ts").write_text("export const COLORS = { background: '#fff' };")
+
+        validator = SceneValidator()
+        result = validator.validate_single_scene(scene_file)
+
+        # Should have warning about large gap
+        gap_warnings = [w for w in result.warnings if "gap" in w.message.lower() and "overflow" in w.message.lower()]
+        assert len(gap_warnings) > 0
+
+    def test_warns_on_large_padding_values(self, tmp_path: Path):
+        """Test warning for large padding values without scale."""
+        scene_content = '''
+import React from "react";
+import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { COLORS } from "./styles";
+
+export const TestScene: React.FC = () => {
+  const frame = useCurrentFrame();
+  const glowPulse = 0.7 + 0.3 * Math.sin(frame * 0.1);
+  return (
+    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
+      <div style={{ padding: 32 }}>{glowPulse}</div>
+    </AbsoluteFill>
+  );
+};
+'''
+        scene_file = tmp_path / "LargePaddingScene.tsx"
+        scene_file.write_text(scene_content)
+        (tmp_path / "styles.ts").write_text("export const COLORS = { background: '#fff' };")
+
+        validator = SceneValidator()
+        result = validator.validate_single_scene(scene_file)
+
+        # Should have warning about large padding
+        padding_warnings = [w for w in result.warnings if "padding" in w.message.lower() and "overflow" in w.message.lower()]
+        assert len(padding_warnings) > 0
+
+    def test_warns_on_large_unscaled_width(self, tmp_path: Path):
+        """Test warning for large width values without scale."""
+        scene_content = '''
+import React from "react";
+import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { COLORS } from "./styles";
+
+export const TestScene: React.FC = () => {
+  const frame = useCurrentFrame();
+  const glowPulse = 0.7 + 0.3 * Math.sin(frame * 0.1);
+  return (
+    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
+      <div style={{ width: 900 }}>{glowPulse}</div>
+    </AbsoluteFill>
+  );
+};
+'''
+        scene_file = tmp_path / "LargeWidthScene.tsx"
+        scene_file.write_text(scene_content)
+        (tmp_path / "styles.ts").write_text("export const COLORS = { background: '#fff' };")
+
+        validator = SceneValidator()
+        result = validator.validate_single_scene(scene_file)
+
+        # Should have warning about large unscaled width
+        width_warnings = [w for w in result.warnings if "width" in w.message.lower() and "unscaled" in w.message.lower()]
+        assert len(width_warnings) > 0
+
+    def test_warns_on_large_unscaled_height(self, tmp_path: Path):
+        """Test warning for large height values without scale."""
+        scene_content = '''
+import React from "react";
+import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { COLORS } from "./styles";
+
+export const TestScene: React.FC = () => {
+  const frame = useCurrentFrame();
+  const glowPulse = 0.7 + 0.3 * Math.sin(frame * 0.1);
+  return (
+    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
+      <div style={{ height: 700 }}>{glowPulse}</div>
+    </AbsoluteFill>
+  );
+};
+'''
+        scene_file = tmp_path / "LargeHeightScene.tsx"
+        scene_file.write_text(scene_content)
+        (tmp_path / "styles.ts").write_text("export const COLORS = { background: '#fff' };")
+
+        validator = SceneValidator()
+        result = validator.validate_single_scene(scene_file)
+
+        # Should have warning about large unscaled height
+        height_warnings = [w for w in result.warnings if "height" in w.message.lower() and "unscaled" in w.message.lower()]
+        assert len(height_warnings) > 0
+
+    def test_no_warning_with_scaled_values(self, tmp_path: Path):
+        """Test no warnings when values are properly scaled."""
+        scene_content = '''
+import React from "react";
+import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
+import { COLORS } from "./styles";
+
+export const TestScene: React.FC = () => {
+  const frame = useCurrentFrame();
+  const { width, height } = useVideoConfig();
+  const scale = Math.min(width / 1920, height / 1080);
+  const glowPulse = 0.7 + 0.3 * Math.sin(frame * 0.1);
+  return (
+    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
+      <div style={{
+        width: 900 * scale,
+        height: 600 * scale,
+        gap: 16 * scale,
+        padding: 12 * scale,
+      }}>{glowPulse}</div>
+    </AbsoluteFill>
+  );
+};
+'''
+        scene_file = tmp_path / "ScaledScene.tsx"
+        scene_file.write_text(scene_content)
+        (tmp_path / "styles.ts").write_text("export const COLORS = { background: '#fff' };")
+
+        validator = SceneValidator()
+        result = validator.validate_single_scene(scene_file)
+
+        # Should not have warnings about large unscaled values
+        unscaled_warnings = [w for w in result.warnings if "unscaled" in w.message.lower()]
+        assert len(unscaled_warnings) == 0
+
+    def test_warns_on_flex_column_without_minheight(self, tmp_path: Path):
+        """Test warning for flex column layout without minHeight: 0."""
+        scene_content = '''
+import React from "react";
+import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion";
+import { COLORS } from "./styles";
+
+export const TestScene: React.FC = () => {
+  const frame = useCurrentFrame();
+  const { width, height } = useVideoConfig();
+  const scale = Math.min(width / 1920, height / 1080);
+  const glowPulse = 0.7 + 0.3 * Math.sin(frame * 0.1);
+  return (
+    <AbsoluteFill style={{ backgroundColor: COLORS.background }}>
+      <div style={{ display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: 1 }}>{glowPulse}</div>
+        <div style={{ flex: 1 }}>Content</div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+'''
+        scene_file = tmp_path / "FlexScene.tsx"
+        scene_file.write_text(scene_content)
+        (tmp_path / "styles.ts").write_text("export const COLORS = { background: '#fff' };")
+
+        validator = SceneValidator()
+        result = validator.validate_single_scene(scene_file)
+
+        # Should have warning about flex column without minHeight
+        flex_warnings = [w for w in result.warnings if "flex" in w.message.lower() and "minHeight" in w.message]
+        assert len(flex_warnings) > 0

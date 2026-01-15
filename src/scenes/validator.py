@@ -127,6 +127,9 @@ class SceneValidator:
         # Check for layout quality
         issues.extend(self._check_layout_quality(content, lines, filename))
 
+        # Check for visual boundary overflow risks
+        issues.extend(self._check_visual_boundaries(content, lines, filename))
+
         return issues
 
     def _check_undefined_variables(
@@ -585,6 +588,169 @@ class SceneValidator:
                     ),
                 )
             )
+
+        return issues
+
+    def _check_visual_boundaries(
+        self, content: str, lines: list[str], filename: str
+    ) -> list[ValidationIssue]:
+        """Check for visual boundary overflow risks.
+
+        Analyzes the code for patterns that commonly cause layout overflow:
+        - Absolute positions outside canvas bounds
+        - Elements with sizes that exceed available space
+        - Grid layouts with equal row heights
+        - Large gaps/padding values
+        - Missing minHeight: 0 on flex children
+        """
+        issues: list[ValidationIssue] = []
+
+        # Canvas dimensions
+        CANVAS_WIDTH = 1920
+        CANVAS_HEIGHT = 1080
+        CONTENT_START_Y = 150  # After header
+        CONTENT_HEIGHT = 880  # Available content area
+        SAFE_MARGIN = 60
+
+        # Check for absolute positions that might overflow
+        # Pattern: top: NUMBER or left: NUMBER (without scale multiplication that keeps it safe)
+        position_pattern = r'(top|left|right|bottom):\s*(\d+)\s*(?!\s*\*\s*scale)'
+        for line_num, line in enumerate(lines, 1):
+            for match in re.finditer(position_pattern, line):
+                prop = match.group(1)
+                value = int(match.group(2))
+
+                # Check if value exceeds bounds
+                if prop in ("top", "bottom") and value > CANVAS_HEIGHT:
+                    issues.append(
+                        ValidationIssue(
+                            severity="error",
+                            message=f"Position {prop}: {value} exceeds canvas height ({CANVAS_HEIGHT})",
+                            file=filename,
+                            line=line_num,
+                            suggestion=f"Use a value less than {CANVAS_HEIGHT} or multiply by scale",
+                        )
+                    )
+                elif prop in ("left", "right") and value > CANVAS_WIDTH:
+                    issues.append(
+                        ValidationIssue(
+                            severity="error",
+                            message=f"Position {prop}: {value} exceeds canvas width ({CANVAS_WIDTH})",
+                            file=filename,
+                            line=line_num,
+                            suggestion=f"Use a value less than {CANVAS_WIDTH} or multiply by scale",
+                        )
+                    )
+
+        # Check for equal grid row heights (common overflow cause)
+        equal_rows_pattern = r'gridTemplateRows:\s*["\']1fr\s+1fr["\']'
+        for line_num, line in enumerate(lines, 1):
+            if re.search(equal_rows_pattern, line):
+                issues.append(
+                    ValidationIssue(
+                        severity="warning",
+                        message="Equal grid row heights (1fr 1fr) often cause overflow",
+                        file=filename,
+                        line=line_num,
+                        suggestion="Use uneven rows like '1.2fr 0.8fr' or '1fr 0.85fr' for better fit",
+                    )
+                )
+
+        # Check for large gap values (>20px unscaled is risky)
+        large_gap_pattern = r'gap:\s*(\d+)\s*(?!\s*\*\s*scale)'
+        for line_num, line in enumerate(lines, 1):
+            for match in re.finditer(large_gap_pattern, line):
+                value = int(match.group(1))
+                if value > 20:
+                    issues.append(
+                        ValidationIssue(
+                            severity="warning",
+                            message=f"Large gap value ({value}px) may cause overflow",
+                            file=filename,
+                            line=line_num,
+                            suggestion="Use gap: 12-16 * scale for compact layouts",
+                        )
+                    )
+
+        # Check for large padding values
+        large_padding_pattern = r'padding:\s*(\d+)\s*(?!\s*\*\s*scale)'
+        for line_num, line in enumerate(lines, 1):
+            for match in re.finditer(large_padding_pattern, line):
+                value = int(match.group(1))
+                if value > 24:
+                    issues.append(
+                        ValidationIssue(
+                            severity="warning",
+                            message=f"Large padding value ({value}px) may cause overflow",
+                            file=filename,
+                            line=line_num,
+                            suggestion="Use padding: 12-16 * scale for compact layouts",
+                        )
+                    )
+
+        # Check for flex containers without minHeight: 0 on children
+        has_flex_column = bool(re.search(r'flexDirection:\s*["\']column["\']', content))
+        has_flex_children = bool(re.search(r'flex:\s*["\']?\d|flex:\s*1', content))
+        has_min_height_zero = bool(re.search(r'minHeight:\s*0', content))
+
+        if has_flex_column and has_flex_children and not has_min_height_zero:
+            issues.append(
+                ValidationIssue(
+                    severity="warning",
+                    message="Flex column layout without minHeight: 0 on children may overflow",
+                    file=filename,
+                    line=None,
+                    suggestion="Add minHeight: 0 to flex children to prevent content overflow",
+                )
+            )
+
+        # Check for very large width/height values without scale
+        size_pattern = r'(width|height):\s*(\d+)\s*(?!\s*\*\s*scale)'
+        for line_num, line in enumerate(lines, 1):
+            for match in re.finditer(size_pattern, line):
+                prop = match.group(1)
+                value = int(match.group(2))
+
+                # Flag sizes that are likely to cause overflow
+                if prop == "width" and value > 800:
+                    issues.append(
+                        ValidationIssue(
+                            severity="warning",
+                            message=f"Large unscaled width ({value}px) may not fit on all screens",
+                            file=filename,
+                            line=line_num,
+                            suggestion=f"Use {value} * scale for responsive sizing",
+                        )
+                    )
+                elif prop == "height" and value > 600:
+                    issues.append(
+                        ValidationIssue(
+                            severity="warning",
+                            message=f"Large unscaled height ({value}px) may overflow content area",
+                            file=filename,
+                            line=line_num,
+                            suggestion=f"Use {value} * scale for responsive sizing",
+                        )
+                    )
+
+        # Check for animations that scale elements (might overflow at max scale)
+        scale_animation_pattern = r'scale:\s*(?:interpolate|spring)[^}]*\[\s*[\d.]+\s*,\s*([\d.]+)\s*\]'
+        for line_num, line in enumerate(lines, 1):
+            for match in re.finditer(scale_animation_pattern, line):
+                try:
+                    max_scale = float(match.group(1))
+                    if max_scale > 1.3:
+                        issues.append(
+                            ValidationIssue(
+                                severity="warning",
+                                message=f"Scale animation to {max_scale}x may cause overflow at peak",
+                                file=filename,
+                                line=line_num,
+                                suggestion="Limit scale animations to 1.0-1.2x or ensure element has room to grow",
+                            )
+                        )
+                except (ValueError, IndexError):
+                    pass
 
         return issues
 
