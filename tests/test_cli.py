@@ -1346,3 +1346,195 @@ class TestCmdGenerate:
         captured = capsys.readouterr()
         # Should show only scenes -> voiceover
         assert "scenes → voiceover" in captured.out
+
+
+class TestCmdScenesSync:
+    """Tests for the scenes --sync command."""
+
+    @pytest.fixture
+    def mock_args(self, tmp_path):
+        """Create mock args for scenes sync command."""
+        args = MagicMock()
+        args.projects_dir = str(tmp_path)
+        args.project = "test-project"
+        args.force = False
+        args.sync = True
+        args.scene = None
+        args.timeout = 60
+        args.verbose = False
+        return args
+
+    @pytest.fixture
+    def project_with_scenes(self, tmp_path):
+        """Create a project with scenes and voiceover manifest."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        # Create config
+        config = {"id": "test-project", "title": "Test Project"}
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        # Create script
+        script_dir = project_dir / "script"
+        script_dir.mkdir()
+        script = {
+            "title": "Test",
+            "scenes": [
+                {
+                    "scene_id": "scene1_hook",
+                    "title": "The Hook",
+                    "scene_type": "hook",
+                    "voiceover": "This is the hook narration.",
+                }
+            ]
+        }
+        with open(script_dir / "script.json", "w") as f:
+            json.dump(script, f)
+
+        # Create scenes directory with a mock scene
+        scenes_dir = project_dir / "scenes"
+        scenes_dir.mkdir()
+        scene_code = '''
+import { AbsoluteFill } from "remotion";
+export const HookScene = () => {
+  const phase1End = 90; // Old timing
+  return <AbsoluteFill>Hook</AbsoluteFill>;
+};
+'''
+        with open(scenes_dir / "HookScene.tsx", "w") as f:
+            f.write(scene_code)
+
+        # Create voiceover manifest with timestamps
+        voiceover_dir = project_dir / "voiceover"
+        voiceover_dir.mkdir()
+        manifest = {
+            "scenes": [
+                {
+                    "scene_id": "scene1_hook",
+                    "audio_path": str(voiceover_dir / "scene1_hook.mp3"),
+                    "duration_seconds": 15.0,
+                    "word_timestamps": [
+                        {"word": "This", "start_seconds": 0.0, "end_seconds": 0.5},
+                        {"word": "is", "start_seconds": 0.5, "end_seconds": 0.8},
+                        {"word": "the", "start_seconds": 0.8, "end_seconds": 1.0},
+                        {"word": "hook", "start_seconds": 1.0, "end_seconds": 1.5},
+                    ]
+                }
+            ]
+        }
+        with open(voiceover_dir / "manifest.json", "w") as f:
+            json.dump(manifest, f)
+
+        return project_dir
+
+    def test_sync_requires_scenes_directory(self, mock_args, tmp_path, capsys):
+        """Test sync fails if scenes directory doesn't exist."""
+        from src.cli.main import cmd_scenes
+
+        # Create project without scenes
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+        config = {"id": "test-project", "title": "Test Project"}
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        result = cmd_scenes(mock_args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "No scenes found" in captured.err
+
+    def test_sync_requires_voiceover_manifest(self, mock_args, tmp_path, capsys):
+        """Test sync fails if voiceover manifest doesn't exist."""
+        from src.cli.main import cmd_scenes
+
+        # Create project with scenes but no voiceover
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+        config = {"id": "test-project", "title": "Test Project"}
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        scenes_dir = project_dir / "scenes"
+        scenes_dir.mkdir()
+        with open(scenes_dir / "HookScene.tsx", "w") as f:
+            f.write("// Scene content")
+
+        result = cmd_scenes(mock_args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "manifest not found" in captured.err
+
+    def test_sync_specific_scene_not_found(self, mock_args, project_with_scenes, capsys):
+        """Test sync fails if specified scene doesn't exist."""
+        from src.cli.main import cmd_scenes
+
+        mock_args.scene = "NonexistentScene.tsx"
+
+        result = cmd_scenes(mock_args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Scene not found" in captured.err or "Error" in captured.err
+
+    def test_sync_shows_progress(self, mock_args, project_with_scenes, capsys):
+        """Test sync shows progress information."""
+        from src.cli.main import cmd_scenes
+        from unittest.mock import patch
+
+        # Mock the sync method to avoid actual LLM calls
+        with patch(
+            "src.scenes.generator.SceneGenerator.sync_all_scenes",
+            return_value={
+                "scenes_dir": str(project_with_scenes / "scenes"),
+                "synced": [{"filename": "HookScene.tsx", "scene_id": "scene1_hook"}],
+                "skipped": [],
+                "errors": [],
+            }
+        ):
+            result = cmd_scenes(mock_args)
+            assert result == 0
+            captured = capsys.readouterr()
+            assert "Syncing" in captured.out
+            assert "Synced: 1 scenes" in captured.out
+
+    def test_sync_reports_skipped_scenes(self, mock_args, project_with_scenes, capsys):
+        """Test sync reports skipped scenes."""
+        from src.cli.main import cmd_scenes
+        from unittest.mock import patch
+
+        # Mock the sync method to return skipped scenes
+        with patch(
+            "src.scenes.generator.SceneGenerator.sync_all_scenes",
+            return_value={
+                "scenes_dir": str(project_with_scenes / "scenes"),
+                "synced": [],
+                "skipped": [{"filename": "HookScene.tsx", "reason": "No matching timestamps"}],
+                "errors": [],
+            }
+        ):
+            mock_args.verbose = True
+            result = cmd_scenes(mock_args)
+            assert result == 0
+            captured = capsys.readouterr()
+            assert "Skipped: 1 scenes" in captured.out
+            assert "No matching timestamps" in captured.out
+
+    def test_sync_returns_error_on_failure(self, mock_args, project_with_scenes, capsys):
+        """Test sync returns error code on failure."""
+        from src.cli.main import cmd_scenes
+        from unittest.mock import patch
+
+        # Mock the sync method to return errors
+        with patch(
+            "src.scenes.generator.SceneGenerator.sync_all_scenes",
+            return_value={
+                "scenes_dir": str(project_with_scenes / "scenes"),
+                "synced": [],
+                "skipped": [],
+                "errors": [{"filename": "HookScene.tsx", "error": "LLM failed"}],
+            }
+        ):
+            result = cmd_scenes(mock_args)
+            assert result == 1
+            captured = capsys.readouterr()
+            assert "Failed: 1 scenes" in captured.out

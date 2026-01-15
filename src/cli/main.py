@@ -940,6 +940,10 @@ def cmd_scenes(args: argparse.Namespace) -> int:
         print(f"Error: {e}", file=sys.stderr)
         return 1
 
+    # Handle sync mode
+    if args.sync:
+        return _cmd_scenes_sync(args, project)
+
     print(f"Generating scenes for {project.id}")
 
     # Check for script
@@ -1011,6 +1015,69 @@ def cmd_scenes(args: argparse.Namespace) -> int:
         return 1
     except Exception as e:
         print(f"Error generating scenes: {e}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+def _cmd_scenes_sync(args: argparse.Namespace, project) -> int:
+    """Sync scene timing to updated voiceover timestamps."""
+    from ..scenes import SceneGenerator
+
+    if args.scene:
+        print(f"Syncing scene {args.scene} for {project.id}")
+    else:
+        print(f"Syncing all scenes for {project.id}")
+
+    # Check scenes exist
+    scenes_dir = project.root_dir / "scenes"
+    if not scenes_dir.exists() or not list(scenes_dir.glob("*.tsx")):
+        print(f"Error: No scenes found in {scenes_dir}", file=sys.stderr)
+        print("Run 'scenes' command first to generate scenes.")
+        return 1
+
+    # Check voiceover manifest exists
+    voiceover_manifest_path = project.root_dir / "voiceover" / "manifest.json"
+    if not voiceover_manifest_path.exists():
+        print(f"Error: Voiceover manifest not found at {voiceover_manifest_path}", file=sys.stderr)
+        print("Run 'voiceover' command first to generate voiceover with timestamps.")
+        return 1
+
+    print(f"Using word timestamps from: {voiceover_manifest_path}")
+    print()
+
+    generator = SceneGenerator(
+        working_dir=project.root_dir.parent.parent,  # Repo root
+        timeout=args.timeout,
+    )
+
+    try:
+        print("Syncing scene timing to voiceover...")
+        results = generator.sync_all_scenes(
+            project_dir=project.root_dir,
+            voiceover_manifest_path=voiceover_manifest_path,
+            scene_filter=args.scene,
+        )
+
+        # Report results
+        print()
+        print(f"Synced: {len(results['synced'])} scenes")
+        if results["skipped"]:
+            print(f"Skipped: {len(results['skipped'])} scenes")
+            if args.verbose:
+                for skip in results["skipped"]:
+                    print(f"  {skip['filename']}: {skip['reason']}")
+        if results["errors"]:
+            print(f"Failed: {len(results['errors'])} scenes")
+            for err in results["errors"]:
+                print(f"  {err['filename']}: {err['error']}")
+            return 1
+
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Error syncing scenes: {e}", file=sys.stderr)
         return 1
 
     return 0
@@ -1692,6 +1759,8 @@ def cmd_generate(args: argparse.Namespace) -> int:
             step_args.mock = args.mock
             step_args.timeout = args.timeout
             step_args.force = args.force or not step_output_exists(step)
+            step_args.sync = False  # Generate mode, not sync
+            step_args.scene = None
             result = cmd_scenes(step_args)
 
         elif step == "voiceover":
@@ -1980,6 +2049,17 @@ Use --force to regenerate all steps.
         "--force",
         action="store_true",
         help="Overwrite existing scenes",
+    )
+    scenes_parser.add_argument(
+        "--sync",
+        action="store_true",
+        help="Sync existing scenes to updated voiceover timing (timing-only update)",
+    )
+    scenes_parser.add_argument(
+        "--scene",
+        type=str,
+        default=None,
+        help="Specific scene file to sync (e.g., HookScene.tsx). Only used with --sync.",
     )
     scenes_parser.add_argument(
         "--timeout",

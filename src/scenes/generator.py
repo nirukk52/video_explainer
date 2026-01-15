@@ -906,6 +906,75 @@ The component should be saved to: {output_path}
 """
 
 
+SYNC_SCENE_PROMPT = """Update the timing in an existing scene to match new voiceover timestamps.
+
+## CRITICAL: TIMING-ONLY UPDATE
+
+You are syncing an existing scene to new voiceover timing. This is NOT a regeneration.
+
+**DO NOT CHANGE**:
+- Visual structure or layout
+- Animation types or effects
+- Color schemes or styling
+- Component hierarchy
+- Import statements
+- Props interface
+
+**ONLY UPDATE**:
+- Frame numbers for animation triggers
+- Phase timing constants (e.g., phase1End, phase2End)
+- Animation delays and durations that are tied to narration
+- Comments about timing (update to reflect new timestamps)
+
+## Existing Scene Code
+
+```typescript
+{existing_code}
+```
+
+## New Word Timestamps
+
+**Scene Duration**: {duration}s = {total_frames} frames at 30fps
+
+{word_timestamps_section}
+
+## Instructions
+
+1. Read through the existing code and identify all timing-related values:
+   - Phase end frames (e.g., `const phase1End = 90`)
+   - Animation trigger frames (e.g., `const titleAppears = 30`)
+   - Delays and durations tied to narration timing
+
+2. For each timing value, find the corresponding word/phrase in the new timestamps
+
+3. Update ONLY the numeric values to match the new timestamps:
+   - If "solution" was at frame 150 and is now at frame 180, update that constant
+   - Keep animation durations the same (e.g., if fade-in was 30 frames, keep it 30 frames)
+   - Maintain the relative timing between elements within a phase
+
+4. Update any timing-related comments to reflect the new timestamps
+
+## Example
+
+If the existing code has:
+```typescript
+// "memory" spoken at frame 120 (4.0s)
+const memoryAppears = 105;  // 15 frames early for anticipation
+```
+
+And the new timestamps show "memory" at frame 150 (5.0s), update to:
+```typescript
+// "memory" spoken at frame 150 (5.0s)
+const memoryAppears = 135;  // 15 frames early for anticipation
+```
+
+## Output
+
+Return the COMPLETE updated component code with ONLY timing values changed.
+The component should be saved to: {output_path}
+"""
+
+
 STYLES_TEMPLATE = '''/**
  * Shared Style Constants for {project_title}
  *
@@ -1422,6 +1491,202 @@ class SceneGenerator:
         self._generate_index(scenes_dir, results["scenes"], script.get("title", "Untitled"))
 
         return results
+
+    def sync_all_scenes(
+        self,
+        project_dir: Path,
+        voiceover_manifest_path: Path | None = None,
+        scene_filter: str | None = None,
+    ) -> dict[str, Any]:
+        """Sync timing in existing scenes to match updated voiceover timestamps.
+
+        This is a lightweight operation that only updates timing values in scenes,
+        preserving all visual structure and animations.
+
+        Args:
+            project_dir: Path to the project directory
+            voiceover_manifest_path: Path to voiceover manifest.json with word timestamps
+            scene_filter: Optional scene filename to sync (e.g., "HookScene.tsx")
+
+        Returns:
+            Dict with sync results
+        """
+        scenes_dir = project_dir / "scenes"
+        script_path = project_dir / "script" / "script.json"
+
+        if not scenes_dir.exists():
+            raise FileNotFoundError(f"Scenes directory not found: {scenes_dir}")
+
+        # Load voiceover manifest for word timestamps
+        voiceover_manifest_path = voiceover_manifest_path or project_dir / "voiceover" / "manifest.json"
+        if not voiceover_manifest_path.exists():
+            raise FileNotFoundError(
+                f"Voiceover manifest not found: {voiceover_manifest_path}\n"
+                "Run 'voiceover' command first to generate voiceover with timestamps."
+            )
+
+        with open(voiceover_manifest_path) as f:
+            manifest = json.load(f)
+
+        # Build lookup of timestamps by scene_id
+        timestamps_by_scene_id: dict[str, tuple[list[dict], float]] = {}
+        for scene_data in manifest.get("scenes", []):
+            scene_id = scene_data.get("scene_id", "")
+            timestamps_by_scene_id[scene_id] = (
+                scene_data.get("word_timestamps", []),
+                scene_data.get("duration_seconds", 20.0),
+            )
+
+        # Load script to get scene info
+        if not script_path.exists():
+            raise FileNotFoundError(f"Script not found: {script_path}")
+
+        with open(script_path) as f:
+            script = json.load(f)
+
+        # Get existing scene files
+        scene_files = list(scenes_dir.glob("*.tsx"))
+        scene_files = [f for f in scene_files if f.name not in ("index.tsx", "styles.tsx")]
+
+        if scene_filter:
+            scene_files = [f for f in scene_files if f.name == scene_filter]
+            if not scene_files:
+                raise FileNotFoundError(f"Scene not found: {scene_filter}")
+
+        results = {
+            "scenes_dir": str(scenes_dir),
+            "synced": [],
+            "skipped": [],
+            "errors": [],
+        }
+
+        for scene_file in scene_files:
+            # Find matching scene in script
+            component_name = scene_file.stem
+            scene_key = self._component_to_registry_key(component_name)
+
+            # Try to find scene_id that matches this scene
+            matching_scene_id = None
+            matching_scene = None
+            for idx, scene in enumerate(script.get("scenes", [])):
+                scene_id = scene.get("scene_id", f"scene{idx + 1}")
+                # scene_id format is "scene1_hook" -> extract "hook" part
+                if "_" in scene_id:
+                    key_part = scene_id.split("_", 1)[1]
+                else:
+                    key_part = scene_id
+
+                # Check if this scene matches
+                title_key = self._title_to_scene_key(scene.get("title", ""))
+                if key_part == scene_key or title_key == scene_key:
+                    matching_scene_id = scene_id
+                    matching_scene = scene
+                    break
+
+            if not matching_scene_id or matching_scene_id not in timestamps_by_scene_id:
+                results["skipped"].append({
+                    "filename": scene_file.name,
+                    "reason": "No matching voiceover timestamps found",
+                })
+                continue
+
+            word_timestamps, duration = timestamps_by_scene_id[matching_scene_id]
+            if not word_timestamps:
+                results["skipped"].append({
+                    "filename": scene_file.name,
+                    "reason": "No word timestamps in voiceover manifest",
+                })
+                continue
+
+            try:
+                self._sync_scene_timing(
+                    scene_file=scene_file,
+                    word_timestamps=word_timestamps,
+                    duration=duration,
+                    voiceover=matching_scene.get("voiceover", "") if matching_scene else "",
+                )
+                results["synced"].append({
+                    "filename": scene_file.name,
+                    "scene_id": matching_scene_id,
+                })
+                print(f"  ✓ Synced {scene_file.name}")
+
+            except Exception as e:
+                results["errors"].append({
+                    "filename": scene_file.name,
+                    "error": str(e),
+                })
+                print(f"  ✗ Failed to sync {scene_file.name}: {e}")
+
+        return results
+
+    def _sync_scene_timing(
+        self,
+        scene_file: Path,
+        word_timestamps: list[dict],
+        duration: float,
+        voiceover: str = "",
+    ) -> None:
+        """Sync timing in a single scene file to match new voiceover timestamps.
+
+        Args:
+            scene_file: Path to the scene .tsx file
+            word_timestamps: Word-level timestamps from voiceover
+            duration: Scene duration in seconds
+            voiceover: The voiceover text (for context)
+        """
+        # Read existing scene code
+        with open(scene_file) as f:
+            existing_code = f.read()
+
+        # Format word timestamps for the prompt
+        word_timestamps_section = self._format_word_timestamps_for_prompt(
+            word_timestamps, voiceover, duration
+        )
+
+        # Build sync prompt
+        prompt = SYNC_SCENE_PROMPT.format(
+            existing_code=existing_code,
+            duration=duration,
+            total_frames=int(duration * 30),
+            word_timestamps_section=word_timestamps_section,
+            output_path=scene_file,
+        )
+
+        # Use LLM to sync timing
+        llm_config = LLMConfig(provider="claude-code", model="claude-sonnet-4-20250514")
+        llm = ClaudeCodeLLMProvider(
+            llm_config,
+            working_dir=self.working_dir,
+            timeout=self.timeout,
+        )
+
+        full_prompt = f"""{prompt}
+
+Write the complete updated component code to the file: {scene_file}
+"""
+
+        result = llm.generate_with_file_access(full_prompt, allow_writes=True)
+
+        if not result.success:
+            raise RuntimeError(f"LLM sync failed: {result.error_message}")
+
+        # Verify file was updated (or extract and write code)
+        if not scene_file.exists():
+            code = self._extract_code(result.response)
+            if code:
+                with open(scene_file, "w") as f:
+                    f.write(code)
+            else:
+                raise RuntimeError(f"Sync failed - no code generated for {scene_file}")
+
+        # Validate the synced scene
+        validation = self.validator.validate_single_scene(scene_file)
+        if validation.errors:
+            # Log errors but don't fail - timing sync shouldn't break validation
+            print(f"    ⚠ Validation warnings after sync:")
+            for error in validation.errors[:3]:
+                print(f"      - {error.message}")
 
     def _generate_scene(
         self,

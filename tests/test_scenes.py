@@ -1043,3 +1043,207 @@ class TestSceneKeyConsistency:
                 f"Key mismatch for actual project title '{title}': "
                 f"generator='{generator_key}', cli='{cli_key}'"
             )
+
+
+class TestSyncSceneTiming:
+    """Tests for the sync_all_scenes and _sync_scene_timing methods."""
+
+    @pytest.fixture
+    def project_with_scenes(self, tmp_path):
+        """Create a project with scenes and voiceover manifest for sync testing."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        # Create script with scene info
+        script_dir = project_dir / "script"
+        script_dir.mkdir()
+        script = {
+            "title": "Test Video",
+            "scenes": [
+                {
+                    "scene_id": "scene1_hook",
+                    "title": "The Hook",
+                    "scene_type": "hook",
+                    "voiceover": "This is a test hook for our video.",
+                    "duration_seconds": 15.0,
+                },
+                {
+                    "scene_id": "scene2_context",
+                    "title": "The Context",
+                    "scene_type": "context",
+                    "voiceover": "Here is some context for the topic.",
+                    "duration_seconds": 20.0,
+                }
+            ]
+        }
+        with open(script_dir / "script.json", "w") as f:
+            json.dump(script, f)
+
+        # Create scenes
+        scenes_dir = project_dir / "scenes"
+        scenes_dir.mkdir()
+
+        hook_scene = '''import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { COLORS } from "./styles";
+
+export const HookScene = () => {
+  const frame = useCurrentFrame();
+  // Old timing: "test" at frame 60 (2.0s)
+  const phase1End = 60;
+  const phase2End = 150;
+
+  return (
+    <AbsoluteFill style={{ background: COLORS.background }}>
+      <h1>Hook Scene</h1>
+    </AbsoluteFill>
+  );
+};
+'''
+        with open(scenes_dir / "HookScene.tsx", "w") as f:
+            f.write(hook_scene)
+
+        context_scene = '''import { AbsoluteFill } from "remotion";
+export const ContextScene = () => {
+  return <AbsoluteFill>Context</AbsoluteFill>;
+};
+'''
+        with open(scenes_dir / "ContextScene.tsx", "w") as f:
+            f.write(context_scene)
+
+        # Create voiceover manifest with timestamps
+        voiceover_dir = project_dir / "voiceover"
+        voiceover_dir.mkdir()
+        manifest = {
+            "scenes": [
+                {
+                    "scene_id": "scene1_hook",
+                    "audio_path": str(voiceover_dir / "scene1_hook.mp3"),
+                    "duration_seconds": 15.0,
+                    "word_timestamps": [
+                        {"word": "This", "start_seconds": 0.0, "end_seconds": 0.3},
+                        {"word": "is", "start_seconds": 0.3, "end_seconds": 0.5},
+                        {"word": "a", "start_seconds": 0.5, "end_seconds": 0.6},
+                        {"word": "test", "start_seconds": 3.0, "end_seconds": 3.5},  # Changed from 2.0s to 3.0s
+                        {"word": "hook", "start_seconds": 3.5, "end_seconds": 4.0},
+                    ]
+                },
+                {
+                    "scene_id": "scene2_context",
+                    "audio_path": str(voiceover_dir / "scene2_context.mp3"),
+                    "duration_seconds": 20.0,
+                    "word_timestamps": [
+                        {"word": "Here", "start_seconds": 0.0, "end_seconds": 0.5},
+                        {"word": "is", "start_seconds": 0.5, "end_seconds": 0.8},
+                    ]
+                }
+            ]
+        }
+        with open(voiceover_dir / "manifest.json", "w") as f:
+            json.dump(manifest, f)
+
+        return project_dir
+
+    def test_sync_all_scenes_missing_scenes_dir(self, tmp_path):
+        """Test sync fails if scenes directory doesn't exist."""
+        from src.scenes.generator import SceneGenerator
+
+        project_dir = tmp_path / "empty-project"
+        project_dir.mkdir()
+
+        generator = SceneGenerator(working_dir=tmp_path)
+
+        with pytest.raises(FileNotFoundError) as exc:
+            generator.sync_all_scenes(project_dir)
+
+        assert "Scenes directory not found" in str(exc.value)
+
+    def test_sync_all_scenes_missing_voiceover_manifest(self, tmp_path):
+        """Test sync fails if voiceover manifest doesn't exist."""
+        from src.scenes.generator import SceneGenerator
+
+        project_dir = tmp_path / "project"
+        project_dir.mkdir()
+        scenes_dir = project_dir / "scenes"
+        scenes_dir.mkdir()
+        with open(scenes_dir / "TestScene.tsx", "w") as f:
+            f.write("// Test")
+
+        generator = SceneGenerator(working_dir=tmp_path)
+
+        with pytest.raises(FileNotFoundError) as exc:
+            generator.sync_all_scenes(project_dir)
+
+        assert "Voiceover manifest not found" in str(exc.value)
+
+    def test_sync_all_scenes_filters_by_scene(self, project_with_scenes):
+        """Test sync can filter to a specific scene."""
+        from src.scenes.generator import SceneGenerator
+        from unittest.mock import patch, MagicMock
+
+        generator = SceneGenerator(working_dir=project_with_scenes.parent)
+
+        # Mock _sync_scene_timing to avoid LLM calls
+        with patch.object(generator, '_sync_scene_timing') as mock_sync:
+            results = generator.sync_all_scenes(
+                project_dir=project_with_scenes,
+                scene_filter="HookScene.tsx"
+            )
+
+            # Should only try to sync HookScene
+            assert mock_sync.call_count == 1
+            call_args = mock_sync.call_args
+            assert "HookScene.tsx" in str(call_args[1]["scene_file"])
+
+    def test_sync_all_scenes_skips_scenes_without_timestamps(self, project_with_scenes):
+        """Test sync skips scenes that don't have matching timestamps."""
+        from src.scenes.generator import SceneGenerator
+        from unittest.mock import patch
+
+        # Add a scene that doesn't have timestamps
+        extra_scene = project_with_scenes / "scenes" / "ExtraScene.tsx"
+        with open(extra_scene, "w") as f:
+            f.write("// Extra scene without timestamps")
+
+        generator = SceneGenerator(working_dir=project_with_scenes.parent)
+
+        with patch.object(generator, '_sync_scene_timing'):
+            results = generator.sync_all_scenes(project_dir=project_with_scenes)
+
+            # ExtraScene should be in skipped
+            skipped_files = [s["filename"] for s in results["skipped"]]
+            assert "ExtraScene.tsx" in skipped_files
+
+    def test_sync_all_scenes_scene_not_found(self, project_with_scenes):
+        """Test sync fails if filtered scene doesn't exist."""
+        from src.scenes.generator import SceneGenerator
+
+        generator = SceneGenerator(working_dir=project_with_scenes.parent)
+
+        with pytest.raises(FileNotFoundError) as exc:
+            generator.sync_all_scenes(
+                project_dir=project_with_scenes,
+                scene_filter="NonexistentScene.tsx"
+            )
+
+        assert "Scene not found" in str(exc.value)
+
+    def test_sync_prompt_contains_existing_code(self):
+        """Test the sync prompt template includes existing code placeholder."""
+        from src.scenes.generator import SYNC_SCENE_PROMPT
+
+        assert "{existing_code}" in SYNC_SCENE_PROMPT
+        assert "{word_timestamps_section}" in SYNC_SCENE_PROMPT
+        assert "{duration}" in SYNC_SCENE_PROMPT
+        assert "{total_frames}" in SYNC_SCENE_PROMPT
+
+    def test_sync_prompt_emphasizes_timing_only(self):
+        """Test the sync prompt emphasizes timing-only updates."""
+        from src.scenes.generator import SYNC_SCENE_PROMPT
+
+        # Should emphasize what NOT to change
+        assert "DO NOT CHANGE" in SYNC_SCENE_PROMPT
+        assert "Visual structure" in SYNC_SCENE_PROMPT or "layout" in SYNC_SCENE_PROMPT
+
+        # Should emphasize what TO change
+        assert "ONLY UPDATE" in SYNC_SCENE_PROMPT
+        assert "Frame numbers" in SYNC_SCENE_PROMPT or "timing" in SYNC_SCENE_PROMPT.lower()

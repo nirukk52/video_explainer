@@ -174,6 +174,17 @@ This uses Claude Code to generate animated React components with:
 - Scene registry for dynamic loading
 - **Automatic validation and self-correction**: The generator validates each scene and automatically retries with error feedback if validation fails
 
+**Syncing Scenes to Updated Voiceover:**
+
+If you re-record or modify the voiceover, use `--sync` to update scene timing without regenerating all visual content:
+
+```bash
+python -m src.cli scenes llm-inference --sync              # Sync all scenes
+python -m src.cli scenes llm-inference --sync --scene HookScene.tsx  # Sync specific scene
+```
+
+This is much faster than full regeneration - it only updates timing values (frame numbers, animation triggers) while preserving all visual structure and animations.
+
 #### Voiceover Generation
 
 Generate audio files from narrations:
