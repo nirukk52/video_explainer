@@ -4,6 +4,10 @@ Usage:
     python -m src.cli list                                    # List all projects
     python -m src.cli info <project>                          # Show project info
     python -m src.cli create <project_id>                     # Create new project
+    python -m src.cli generate <project>                      # Run full pipeline end-to-end
+    python -m src.cli generate <project> --from scenes        # Start from a specific step
+    python -m src.cli generate <project> --to voiceover       # Stop at a specific step
+    python -m src.cli generate <project> --force              # Force regenerate all steps
     python -m src.cli script <project>                        # Generate script from docs
     python -m src.cli script <project> --url <url>            # Generate script from URL
     python -m src.cli script <project> -i doc.pdf             # Generate script from PDF
@@ -1560,6 +1564,195 @@ def cmd_factcheck(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_generate(args: argparse.Namespace) -> int:
+    """Run the full video generation pipeline end-to-end.
+
+    This command orchestrates all the steps needed to create a video:
+    1. script - Generate script from input docs
+    2. narration - Generate narrations for scenes
+    3. scenes - Generate Remotion scene components
+    4. voiceover - Generate audio from narrations
+    5. storyboard - Create storyboard linking scenes + audio
+    6. render - Render final video
+    """
+    from ..project import load_project
+
+    # Define pipeline steps in order
+    PIPELINE_STEPS = ["script", "narration", "scenes", "voiceover", "storyboard", "render"]
+
+    # Parse --from and --to options
+    start_step = args.from_step.lower() if args.from_step else "script"
+    end_step = args.to_step.lower() if args.to_step else "render"
+
+    if start_step not in PIPELINE_STEPS:
+        print(f"Error: Unknown step '{start_step}'")
+        print(f"Available steps: {', '.join(PIPELINE_STEPS)}")
+        return 1
+
+    if end_step not in PIPELINE_STEPS:
+        print(f"Error: Unknown step '{end_step}'")
+        print(f"Available steps: {', '.join(PIPELINE_STEPS)}")
+        return 1
+
+    start_idx = PIPELINE_STEPS.index(start_step)
+    end_idx = PIPELINE_STEPS.index(end_step)
+
+    if start_idx > end_idx:
+        print(f"Error: --from step '{start_step}' comes after --to step '{end_step}'")
+        return 1
+
+    steps_to_run = PIPELINE_STEPS[start_idx : end_idx + 1]
+
+    # Load project
+    try:
+        project = load_project(Path(args.projects_dir) / args.project)
+    except FileNotFoundError as e:
+        print(f"Error: {e}")
+        return 1
+
+    print(f"{'=' * 60}")
+    print(f"VIDEO GENERATION PIPELINE")
+    print(f"{'=' * 60}")
+    print(f"Project: {project.id}")
+    print(f"Title: {project.title}")
+    print(f"Steps: {' → '.join(steps_to_run)}")
+    if args.force:
+        print(f"Mode: Force regenerate all steps")
+    else:
+        print(f"Mode: Skip completed steps")
+    print(f"{'=' * 60}\n")
+
+    # Helper to check if step output exists
+    def step_output_exists(step: str) -> bool:
+        """Check if a step's output already exists."""
+        if step == "script":
+            return (project.root_dir / "script" / "script.json").exists()
+        elif step == "narration":
+            return (project.root_dir / "narration" / "narrations.json").exists()
+        elif step == "scenes":
+            scenes_dir = project.root_dir / "scenes"
+            if not scenes_dir.exists():
+                return False
+            tsx_files = list(scenes_dir.glob("Scene*.tsx"))
+            return len(tsx_files) > 0
+        elif step == "voiceover":
+            return (project.root_dir / "voiceover" / "manifest.json").exists()
+        elif step == "storyboard":
+            return (project.root_dir / "storyboard" / "storyboard.json").exists()
+        elif step == "render":
+            output_dir = project.root_dir / "output"
+            if not output_dir.exists():
+                return False
+            mp4_files = list(output_dir.glob("*.mp4"))
+            return len(mp4_files) > 0
+        return False
+
+    # Run each step
+    for step_num, step in enumerate(steps_to_run, 1):
+        step_header = f"[{step_num}/{len(steps_to_run)}] {step.upper()}"
+        print(f"\n{'─' * 60}")
+        print(f"{step_header}")
+        print(f"{'─' * 60}")
+
+        # Check if we can skip this step
+        if not args.force and step_output_exists(step):
+            print(f"✓ Output already exists, skipping (use --force to regenerate)")
+            continue
+
+        # Create args namespace for the step command
+        step_args = argparse.Namespace(
+            project=args.project,
+            projects_dir=args.projects_dir,
+        )
+
+        # Add step-specific arguments
+        if step == "script":
+            # Check if input files exist
+            input_dir = project.root_dir / "input"
+            if not input_dir.exists() or not list(input_dir.glob("*")):
+                print(f"Error: No input files found in {input_dir}")
+                print("Please add input documents (PDF, MD, or run with --url)")
+                return 1
+            step_args.input = None
+            step_args.url = None
+            step_args.duration = None
+            step_args.mock = args.mock
+            step_args.timeout = args.timeout
+            step_args.force = args.force or not step_output_exists(step)
+            step_args.verbose = False
+            result = cmd_script(step_args)
+
+        elif step == "narration":
+            step_args.mock = args.mock
+            step_args.timeout = args.timeout
+            step_args.force = args.force or not step_output_exists(step)
+            result = cmd_narration(step_args)
+
+        elif step == "scenes":
+            step_args.mock = args.mock
+            step_args.timeout = args.timeout
+            step_args.force = args.force or not step_output_exists(step)
+            result = cmd_scenes(step_args)
+
+        elif step == "voiceover":
+            step_args.provider = args.voice_provider
+            step_args.mock = args.mock
+            step_args.continue_on_error = False
+            step_args.export_script = False
+            step_args.output = None
+            step_args.audio_dir = None
+            step_args.whisper_model = "base"
+            step_args.no_sync = False
+            step_args.with_tags = False
+            result = cmd_voiceover(step_args)
+
+        elif step == "storyboard":
+            step_args.view = False
+            step_args.mock = args.mock
+            step_args.timeout = args.timeout
+            step_args.force = args.force or not step_output_exists(step)
+            result = cmd_storyboard(step_args)
+
+        elif step == "render":
+            step_args.resolution = args.resolution
+            step_args.quality = "high"
+            step_args.output = None
+            step_args.scenes = None
+            step_args.preview = False
+            step_args.open_output = False
+            step_args.dev = False
+            step_args.fast = False
+            step_args.concurrency = None
+            result = cmd_render(step_args)
+
+        else:
+            print(f"Error: Unknown step '{step}'")
+            return 1
+
+        # Check result
+        if result != 0:
+            print(f"\n{'=' * 60}")
+            print(f"PIPELINE FAILED at step: {step}")
+            print(f"{'=' * 60}")
+            return result
+
+        print(f"✓ {step.upper()} completed successfully")
+
+    # Success
+    print(f"\n{'=' * 60}")
+    print(f"PIPELINE COMPLETED SUCCESSFULLY")
+    print(f"{'=' * 60}")
+
+    # Show output location
+    output_dir = project.root_dir / "output"
+    mp4_files = list(output_dir.glob("*.mp4")) if output_dir.exists() else []
+    if mp4_files:
+        latest_video = max(mp4_files, key=lambda f: f.stat().st_mtime)
+        print(f"\nOutput video: {latest_video}")
+
+    return 0
+
+
 def main() -> int:
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
@@ -1589,6 +1782,67 @@ def main() -> int:
     create_parser.add_argument("--title", help="Project title")
     create_parser.add_argument("--description", help="Project description")
     create_parser.set_defaults(func=cmd_create)
+
+    # generate command (full pipeline)
+    generate_parser = subparsers.add_parser(
+        "generate",
+        help="Run the full video generation pipeline end-to-end",
+        description="""
+Run all steps to generate a video from input documents:
+  1. script     - Generate script from input docs
+  2. narration  - Generate narrations for scenes
+  3. scenes     - Generate Remotion scene components
+  4. voiceover  - Generate audio from narrations
+  5. storyboard - Create storyboard linking scenes + audio
+  6. render     - Render final video
+
+By default, skips steps that have already been completed.
+Use --force to regenerate all steps.
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    generate_parser.add_argument("project", help="Project ID")
+    generate_parser.add_argument(
+        "--force", "-f",
+        action="store_true",
+        help="Force regenerate all steps even if output exists",
+    )
+    generate_parser.add_argument(
+        "--from",
+        dest="from_step",
+        choices=["script", "narration", "scenes", "voiceover", "storyboard", "render"],
+        help="Start from this step (skip earlier steps)",
+    )
+    generate_parser.add_argument(
+        "--to",
+        dest="to_step",
+        choices=["script", "narration", "scenes", "voiceover", "storyboard", "render"],
+        help="Stop after this step (skip later steps)",
+    )
+    generate_parser.add_argument(
+        "--resolution", "-r",
+        choices=["720p", "1080p", "4k"],
+        default="1080p",
+        help="Video resolution for render step (default: 1080p)",
+    )
+    generate_parser.add_argument(
+        "--voice-provider",
+        choices=["elevenlabs", "edge"],
+        default="elevenlabs",
+        help="TTS provider for voiceover step (default: elevenlabs)",
+    )
+    generate_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock LLM/TTS for testing (faster, no API calls)",
+    )
+    generate_parser.add_argument(
+        "--timeout",
+        type=int,
+        default=600,
+        help="LLM timeout in seconds (default: 600)",
+    )
+    generate_parser.set_defaults(func=cmd_generate)
 
     # voiceover command
     voiceover_parser = subparsers.add_parser("voiceover", help="Generate voiceovers")

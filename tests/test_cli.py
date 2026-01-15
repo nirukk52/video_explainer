@@ -16,6 +16,7 @@ from src.cli.main import (
     cmd_storyboard,
     cmd_render,
     cmd_script,
+    cmd_generate,
     main,
     RESOLUTION_PRESETS,
 )
@@ -1199,3 +1200,149 @@ class TestCLIIntegration:
         assert "--resolution" in result.stdout
         assert "--fast" in result.stdout
         assert "--concurrency" in result.stdout
+
+    def test_generate_help(self):
+        """Test generate --help shows pipeline options."""
+        result = subprocess.run(
+            [sys.executable, "-m", "src.cli", "generate", "--help"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0
+        assert "script" in result.stdout
+        assert "narration" in result.stdout
+        assert "scenes" in result.stdout
+        assert "voiceover" in result.stdout
+        assert "storyboard" in result.stdout
+        assert "render" in result.stdout
+        assert "--force" in result.stdout
+        assert "--from" in result.stdout
+        assert "--to" in result.stdout
+
+
+class TestCmdGenerate:
+    """Tests for the generate command (full pipeline)."""
+
+    @pytest.fixture
+    def mock_args(self, tmp_path):
+        """Create mock args for generate command."""
+        args = MagicMock()
+        args.projects_dir = str(tmp_path)
+        args.project = "test-project"
+        args.force = False
+        args.from_step = None
+        args.to_step = None
+        args.resolution = "1080p"
+        args.voice_provider = "elevenlabs"
+        args.mock = True
+        args.timeout = 60
+        return args
+
+    @pytest.fixture
+    def sample_project(self, tmp_path):
+        """Create a sample project for testing."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+        config = {"id": "test-project", "title": "Test Project"}
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+        return project_dir
+
+    def test_generate_returns_error_for_nonexistent_project(self, mock_args, capsys):
+        """Test generate fails gracefully for nonexistent project."""
+        from src.cli.main import cmd_generate
+        result = cmd_generate(mock_args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Error" in captured.out
+
+    def test_generate_validates_from_step(self, mock_args, sample_project, capsys):
+        """Test generate validates --from step name."""
+        from src.cli.main import cmd_generate
+        mock_args.from_step = "invalid_step"
+        result = cmd_generate(mock_args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Unknown step" in captured.out
+
+    def test_generate_validates_to_step(self, mock_args, sample_project, capsys):
+        """Test generate validates --to step name."""
+        from src.cli.main import cmd_generate
+        mock_args.to_step = "invalid_step"
+        result = cmd_generate(mock_args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "Unknown step" in captured.out
+
+    def test_generate_validates_step_order(self, mock_args, sample_project, capsys):
+        """Test generate validates --from comes before --to."""
+        from src.cli.main import cmd_generate
+        mock_args.from_step = "render"
+        mock_args.to_step = "script"
+        result = cmd_generate(mock_args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "comes after" in captured.out
+
+    def test_generate_requires_input_files_for_script_step(self, mock_args, sample_project, capsys):
+        """Test generate fails if no input files for script step."""
+        from src.cli.main import cmd_generate
+        result = cmd_generate(mock_args)
+        assert result == 1
+        captured = capsys.readouterr()
+        assert "No input files found" in captured.out
+
+    def test_generate_skips_completed_steps(self, mock_args, sample_project, capsys):
+        """Test generate skips steps that have output already."""
+        from src.cli.main import cmd_generate
+
+        # Create script output (to simulate script step completed)
+        script_dir = sample_project / "script"
+        script_dir.mkdir()
+        with open(script_dir / "script.json", "w") as f:
+            json.dump({"title": "Test", "scenes": []}, f)
+
+        # Create input files
+        input_dir = sample_project / "input"
+        input_dir.mkdir()
+        with open(input_dir / "test.md", "w") as f:
+            f.write("# Test content")
+
+        mock_args.to_step = "script"  # Only run script step
+        result = cmd_generate(mock_args)
+
+        captured = capsys.readouterr()
+        # Should skip script step since output exists
+        assert "Output already exists, skipping" in captured.out
+
+    def test_generate_shows_pipeline_header(self, mock_args, sample_project, capsys):
+        """Test generate shows pipeline header with project info."""
+        from src.cli.main import cmd_generate
+
+        # Create input files
+        input_dir = sample_project / "input"
+        input_dir.mkdir()
+        with open(input_dir / "test.md", "w") as f:
+            f.write("# Test content")
+
+        mock_args.to_step = "script"  # Only run first step
+
+        # Run (will fail at script step but we just want to check header)
+        cmd_generate(mock_args)
+
+        captured = capsys.readouterr()
+        assert "VIDEO GENERATION PIPELINE" in captured.out
+        assert "test-project" in captured.out
+
+    def test_generate_with_from_and_to_options(self, mock_args, sample_project, capsys):
+        """Test generate respects --from and --to options."""
+        from src.cli.main import cmd_generate
+
+        mock_args.from_step = "scenes"
+        mock_args.to_step = "voiceover"
+
+        cmd_generate(mock_args)
+
+        captured = capsys.readouterr()
+        # Should show only scenes -> voiceover
+        assert "scenes → voiceover" in captured.out
