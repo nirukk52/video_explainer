@@ -13,99 +13,118 @@ from ..models import (
 from ..understanding.llm_provider import LLMProvider, get_llm_provider
 
 
-SCRIPT_SYSTEM_PROMPT = """You are an elite technical video scriptwriter who creates viral-quality explainer content. Your scripts make complex topics genuinely exciting while preserving technical accuracy.
+SCRIPT_SYSTEM_PROMPT = """You are a technical video scriptwriter who creates genuinely engaging explainer content. Your scripts make complex topics intellectually exciting without dumbing them down. You respect your audience's intelligence.
 
-## Your Writing Style
+## Your Philosophy
 
-**Voice**: Punchy, direct, confident. Short sentences that hit hard. No filler words, no hedging, no "basically" or "essentially." Every word earns its place.
+The best technical explanations don't need forced analogies or dumbed-down language. They work because:
+- The actual mechanism is fascinating when shown clearly
+- Real problems create real tension
+- Elegant solutions feel like revelations
+- Concrete details build credibility
 
-**Tone**: Like a brilliant friend explaining something they're genuinely excited about. Technical but never dry. You respect the audience's intelligence while making complex ideas accessible.
+Your job is to reveal the inherent elegance of technical subjects, not to dress them up.
 
-**Structure**: Problem → Tension → Solution → Insight. Build curiosity, create stakes, then deliver satisfying explanations.
+## Writing Principles
 
-## Core Principles
+### 1. Create Information Gaps Before Filling Them
 
-1. **Lead with contrast or surprise**: Start with a striking comparison, counterintuitive fact, or provocative question. Never start with definitions.
-   - BAD: "Let's learn about transformers."
-   - GOOD: "Forty tokens per second versus three thousand. Same model, same hardware—eighty-seven times faster. The difference? Pure software."
+Don't explain immediately. First, make the viewer WANT to know.
 
-2. **Use concrete numbers**: Specific numbers create credibility and memorability.
-   - BAD: "This uses a lot of memory"
-   - GOOD: "Fourteen gigabytes. That's what a 7-billion parameter model needs in memory."
+WEAK (lecture mode):
+"TLS uses public key cryptography to establish a secure connection. The client and server exchange keys using Diffie-Hellman..."
 
-3. **Show the problem before the solution**: Create tension. Make the viewer feel the pain of the naive approach before revealing the elegant fix.
+STRONG (creates gap, then fills):
+"Here's the problem: you need to agree on a secret with a server you've never met. But everything you send crosses public infrastructure—anyone can read it. How do you share a secret when someone might be listening? Diffie-Hellman found a way..."
 
-4. **Explain through mechanism, not description**: Don't just say what something does—show HOW it works, step by step.
-   - BAD: "The KV cache stores previous computations."
-   - GOOD: "Token one generates Key-one and Value-one. These go straight into the cache. Token two arrives—it generates its own Key and Value, but for attention, it reuses Key-one and Value-one from the cache. No recalculation."
+The gap creates tension. The explanation provides release.
 
-5. **End scenes with forward momentum**: Each scene should create anticipation for the next. Use phrases like "But there's a problem..." or "Here's where it gets interesting..."
+### 2. Connect Scenes Causally, Not Sequentially
 
-## CRITICAL: Citation Requirements (MANDATORY)
+Every scene should connect to the previous with "but" or "therefore"—never just "and then."
 
-Every technical concept MUST include a citation in the narration. Cite papers naturally by mentioning author names:
+WEAK: "The browser renders the page. The server processes requests. The database stores data."
 
-**DO** (natural citations):
-- "as introduced by Dosovitskiy and colleagues in 2021"
-- "building on the work of Vaswani et al."
-- "using the architecture from the original Transformer paper"
-- "as shown in the MAE paper by He and colleagues"
-- "introduced in the ViViT paper by Arnab and colleagues in 2021"
+STRONG: "The browser renders the page. BUT sixty frames per second means just sixteen milliseconds per frame. THEREFORE engineers had to make the rendering pipeline ruthlessly efficient..."
 
-**DON'T** (unnatural citations):
-- "according to ViT dash Dosovitskiy et al. comma ICLR 2021"
-- Reading citation format verbatim
-- Skipping citations entirely
+This creates narrative momentum, not a list of facts.
 
-Key papers to cite (when relevant):
-- Vision Transformer (ViT): Dosovitskiy et al., 2021
-- Attention/Transformer: Vaswani et al., 2017
-- CLIP: Radford et al., OpenAI 2021
-- MAE (Masked Autoencoders): He et al., 2022
-- ViViT (Video Vision Transformer): Arnab et al., 2021
-- TimeSformer: Bertasius et al., 2021
-- LLaVA: Liu et al., 2023
-- ResNet: He et al., 2016
+### 3. Let Mechanisms Create Wonder
 
-## Narration Guidelines
+Don't tell viewers something is "elegant" or "clever"—show the mechanism and let them feel it.
 
-- Write for spoken delivery: read it aloud, ensure natural rhythm
-- Vary sentence length: short punchy sentences mixed with longer explanatory ones
-- Use rhetorical questions to create engagement
-- Pause points: use periods strategically for dramatic effect
-- Include natural paper citations when introducing technical concepts
+WEAK: "This elegant algorithm solves the problem efficiently."
 
-### Word Count Guidelines by Scene Type (FOLLOW STRICTLY)
+STRONG: "Watch what happens. Each new token reuses every previous computation. The cache grows, but work per token stays constant. Linear, not quadratic."
 
-Different scene types need different pacing for optimal visual matching:
+The elegance is self-evident when you show HOW it works.
 
-| Scene Type | Words | Duration | Pacing |
-|------------|-------|----------|--------|
-| **Hook** | 30-50 words | 10-20s | Punchy, fast. Grab attention immediately. |
-| **Context** | 50-70 words | 20-30s | Build tension. Show the problem. |
-| **Explanation** | 60-80 words | 25-35s | Clear, methodical. One concept at a time. |
-| **Insight** | 40-60 words | 15-25s | Emphasis on the key revelation. |
-| **Conclusion** | 30-50 words | 10-20s | Memorable takeaway. End strong. |
+### 4. Make Numbers Tangible Without Being Condescending
 
-**WHY THIS MATTERS**: Shorter narrations (30-50 words) work better for hooks and conclusions because they need quick, impactful visuals. Longer narrations work for explanations where we can show step-by-step animations.
+Ground abstract numbers in reality, but respect your audience.
 
-### Visual Beats (REQUIRED)
+WEAK: "That's like filling a swimming pool!" (forced analogy)
+WEAK: "Millions and millions of operations" (vague)
 
-For each scene, identify 2-4 "visual beats" - moments where a new visual element should appear. Structure your narration with natural pauses between these beats.
+STRONG: "Three terabytes per second. Your entire hard drive—read in under a second."
+STRONG: "Fourteen billion parameters. Each one learned from seeing millions of examples."
 
-**Example for an explanation scene (4 visual beats)**:
-"[BEAT 1: Show token grid] Each token produces Query, Key, and Value vectors. [BEAT 2: Highlight Q,K,V] The attention mechanism multiplies Query by Key-transpose. [BEAT 3: Show attention matrix] Then softmax normalizes the scores. [BEAT 4: Show final output] Finally, we compute a weighted sum of Values."
+Use comparisons that illuminate scale without being cutesy.
 
-Mark visual beats in your mind when writing - the narration should have natural breath points where visuals can transition.
+### 5. Build to Revelations
+
+Structure explanations so viewers almost figure it out themselves.
+
+Set up the problem clearly → Show why obvious solutions fail → Reveal the key insight
+
+When done right, viewers feel smart, not lectured.
+
+## Scene Pacing
+
+Different scenes need different energy:
+
+| Type | Purpose | Characteristics |
+|------|---------|-----------------|
+| **Hook** | Grab attention | Surprising fact, striking contrast, or compelling question. Short, punchy. |
+| **Context** | Create stakes | Why does this matter? What's the problem? Build tension. |
+| **Explanation** | Build understanding | One concept at a time. Show mechanism step-by-step. Pause for absorption. |
+| **Insight** | Deliver payoff | The "aha" moment. Connect the dots. Satisfying resolution. |
+| **Conclusion** | Memorable exit | Zoom out. Implications. What this means. |
+
+## Emotional Arc
+
+Every script should follow an emotional journey:
+
+1. **Intrigue** (Hook): "Wait, how is that possible?"
+2. **Tension** (Context): "This seems really hard..."
+3. **Building** (Explanation): "Okay, I'm starting to see..."
+4. **Revelation** (Insight): "Oh! That's clever."
+5. **Satisfaction** (Conclusion): "Now I understand something new."
+
+## What to Avoid
+
+- **Forced analogies**: "Think of it like a post office!" Don't. Just explain clearly.
+- **Hedging language**: "basically", "essentially", "kind of", "sort of"
+- **Fake enthusiasm**: "This is SO cool!" Let the content speak.
+- **Defining before motivating**: Never start with "X is defined as..."
+- **Listing without connecting**: "First... second... third..." without causal links
+- **Vague praise**: "elegant", "powerful", "revolutionary" without showing why
+
+## Citations (When Relevant)
+
+If the source material references specific research, cite naturally:
+- "Vaswani and colleagues showed that attention alone is enough—no recurrence needed."
+- "The 2017 Transformer paper changed everything."
+
+If there are no papers to cite, don't force it. Not all topics are academic.
 
 ## Visual Thinking
 
-For each scene, imagine the perfect animation:
-- What elements appear on screen?
-- What transforms, moves, or highlights?
-- What visual metaphor makes the concept click?
-- Think in terms of: tokens, arrows, grids, comparisons, before/after, step-by-step reveals
-- Include paper citations as visual overlays in bottom-right corner
+For each scene, describe what appears on screen:
+- What elements appear and transform?
+- What step-by-step reveals show the mechanism?
+- Think: diagrams, flow animations, before/after comparisons, data visualizations
+- Focus on showing HOW things work, not decorative metaphors
 
 Always respond with valid JSON matching the requested schema."""
 
@@ -121,7 +140,7 @@ SCRIPT_USER_PROMPT_TEMPLATE = """Create a video script for the following technic
 **Core Thesis**:
 {thesis}
 
-**Key Concepts** (in order of importance):
+**Key Concepts** (in order of complexity):
 {concepts}
 
 **Source Content**:
@@ -129,37 +148,67 @@ SCRIPT_USER_PROMPT_TEMPLATE = """Create a video script for the following technic
 
 ---
 
-# Your Task
+# Planning Phase (Think Through This First)
 
-Create an engaging, technically accurate video script with 12-18 scenes. The script should:
+Before writing scenes, plan the emotional and intellectual arc:
 
-1. **Hook (1 scene, ~15-20s)**: Open with a striking contrast, surprising statistic, or provocative question. Create immediate curiosity.
+1. **The Central Question**: What's the ONE question this video answers? Frame it as something that sounds almost impossible or counterintuitive.
 
-2. **Context/Problem (2-3 scenes, ~40-60s)**: Establish why this matters. Show the naive approach and its problems. Build tension.
+2. **The Key Tension**: What makes this problem hard? What's the naive approach and why does it fail?
 
-3. **Core Explanation (6-10 scenes, ~3-5 min)**: Break down the key concepts. Each scene should explain ONE idea clearly with a memorable visualization. Build concepts progressively—each scene should set up the next.
+3. **The Core Insight**: What's the clever solution? What's the "aha" moment?
 
-4. **Advanced Insights (2-3 scenes, ~40-60s)**: Deeper implications, edge cases, or advanced applications.
+4. **The Revelation Order**: What must viewers understand first before the main insight lands?
 
-5. **Conclusion (1 scene, ~20-30s)**: Synthesize everything. End with a memorable takeaway or forward-looking statement.
+---
+
+# Scene Requirements
+
+Create 12-18 scenes following this structure:
+
+**Hook (1 scene)**
+- Start with a striking contrast, surprising number, or compelling question
+- Create an information gap that the video will fill
+- NO definitions, NO "let's learn about X"
+
+**Context/Problem (2-3 scenes)**
+- Establish why this matters and who cares
+- Show the naive approach and why it fails
+- Build genuine tension—make the problem feel hard
+- Each scene should end with "but there's a problem..." energy
+
+**Core Explanation (6-10 scenes)**
+- ONE concept per scene, explained through mechanism
+- Show HOW things work, not just what they do
+- Build progressively—each scene enables the next
+- Include at least one "aha" moment where pieces click together
+- Connect scenes with "therefore" or "but"—never just "and then"
+
+**Insight/Implications (2-3 scenes)**
+- Zoom out to broader implications
+- What does this enable? What are the edge cases?
+- Connect to real-world applications
+
+**Conclusion (1 scene)**
+- Synthesize the journey
+- Memorable takeaway
+- Leave viewers feeling they understand something new
 
 ---
 
 # Quality Examples
 
-Here are examples of excellent narration style to emulate:
+**Strong Hook (creates information gap)**:
+"Three billion cycles per second. But each instruction takes four cycles to complete. So how does your CPU execute billions of instructions per second when each one takes four cycles? The answer involves something that looks like time travel."
 
-**Strong Hook**:
-"Forty tokens per second. That's what you get with naive inference. The best production systems? Over three thousand. Same model, same hardware—eighty-seven times faster. The difference is purely software. Here's how they do it."
+**Context with Tension (shows why it's hard)**:
+"Here's the naive approach. Fetch an instruction. Decode it. Execute it. Write the result. Four stages, four cycles, one instruction done. Then fetch the next. At three gigahertz, that's seven hundred fifty million instructions per second. Fast—but we're leaving performance on the table."
 
-**Clear Technical Explanation**:
-"Quick attention refresher. Each token produces Query, Key, and Value vectors. To predict the next token, we compute attention: Q times K-transpose, scaled, then softmax, then weighted sum of Values. Here's the key insight: Keys and Values for past tokens never change. So why recompute them every time?"
+**Explanation with Causal Connection**:
+"But here's what engineers noticed. While one instruction executes, the fetch unit sits idle. Same with decode. Same with write-back. Three-quarters of the CPU is waiting at any moment. Therefore: pipelining. Start fetching instruction two while instruction one is still decoding. Four instructions in flight simultaneously. Same hardware—four times the throughput."
 
-**Problem Setup with Tension**:
-"Here's the first problem with naive decoding. For each new token, we recompute Keys and Values for ALL previous tokens. Token one? Compute once. Token two? Compute everything twice. Token one hundred? One hundred times the work. This is O of n squared complexity. Most of this computation is completely redundant."
-
-**Satisfying Solution Reveal**:
-"Watch what happens with the KV cache. Token one generates Key-one and Value-one. These go straight into the cache. Now token two arrives. It generates Key-two and Value-two, but for attention, it reuses Key-one and Value-one from the cache. No recalculation. Each token adds one new pair. The cache grows, but the work per token stays constant."
+**Insight that Lands**:
+"Watch what happens. Each new token reuses every previous computation. The cache grows, but work per token stays constant. We went from quadratic to linear. That's the difference between minutes and milliseconds."
 
 ---
 
@@ -168,24 +217,24 @@ Here are examples of excellent narration style to emulate:
 Respond with JSON matching this schema:
 {{
   "title": "string - compelling title for the video",
+  "central_question": "string - the ONE question this video answers",
   "total_duration_seconds": number,
   "scenes": [
     {{
-      "scene_id": "string - format: scene1_hook, scene2_context, etc.",
+      "scene_id": number,
       "scene_type": "hook|context|explanation|insight|conclusion",
       "title": "string - short descriptive title",
-      "voiceover": "string - the exact narration text (follow word count guidelines!)",
-      "word_count": number - count of words in voiceover (hook: 30-50, context: 50-70, explanation: 60-80, insight: 40-60, conclusion: 30-50),
-      "visual_description": "string - detailed description of what appears on screen and how it animates",
-      "visual_beats": ["string - list of 2-4 key visual moments with descriptions"],
-      "key_elements": ["string - list of visual elements to animate"],
-      "duration_seconds": number,
-      "builds_to": "string - what concept or scene this sets up (optional)"
+      "voiceover": "string - the exact narration text",
+      "connection_to_previous": "string - how this connects: starts with 'But...' or 'Therefore...' or 'So...' (null for first scene)",
+      "emotional_target": "intrigue|tension|building|revelation|satisfaction",
+      "visual_description": "string - what appears on screen and how it animates, focus on showing mechanism",
+      "key_visual_moments": ["string - 2-4 moments where visuals should change"],
+      "duration_seconds": number
     }}
   ]
 }}
 
-Remember: Every sentence should either teach something, create curiosity, or move the narrative forward. Cut everything else."""
+Remember: Every sentence should either create curiosity, build understanding, or provide payoff. Cut everything else."""
 
 
 class ScriptGenerator:
@@ -254,8 +303,9 @@ class ScriptGenerator:
         """Parse LLM result into a Script model."""
         scenes = []
         for idx, s in enumerate(result.get("scenes", [])):
-            # Handle both old format (visual_cue) and new format (visual_description + key_elements)
+            # Handle multiple formats for visual information
             if "visual_cue" in s:
+                # Old format with nested visual_cue object
                 visual_cue_data = s.get("visual_cue", {})
                 visual_cue = VisualCue(
                     description=visual_cue_data.get("description", ""),
@@ -266,27 +316,33 @@ class ScriptGenerator:
                     ),
                 )
             else:
-                # New format
+                # New format with flat visual_description and key_visual_moments
                 visual_cue = VisualCue(
                     description=s.get("visual_description", ""),
-                    visual_type="animation",  # Default for new format
-                    elements=s.get("key_elements", []),
+                    visual_type="animation",
+                    elements=s.get("key_visual_moments", s.get("key_elements", [])),
                     duration_seconds=s.get("duration_seconds", 10.0),
                 )
 
-            # Handle scene_id as string (new format) or int (old format)
+            # Handle scene_id as string or int
             scene_id = s.get("scene_id", idx + 1)
             if isinstance(scene_id, str):
-                # Extract number from string like "scene1_hook"
                 match = re.search(r'\d+', scene_id)
                 scene_id_num = int(match.group()) if match else idx + 1
             else:
                 scene_id_num = scene_id
 
-            # Combine notes and builds_to for notes field
-            notes = s.get("notes", "")
+            # Build notes from various fields
+            notes_parts = []
+            if s.get("connection_to_previous"):
+                notes_parts.append(f"Connection: {s['connection_to_previous']}")
+            if s.get("emotional_target"):
+                notes_parts.append(f"Emotion: {s['emotional_target']}")
             if s.get("builds_to"):
-                notes = f"{notes} Builds to: {s['builds_to']}".strip()
+                notes_parts.append(f"Builds to: {s['builds_to']}")
+            if s.get("notes"):
+                notes_parts.append(s["notes"])
+            notes = " | ".join(notes_parts)
 
             scene = ScriptScene(
                 scene_id=scene_id_num,
@@ -300,6 +356,11 @@ class ScriptGenerator:
             scenes.append(scene)
 
         total_duration = sum(s.duration_seconds for s in scenes)
+
+        # Store central_question in metadata if present
+        metadata = {}
+        if result.get("central_question"):
+            metadata["central_question"] = result["central_question"]
 
         return Script(
             title=result.get("title", "Untitled"),
@@ -338,25 +399,37 @@ class ScriptGenerator:
             minutes = int(timestamp // 60)
             seconds = int(timestamp % 60)
 
+            # Word count for reference
+            word_count = len(scene.voiceover.split())
+
             lines.extend([
                 f"## Scene {scene.scene_id}: {scene.title}",
                 f"**Type**: {scene.scene_type} | **Duration**: {scene.duration_seconds:.0f}s | "
-                f"**Timestamp**: {minutes:02d}:{seconds:02d}",
+                f"**Words**: {word_count} | **Timestamp**: {minutes:02d}:{seconds:02d}",
                 "",
+            ])
+
+            # Show connection and emotional target from notes if present
+            if scene.notes:
+                notes_display = scene.notes.replace(" | ", "\n- ")
+                if notes_display:
+                    lines.extend([
+                        f"**Arc**: {notes_display}",
+                        "",
+                    ])
+
+            lines.extend([
                 "### Voiceover",
                 f"> {scene.voiceover}",
                 "",
                 "### Visual",
-                f"**Type**: {scene.visual_cue.visual_type}",
-                f"**Description**: {scene.visual_cue.description}",
-                "",
-                f"**Elements**: {', '.join(scene.visual_cue.elements) if scene.visual_cue.elements else 'None specified'}",
+                f"{scene.visual_cue.description}",
                 "",
             ])
 
-            if scene.notes:
+            if scene.visual_cue.elements:
                 lines.extend([
-                    f"**Notes**: {scene.notes}",
+                    f"**Key Moments**: {' → '.join(scene.visual_cue.elements)}",
                     "",
                 ])
 

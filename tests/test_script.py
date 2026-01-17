@@ -140,6 +140,210 @@ class TestScriptFormatting:
         assert len(loaded.scenes) == len(sample_script.scenes)
 
 
+class TestScriptParserNewFormat:
+    """Tests for parsing the new script format with emotional arc fields."""
+
+    @pytest.fixture
+    def generator(self):
+        return ScriptGenerator()
+
+    def test_parse_new_format_with_all_fields(self, generator):
+        """Test parsing script with new format fields."""
+        result = {
+            "title": "Test Video",
+            "central_question": "How does X work when Y happens?",
+            "total_duration_seconds": 120,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "scene_type": "hook",
+                    "title": "The Hook",
+                    "voiceover": "Here's a surprising fact about technology.",
+                    "connection_to_previous": None,
+                    "emotional_target": "intrigue",
+                    "visual_description": "Animated diagram showing the concept",
+                    "key_visual_moments": ["Show diagram", "Highlight key part", "Zoom in"],
+                    "duration_seconds": 20,
+                },
+                {
+                    "scene_id": 2,
+                    "scene_type": "context",
+                    "title": "The Problem",
+                    "voiceover": "But here's why this is harder than it looks.",
+                    "connection_to_previous": "But this creates a challenge...",
+                    "emotional_target": "tension",
+                    "visual_description": "Show the naive approach failing",
+                    "key_visual_moments": ["Show attempt", "Show failure"],
+                    "duration_seconds": 30,
+                },
+            ],
+        }
+
+        script = generator._parse_script_result(result, "test.md")
+
+        assert script.title == "Test Video"
+        assert len(script.scenes) == 2
+
+        # Check first scene
+        scene1 = script.scenes[0]
+        assert scene1.scene_type == "hook"
+        assert scene1.visual_cue.description == "Animated diagram showing the concept"
+        assert "Show diagram" in scene1.visual_cue.elements
+        assert "intrigue" in scene1.notes.lower()
+
+        # Check second scene has connection info
+        scene2 = script.scenes[1]
+        assert "connection" in scene2.notes.lower()
+        assert "tension" in scene2.notes.lower()
+
+    def test_parse_old_format_still_works(self, generator):
+        """Test backward compatibility with old visual_cue format."""
+        result = {
+            "title": "Old Format Video",
+            "total_duration_seconds": 60,
+            "scenes": [
+                {
+                    "scene_id": "scene1_hook",
+                    "scene_type": "hook",
+                    "title": "Old Hook",
+                    "voiceover": "Old style narration.",
+                    "visual_cue": {
+                        "description": "Old style visual description",
+                        "visual_type": "animation",
+                        "elements": ["element1", "element2"],
+                        "duration_seconds": 15,
+                    },
+                    "duration_seconds": 15,
+                    "builds_to": "next concept",
+                },
+            ],
+        }
+
+        script = generator._parse_script_result(result, "test.md")
+
+        assert script.title == "Old Format Video"
+        scene = script.scenes[0]
+        assert scene.scene_id == 1  # Extracted from "scene1_hook"
+        assert scene.visual_cue.description == "Old style visual description"
+        assert scene.visual_cue.elements == ["element1", "element2"]
+        assert "Builds to" in scene.notes
+
+    def test_parse_mixed_format(self, generator):
+        """Test parsing when some fields use old format, some use new."""
+        result = {
+            "title": "Mixed Format",
+            "total_duration_seconds": 30,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "scene_type": "explanation",
+                    "title": "Mixed Scene",
+                    "voiceover": "Explanation text.",
+                    "visual_description": "New style description",
+                    "key_elements": ["old_key_elements_field"],  # Old field name
+                    "duration_seconds": 30,
+                },
+            ],
+        }
+
+        script = generator._parse_script_result(result, "test.md")
+        scene = script.scenes[0]
+
+        # Should fall back to key_elements if key_visual_moments not present
+        assert scene.visual_cue.description == "New style description"
+
+    def test_format_shows_word_count(self, generator):
+        """Test that formatted output includes word count."""
+        from src.models import Script, ScriptScene, VisualCue
+
+        script = Script(
+            title="Word Count Test",
+            total_duration_seconds=30,
+            scenes=[
+                ScriptScene(
+                    scene_id=1,
+                    scene_type="hook",
+                    title="Test Scene",
+                    voiceover="One two three four five six seven eight nine ten.",
+                    visual_cue=VisualCue(
+                        description="Test visual",
+                        visual_type="animation",
+                        elements=[],
+                        duration_seconds=30,
+                    ),
+                    duration_seconds=30,
+                    notes="",
+                )
+            ],
+            source_document="test.md",
+        )
+
+        formatted = generator.format_script_for_review(script)
+        assert "Words" in formatted
+        assert "10" in formatted  # 10 words in voiceover
+
+    def test_format_shows_arc_info(self, generator):
+        """Test that formatted output includes emotional arc information."""
+        from src.models import Script, ScriptScene, VisualCue
+
+        script = Script(
+            title="Arc Test",
+            total_duration_seconds=30,
+            scenes=[
+                ScriptScene(
+                    scene_id=1,
+                    scene_type="context",
+                    title="Tension Scene",
+                    voiceover="Building tension here.",
+                    visual_cue=VisualCue(
+                        description="Test visual",
+                        visual_type="animation",
+                        elements=["moment1", "moment2"],
+                        duration_seconds=30,
+                    ),
+                    duration_seconds=30,
+                    notes="Connection: But here's the problem | Emotion: tension",
+                )
+            ],
+            source_document="test.md",
+        )
+
+        formatted = generator.format_script_for_review(script)
+        assert "Arc" in formatted
+        assert "moment1" in formatted
+        assert "moment2" in formatted
+
+    def test_key_visual_moments_in_elements(self, generator):
+        """Test that key_visual_moments are stored in visual_cue.elements."""
+        result = {
+            "title": "Visual Moments Test",
+            "total_duration_seconds": 30,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "scene_type": "explanation",
+                    "title": "Test",
+                    "voiceover": "Test narration.",
+                    "visual_description": "Description",
+                    "key_visual_moments": [
+                        "Show initial state",
+                        "Animate transformation",
+                        "Reveal final result",
+                    ],
+                    "duration_seconds": 30,
+                },
+            ],
+        }
+
+        script = generator._parse_script_result(result, "test.md")
+        elements = script.scenes[0].visual_cue.elements
+
+        assert len(elements) == 3
+        assert "Show initial state" in elements
+        assert "Animate transformation" in elements
+        assert "Reveal final result" in elements
+
+
 class TestRealDocumentScript:
     """Test script generation with the real LLM inference document."""
 
