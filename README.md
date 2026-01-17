@@ -2,6 +2,10 @@
 
 A system for generating high-quality explainer videos from technical documents. Transform research papers, articles, and documentation into engaging video content with automated narration and programmatic animations.
 
+## Example Videos Generated Using This System
+- [How LLMs Actually Understand Images](https://youtu.be/PuodF4pq79g?si=4T0CV555qr89DSvY)
+- [What Actually Happens When You Prompt AI?](https://youtu.be/nmBqcRl2tmM?si=FhCf4G5lKY3_rZ5I)
+
 ## Features
 
 - **Project-Based Organization**: Self-contained projects with all files in one place
