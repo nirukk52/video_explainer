@@ -7,10 +7,46 @@ import pytest
 from src.config import Config
 
 
+def pytest_addoption(parser):
+    """Add custom command line options."""
+    parser.addoption(
+        "--run-llm-tests",
+        action="store_true",
+        default=False,
+        help="Run LLM integration tests (expensive, makes real API calls)",
+    )
+
+
+def pytest_configure(config):
+    """Configure custom markers."""
+    config.addinivalue_line(
+        "markers", "llm_integration: mark test as requiring real LLM calls"
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip LLM tests unless --run-llm-tests is provided."""
+    if not config.getoption("--run-llm-tests", default=False):
+        skip_llm = pytest.mark.skip(
+            reason="LLM integration tests skipped. Use --run-llm-tests to run."
+        )
+        for item in items:
+            if "llm_integration" in item.keywords:
+                item.add_marker(skip_llm)
+
+
 @pytest.fixture
 def test_config() -> Config:
     """Provide a test configuration."""
     return Config()
+
+
+@pytest.fixture
+def mock_config() -> Config:
+    """Provide a test configuration with mock LLM provider."""
+    config = Config()
+    config.llm.provider = "mock"
+    return config
 
 
 @pytest.fixture

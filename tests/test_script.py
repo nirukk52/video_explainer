@@ -15,8 +15,8 @@ class TestScriptGenerator:
     """Tests for the script generator."""
 
     @pytest.fixture
-    def generator(self):
-        return ScriptGenerator()
+    def generator(self, mock_config):
+        return ScriptGenerator(config=mock_config)
 
     @pytest.fixture
     def sample_analysis(self) -> ContentAnalysis:
@@ -95,8 +95,8 @@ class TestScriptFormatting:
     """Tests for script formatting and serialization."""
 
     @pytest.fixture
-    def generator(self):
-        return ScriptGenerator()
+    def generator(self, mock_config):
+        return ScriptGenerator(config=mock_config)
 
     @pytest.fixture
     def sample_script(self, generator, sample_markdown):
@@ -355,12 +355,12 @@ class TestRealDocumentScript:
         return path
 
     @pytest.fixture
-    def generator(self):
-        return ScriptGenerator()
+    def generator(self, mock_config):
+        return ScriptGenerator(config=mock_config)
 
     @pytest.fixture
-    def analyzer(self):
-        return ContentAnalyzer()
+    def analyzer(self, mock_config):
+        return ContentAnalyzer(config=mock_config)
 
     def test_generate_script_for_inference_doc(
         self, generator, analyzer, inference_doc_path

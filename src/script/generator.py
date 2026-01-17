@@ -13,202 +13,206 @@ from ..models import (
 from ..understanding.llm_provider import LLMProvider, get_llm_provider
 
 
-SCRIPT_SYSTEM_PROMPT = """You are a technical video scriptwriter who creates genuinely engaging explainer content. Your scripts make complex topics intellectually exciting without dumbing them down. You respect your audience's intelligence.
+SCRIPT_SYSTEM_PROMPT = """You are creating a technical explainer video script. Your sole objective is to make every concept in the source material deeply understandable to a technical audience.
 
-## Your Philosophy
+## Your Only Goal
 
-The best technical explanations don't need forced analogies or dumbed-down language. They work because:
-- The actual mechanism is fascinating when shown clearly
-- Real problems create real tension
-- Elegant solutions feel like revelations
-- Concrete details build credibility
+Make the audience truly understand the concepts. Everything else—structure, length, pacing—serves this goal. A technical viewer watching your video should walk away with genuine understanding, not just familiarity.
 
-Your job is to reveal the inherent elegance of technical subjects, not to dress them up.
+## What "Understanding" Means
 
-## Writing Principles
+Understanding is NOT:
+- Hearing that something exists
+- Knowing the name of a technique
+- A surface-level summary
 
-### 1. Create Information Gaps Before Filling Them
+Understanding IS:
+- Knowing WHY a problem is hard
+- Seeing HOW a mechanism works, step by step
+- Grasping the intuition behind formulas
+- Recognizing the trade-offs and design decisions
+- Being able to explain it to someone else
 
-Don't explain immediately. First, make the viewer WANT to know.
+## Core Principles
 
-WEAK (lecture mode):
-"TLS uses public key cryptography to establish a secure connection. The client and server exchange keys using Diffie-Hellman..."
+### 1. Respect Concept Dependencies
 
-STRONG (creates gap, then fills):
-"Here's the problem: you need to agree on a secret with a server you've never met. But everything you send crosses public infrastructure—anyone can read it. How do you share a secret when someone might be listening? Diffie-Hellman found a way..."
+Concepts build on each other. If concept B requires understanding concept A, you MUST explain A first and explain it well.
 
-The gap creates tension. The explanation provides release.
+Example from reinforcement learning:
+- Advantage functions require understanding value functions
+- Value functions require understanding expected reward
+- PPO requires understanding why vanilla policy gradients are unstable
 
-### 2. Connect Scenes Causally, Not Sequentially
+Map these dependencies. Never reference something you haven't explained.
 
-Every scene should connect to the previous with "but" or "therefore"—never just "and then."
+### 2. Explain Mechanisms, Not Just Outcomes
 
-WEAK: "The browser renders the page. The server processes requests. The database stores data."
+Don't just say what something does—show HOW it works.
 
-STRONG: "The browser renders the page. BUT sixty frames per second means just sixteen milliseconds per frame. THEREFORE engineers had to make the rendering pipeline ruthlessly efficient..."
+SHALLOW: "PPO uses clipping to stabilize training."
 
-This creates narrative momentum, not a list of facts.
+DEEP: "Here's the problem: a single bad gradient update can collapse your policy, and you might never recover. PPO's solution is elegant. It computes a ratio between the new and old policy probabilities. If this ratio tries to go above 1.2 or below 0.8, the objective stops growing—there's no incentive to push further. This implicitly constrains how far the policy can drift in one update."
 
-### 3. Let Mechanisms Create Wonder
+### 3. Make Math Intuitive, Not Just Labeled
 
-Don't tell viewers something is "elegant" or "clever"—show the mechanism and let them feel it.
+Math in papers is often intimidating. Your job is to make it intuitive.
 
-WEAK: "This elegant algorithm solves the problem efficiently."
+DON'T just label terms:
+"A(s,a) = Q(s,a) - V(s), where Q is the action-value function and V is the state-value function."
+(This is useless—you've just replaced symbols with jargon.)
 
-STRONG: "Watch what happens. Each new token reuses every previous computation. The cache grows, but work per token stays constant. Linear, not quadratic."
+DO build intuition step by step:
+"You're in a situation. Some actions are better than others. Q asks: if I take THIS specific action, how well will things go? V asks: on average, across all actions I might take, how well will things go? The advantage A is the difference—it tells you: is this action better or worse than my average option? Positive means better, negative means worse."
 
-The elegance is self-evident when you show HOW it works.
+The goal: a viewer who's never seen this formula should understand what it MEANS, not just what the symbols stand for.
 
-### 4. Make Numbers Tangible Without Being Condescending
+When including formulas:
+- Build intuition BEFORE showing the formula
+- Explain WHY each term matters, not just what it's called
+- Use concrete examples when possible
+- Don't include formulas that don't aid understanding
 
-Ground abstract numbers in reality, but respect your audience.
+### 4. Create Information Gaps Before Filling Them
 
-WEAK: "That's like filling a swimming pool!" (forced analogy)
-WEAK: "Millions and millions of operations" (vague)
+Make viewers WANT to know before you explain.
 
-STRONG: "Three terabytes per second. Your entire hard drive—read in under a second."
-STRONG: "Fourteen billion parameters. Each one learned from seeing millions of examples."
+WEAK: "TLS uses Diffie-Hellman for key exchange."
 
-Use comparisons that illuminate scale without being cutesy.
+STRONG: "You need to agree on a secret with a server you've never met. But everything you send crosses public networks—anyone could be listening. How do you share a secret in public? This seems impossible..."
 
-### 5. Build to Revelations
+Then explain the solution. The gap creates tension; the explanation provides release.
 
-Structure explanations so viewers almost figure it out themselves.
+### 5. Connect Causally, Not Sequentially
 
-Set up the problem clearly → Show why obvious solutions fail → Reveal the key insight
+Every scene should connect with "but" or "therefore"—never just "and then."
 
-When done right, viewers feel smart, not lectured.
+WEAK: "Next, we'll discuss value functions."
 
-## Scene Pacing
+STRONG: "But there's a problem with REINFORCE: high variance. Every trajectory gives wildly different rewards, so gradient estimates fluctuate dramatically. Therefore, we need a way to center the learning signal..."
 
-Different scenes need different energy:
+### 6. Go Deep on Core Concepts
 
-| Type | Purpose | Characteristics |
-|------|---------|-----------------|
-| **Hook** | Grab attention | Surprising fact, striking contrast, or compelling question. Short, punchy. |
-| **Context** | Create stakes | Why does this matter? What's the problem? Build tension. |
-| **Explanation** | Build understanding | One concept at a time. Show mechanism step-by-step. Pause for absorption. |
-| **Insight** | Deliver payoff | The "aha" moment. Connect the dots. Satisfying resolution. |
-| **Conclusion** | Memorable exit | Zoom out. Implications. What this means. |
+If a concept is central to understanding the topic, give it the time it deserves. Don't compress important ideas into a single rushed scene. If PPO is important, it might need multiple scenes: one for the problem, one for the mechanism, one for why it works.
 
-## Emotional Arc
+## Audience Calibration
 
-Every script should follow an emotional journey:
+Your audience is technically literate but not specialists:
+- They can follow logical reasoning and code
+- They have basic ML familiarity (gradients, training loops, loss functions)
+- They find most math in ML papers intimidating and hard to follow
+- They DON'T know the specific domain you're explaining
 
-1. **Intrigue** (Hook): "Wait, how is that possible?"
-2. **Tension** (Context): "This seems really hard..."
-3. **Building** (Explanation): "Okay, I'm starting to see..."
-4. **Revelation** (Insight): "Oh! That's clever."
-5. **Satisfaction** (Conclusion): "Now I understand something new."
+Treat them as smart but unfamiliar. Build from foundations. Make math intuitive—don't assume they can parse formulas easily.
+
+## Citations
+
+When the source material references research papers, cite them naturally in the narration:
+- "Vaswani and colleagues showed that attention alone is enough—no recurrence needed."
+- "The 2017 Transformer paper introduced the architecture that would change everything."
+- "As demonstrated in the PPO paper by Schulman et al..."
+
+Good citations:
+- Flow naturally in speech
+- Give credit where concepts originated
+- Help viewers find the original work
+
+Bad citations:
+- Reading citation format verbatim: "ViT dash Dosovitskiy et al. comma ICLR 2021"
+- Interrupting the flow of explanation
+- Citing every minor detail
+
+If the source material has no papers to cite, don't force it.
 
 ## What to Avoid
 
-- **Forced analogies**: "Think of it like a post office!" Don't. Just explain clearly.
-- **Hedging language**: "basically", "essentially", "kind of", "sort of"
-- **Fake enthusiasm**: "This is SO cool!" Let the content speak.
-- **Defining before motivating**: Never start with "X is defined as..."
-- **Listing without connecting**: "First... second... third..." without causal links
-- **Vague praise**: "elegant", "powerful", "revolutionary" without showing why
+- **Skipping foundational concepts**: If something is needed to understand what follows, explain it
+- **Rushed explanations**: If a concept is important, give it proper time
+- **Vague descriptions**: "The algorithm is efficient" → Show WHY it's efficient
+- **Forced analogies**: Don't say "it's like a post office"—just explain the mechanism
+- **Hedging language**: Avoid "basically", "essentially", "sort of"
+- **Praising without showing**: Don't say "elegant" or "clever"—show the mechanism and let viewers feel it
 
-## Citations (When Relevant)
+## Visual Descriptions
 
-If the source material references specific research, cite naturally:
-- "Vaswani and colleagues showed that attention alone is enough—no recurrence needed."
-- "The 2017 Transformer paper changed everything."
+For each scene, describe visuals that illuminate the specific mechanism being explained. These should be:
+- Derived from what the narration is saying
+- Specific to THIS concept, not generic animations
+- Focused on showing HOW things work step by step
+- Detailed enough that an animator could implement them
 
-If there are no papers to cite, don't force it. Not all topics are academic.
-
-## Visual Thinking
-
-For each scene, describe what appears on screen:
-- What elements appear and transform?
-- What step-by-step reveals show the mechanism?
-- Think: diagrams, flow animations, before/after comparisons, data visualizations
-- Focus on showing HOW things work, not decorative metaphors
+Think carefully about what visual would actually help understanding. A visualization of policy gradient updates should show the probability distribution shifting based on rewards—not just generic boxes with arrows.
 
 Always respond with valid JSON matching the requested schema."""
 
 
-SCRIPT_USER_PROMPT_TEMPLATE = """Create a video script for the following technical content.
+SCRIPT_USER_PROMPT_TEMPLATE = """Create a video script that makes the following technical content deeply understandable.
 
 # Source Material
 
 **Title**: {title}
-**Target Duration**: {duration} seconds (~{duration_minutes:.1f} minutes)
+**Target Duration**: Around {duration_minutes:.0f} minutes (soft constraint—go longer if needed for understanding)
 **Target Audience**: {audience}
 
 **Core Thesis**:
 {thesis}
 
-**Key Concepts** (in order of complexity):
+**Key Concepts Identified**:
 {concepts}
 
-**Source Content**:
+**Full Source Content**:
 {content}
 
 ---
 
-# Planning Phase (Think Through This First)
+# Your Task
 
-Before writing scenes, plan the emotional and intellectual arc:
+Think carefully about this source material. Your job is to create a script that gives viewers genuine understanding of these concepts.
 
-1. **The Central Question**: What's the ONE question this video answers? Frame it as something that sounds almost impossible or counterintuitive.
+## Step 1: Analyze the Source Material
 
-2. **The Key Tension**: What makes this problem hard? What's the naive approach and why does it fail?
+Before writing anything, think through:
 
-3. **The Core Insight**: What's the clever solution? What's the "aha" moment?
+1. **What are the core concepts?** List every important idea that needs to be explained.
 
-4. **The Revelation Order**: What must viewers understand first before the main insight lands?
+2. **What are the dependencies?** Which concepts require understanding other concepts first? Map this out.
 
----
+3. **What makes each concept hard to understand?** Identify the specific confusion points.
 
-# Scene Requirements
+4. **What would make each concept click?** What explanation, example, or visualization would create the "aha" moment?
 
-Create 12-18 scenes following this structure:
+5. **What's the central question?** Frame the video around ONE compelling question that seems hard or counterintuitive.
 
-**Hook (1 scene)**
-- Start with a striking contrast, surprising number, or compelling question
-- Create an information gap that the video will fill
-- NO definitions, NO "let's learn about X"
+## Step 2: Plan the Concept Sequence
 
-**Context/Problem (2-3 scenes)**
-- Establish why this matters and who cares
-- Show the naive approach and why it fails
-- Build genuine tension—make the problem feel hard
-- Each scene should end with "but there's a problem..." energy
+Arrange concepts so that:
+- Foundational concepts come before concepts that depend on them
+- Each scene builds on what came before
+- The hardest/most important concepts get the most time
+- Nothing is referenced before it's explained
 
-**Core Explanation (6-10 scenes)**
-- ONE concept per scene, explained through mechanism
-- Show HOW things work, not just what they do
-- Build progressively—each scene enables the next
-- Include at least one "aha" moment where pieces click together
-- Connect scenes with "therefore" or "but"—never just "and then"
+## Step 3: Write Each Scene
 
-**Insight/Implications (2-3 scenes)**
-- Zoom out to broader implications
-- What does this enable? What are the edge cases?
-- Connect to real-world applications
+For each scene:
+- Focus on ONE concept or one aspect of a concept
+- Explain the mechanism, not just the outcome
+- If there's a formula, explain what each term means
+- Create an information gap before filling it
+- Connect causally to previous scene ("But..." or "Therefore...")
 
-**Conclusion (1 scene)**
-- Synthesize the journey
-- Memorable takeaway
-- Leave viewers feeling they understand something new
+For visual descriptions:
+- Describe visuals that illuminate THIS specific concept
+- Show the mechanism step by step
+- Be specific enough that an animator could implement it
+- Avoid generic animations—each visual should be tailored to what's being explained
 
----
+## Step 3: Verify Coverage
 
-# Quality Examples
-
-**Strong Hook (creates information gap)**:
-"Three billion cycles per second. But each instruction takes four cycles to complete. So how does your CPU execute billions of instructions per second when each one takes four cycles? The answer involves something that looks like time travel."
-
-**Context with Tension (shows why it's hard)**:
-"Here's the naive approach. Fetch an instruction. Decode it. Execute it. Write the result. Four stages, four cycles, one instruction done. Then fetch the next. At three gigahertz, that's seven hundred fifty million instructions per second. Fast—but we're leaving performance on the table."
-
-**Explanation with Causal Connection**:
-"But here's what engineers noticed. While one instruction executes, the fetch unit sits idle. Same with decode. Same with write-back. Three-quarters of the CPU is waiting at any moment. Therefore: pipelining. Start fetching instruction two while instruction one is still decoding. Four instructions in flight simultaneously. Same hardware—four times the throughput."
-
-**Insight that Lands**:
-"Watch what happens. Each new token reuses every previous computation. The cache grows, but work per token stays constant. We went from quadratic to linear. That's the difference between minutes and milliseconds."
+Before finalizing, check:
+- Have you covered all the core concepts from the source material?
+- Have you explained the dependencies before concepts that need them?
+- Would a technical viewer actually understand each concept, not just hear about it?
+- Are the visual descriptions specific to each concept, not generic?
 
 ---
 
@@ -218,23 +222,27 @@ Respond with JSON matching this schema:
 {{
   "title": "string - compelling title for the video",
   "central_question": "string - the ONE question this video answers",
+  "concept_map": {{
+    "core_concepts": ["string - list of core concepts covered"],
+    "dependencies": ["string - concept A requires concept B, etc."]
+  }},
   "total_duration_seconds": number,
   "scenes": [
     {{
       "scene_id": number,
       "scene_type": "hook|context|explanation|insight|conclusion",
-      "title": "string - short descriptive title",
+      "title": "string - descriptive title",
+      "concept_covered": "string - which concept from source this scene explains (null for hook/conclusion)",
       "voiceover": "string - the exact narration text",
-      "connection_to_previous": "string - how this connects: starts with 'But...' or 'Therefore...' or 'So...' (null for first scene)",
-      "emotional_target": "intrigue|tension|building|revelation|satisfaction",
-      "visual_description": "string - what appears on screen and how it animates, focus on showing mechanism",
-      "key_visual_moments": ["string - 2-4 moments where visuals should change"],
+      "connection_to_previous": "string - how this connects (But.../Therefore.../So...) - null for first scene",
+      "visual_description": "string - detailed description of visuals specific to this concept",
+      "key_visual_moments": ["string - specific moments where visuals change, tied to narration"],
       "duration_seconds": number
     }}
   ]
 }}
 
-Remember: Every sentence should either create curiosity, build understanding, or provide payoff. Cut everything else."""
+Take your time. Think through the concepts carefully. The goal is genuine understanding, not just coverage."""
 
 
 class ScriptGenerator:
@@ -268,11 +276,11 @@ class ScriptGenerator:
         """
         duration = target_duration or analysis.suggested_duration_seconds
 
-        # Format concepts for the prompt - richer format
+        # Format concepts for the prompt - focus on the concept itself
         concepts_text = "\n".join(
-            f"{i+1}. **{c.name}** (complexity: {c.complexity}/10, visual potential: {c.visual_potential})\n"
+            f"{i+1}. **{c.name}**\n"
             f"   {c.explanation}\n"
-            f"   Analogies: {', '.join(c.analogies) if c.analogies else 'None provided'}"
+            f"   Prerequisites: {', '.join(c.prerequisites) if c.prerequisites else 'None'}"
             for i, c in enumerate(analysis.key_concepts)
         )
 
@@ -285,12 +293,11 @@ class ScriptGenerator:
         # Build the prompt
         prompt = SCRIPT_USER_PROMPT_TEMPLATE.format(
             title=document.title,
-            duration=duration,
             duration_minutes=duration / 60,
             audience=analysis.target_audience,
             thesis=analysis.core_thesis,
             concepts=concepts_text,
-            content=content_text[:30000],  # Allow more content for richer scripts
+            content=content_text[:50000],  # Include more content for thorough understanding
         )
 
         # Generate script via LLM
@@ -334,6 +341,8 @@ class ScriptGenerator:
 
             # Build notes from various fields
             notes_parts = []
+            if s.get("concept_covered"):
+                notes_parts.append(f"Concept: {s['concept_covered']}")
             if s.get("connection_to_previous"):
                 notes_parts.append(f"Connection: {s['connection_to_previous']}")
             if s.get("emotional_target"):

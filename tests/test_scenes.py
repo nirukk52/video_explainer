@@ -129,26 +129,26 @@ class TestStylesTemplate:
 
     def test_styles_template_has_colors(self):
         """Test that styles template includes colors."""
-        content = STYLES_TEMPLATE.format(project_title="Test Project")
+        content = STYLES_TEMPLATE.format(project_title="Test Project", sidebar_width=0)
         assert "COLORS" in content
         assert "#0066FF" in content  # primary
         assert "#FF6600" in content  # secondary
 
     def test_styles_template_has_typography(self):
         """Test that styles template includes fonts."""
-        content = STYLES_TEMPLATE.format(project_title="Test Project")
+        content = STYLES_TEMPLATE.format(project_title="Test Project", sidebar_width=0)
         assert "FONTS" in content
         assert "fontSize" in content
 
     def test_styles_template_has_helpers(self):
         """Test that styles template includes helper functions."""
-        content = STYLES_TEMPLATE.format(project_title="Test Project")
+        content = STYLES_TEMPLATE.format(project_title="Test Project", sidebar_width=0)
         assert "getSceneIndicatorStyle" in content
         assert "getScale" in content
 
     def test_styles_template_project_title(self):
         """Test that project title is included."""
-        content = STYLES_TEMPLATE.format(project_title="My Custom Project")
+        content = STYLES_TEMPLATE.format(project_title="My Custom Project", sidebar_width=0)
         assert "My Custom Project" in content
 
 

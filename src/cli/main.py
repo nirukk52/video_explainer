@@ -809,106 +809,104 @@ def cmd_narration(args: argparse.Namespace) -> int:
             timeout=300,
         )
 
-        prompt = f"""# Task: Generate High-Quality Video Narrations
+        prompt = f"""# Task: Generate Narrations That Create Deep Understanding
 
-You are an elite technical video scriptwriter creating narrations for a video about: **{topic}**
+You are creating narrations for a technical explainer video about: **{topic}**
+
+Your goal: Make every concept deeply understandable to a technical audience.
 
 {script_context}
 {input_context}
 
 ---
 
-## CRITICAL: Content Prioritization
+## Your Role
 
-**YOUR PRIMARY SOURCE IS THE SCRIPT**. The script defines:
-- The exact scene structure (do NOT add or remove scenes)
-- The narrative flow and progression
-- The key concepts to cover in each scene
-
-**THE SOURCE DOCUMENT IS SUPPLEMENTARY**. Use it ONLY to:
-- Ensure technical accuracy (correct terminology, accurate numbers)
-- Add specific details, statistics, or examples from the original paper
-- Enrich explanations where the script is thin
-- Verify facts and claims
-
-**NEVER**:
-- Change the scene structure defined in the script
-- Add concepts not mentioned in the script
-- Change the narrative arc or progression
-- Deviate from the script's framing of the topic
+The script defines the structure and concepts. Your job is to write narrations that:
+1. Follow the script's scene structure exactly (same number of scenes, same order)
+2. Make each concept genuinely understandable, not just mentioned
+3. Use the source document to ensure technical accuracy and add precision
+4. Create narrations that would make a technical viewer truly understand the topic
 
 ---
 
-## Your Writing Style
+## What Makes Narration Effective
 
-**Voice**: Punchy, direct, confident. Short sentences that hit hard. No filler words, no hedging, no "basically" or "essentially." Every word earns its place.
+### Explain Mechanisms, Not Just Outcomes
 
-**Tone**: Like a brilliant friend explaining something they're genuinely excited about. Technical but never dry. Respect the audience's intelligence while making complex ideas accessible.
+Don't just say what something does—show HOW it works.
 
-**Structure**: Problem → Tension → Solution → Insight. Build curiosity, create stakes, deliver satisfying explanations.
+SHALLOW: "PPO uses clipping to stabilize training."
+
+DEEP: "Here's the problem: a single bad gradient update can collapse your policy. PPO's solution: compute the ratio between new and old policy probabilities. If this ratio exceeds 1.2 or drops below 0.8, the gradient is clipped—no incentive to push further. This prevents catastrophic updates."
+
+### Make Math Intuitive, Not Just Labeled
+
+Most viewers find ML paper math intimidating. Don't just label terms—build intuition:
+
+DON'T: "A(s,a) = Q(s,a) - V(s), where Q is the action-value function and V is the state-value function."
+
+DO: "You're in a situation. Q asks: if I take THIS action, how well will things go? V asks: on average, how well do things go from here? The advantage A is the difference—is this action better or worse than average? Positive means better than average. Negative means worse."
+
+Build understanding BEFORE showing formulas. The goal is intuition, not notation.
+
+### Create Information Gaps Before Filling Them
+
+Make viewers WANT to know before you explain:
+
+"You need to share a secret with a server you've never met. But everything you send crosses public networks—anyone could listen. How do you share a secret in public? This seems impossible..."
+
+Then explain. The gap creates tension; the explanation provides release.
+
+### Use Precise Numbers from the Source
+
+Pull specific numbers, statistics, and results from the source document:
+- "83% on AIME compared to GPT-4's 13%"
+- "Improved from 15.6% to 71.0% through RL alone"
+- "256-bit keys—brute forcing would take longer than the age of the universe"
+
+### Connect Scenes Causally
+
+Each scene should connect to the previous with "but" or "therefore":
+
+"But there's a problem with REINFORCE: high variance. Gradient estimates fluctuate wildly. Therefore, we need advantage functions to center the learning signal..."
 
 ---
 
-## Core Principles
+## Think Carefully About Each Scene
 
-1. **Lead with contrast or surprise**: Start with a striking comparison, counterintuitive fact, or provocative question.
-   - BAD: "Let's learn about vision transformers."
-   - GOOD: "One hundred fifty thousand pixels. That's what a single 224×224 image contains. Transformers were built for sequences of 2,000 tokens. How do we bridge that gap?"
+For each scene in the script:
 
-2. **Use concrete numbers**: Specific numbers create credibility and memorability.
-   - BAD: "This processes many patches"
-   - GOOD: "196 patches. Each one a 16×16 window into the image."
+1. **What concept is this scene explaining?** Identify the core idea.
 
-3. **Show the problem before the solution**: Create tension. Make the viewer feel the pain before revealing the elegant fix.
+2. **What would make this concept click?** What explanation, example, or framing would create genuine understanding?
 
-4. **Explain through mechanism**: Don't just say what something does—show HOW it works.
-   - BAD: "Patch embeddings convert images to tokens."
-   - GOOD: "Take a 16×16 patch. Flatten it to 768 values. Multiply by a learned projection matrix. Now you have a token—just like text."
+3. **What details from the source document would help?** Pull in specific numbers, results, or technical precision.
 
-5. **End scenes with forward momentum**: Each scene should create anticipation for the next.
+4. **How does this connect to what came before?** Ensure causal flow.
 
----
-
-## Quality Examples
-
-**Strong Hook**:
-"Forty tokens per second. That's what you get with naive inference. The best production systems? Over three thousand. Same model, same hardware—eighty-seven times faster. The difference is purely software. Here's how they do it."
-
-**Clear Technical Explanation**:
-"Quick attention refresher. Each token produces Query, Key, and Value vectors. To predict the next token, we compute attention: Q times K-transpose, scaled, then softmax, then weighted sum of Values. Here's the key insight: Keys and Values for past tokens never change. So why recompute them every time?"
-
-**Problem Setup with Tension**:
-"Here's the first problem with naive decoding. For each new token, we recompute Keys and Values for ALL previous tokens. Token one? Compute once. Token two? Compute everything twice. Token one hundred? One hundred times the work. This is O of n squared complexity. Most of this computation is completely redundant."
+5. **Would a technical viewer actually understand this?** Not just hear about it, but get it.
 
 ---
 
 ## Output Requirements
 
-Create a narrations.json file with 12-18 scenes following this structure:
-- **Scene 1**: Hook (15-20s) - striking opening
-- **Scenes 2-3**: Context/Problem (40-60s) - establish stakes
-- **Scenes 4-12**: Core Explanation (3-5 min) - one concept per scene
-- **Scenes 13-15**: Advanced Insights (40-60s) - deeper implications
-- **Final Scene**: Conclusion (20-30s) - memorable takeaway
-
-Each scene narration should be 40-80 words (15-30 seconds when spoken).
-
 Write the JSON file to: {narration_path}
 
-Use this exact structure:
+Match the script's scene structure exactly. Use this format:
 {{
   "scenes": [
     {{
       "scene_id": "scene1_hook",
-      "title": "The Hook Title",
-      "duration_seconds": 18,
-      "narration": "The actual narration text..."
+      "title": "Scene title from script",
+      "duration_seconds": <estimated based on word count, ~2.5 words/second>,
+      "narration": "The narration text that creates understanding..."
     }}
   ],
-  "total_duration_seconds": 400
+  "total_duration_seconds": <sum of all scene durations>
 }}
 
-Remember: Every sentence should either teach something, create curiosity, or move the narrative forward. Cut everything else.
+Take your time with each scene. The goal is genuine understanding, not just coverage.
 """
 
         try:

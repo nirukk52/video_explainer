@@ -77,24 +77,30 @@ class MockLLMProvider(LLMProvider):
     def generate_json(
         self, prompt: str, system_prompt: str | None = None
     ) -> dict[str, Any]:
-        """Generate mock JSON responses for known prompt patterns."""
+        """Generate mock JSON responses for known prompt patterns.
+
+        Pattern matching order is important:
+        1. Storyboard (most specific - contains "storyboard" keyword)
+        2. Script (contains "script" + "create/generate", but NOT "storyboard")
+        3. Content analysis (contains "analyze" + "content/document")
+        """
         prompt_lower = prompt.lower()
+
+        # Storyboard generation request (check first - most specific)
+        if "storyboard" in prompt_lower or "scene id:" in prompt_lower:
+            return self._mock_storyboard_generation(prompt)
+
+        # Script generation request (check before analysis - scripts may contain "analyze")
+        if "script" in prompt_lower and (
+            "generate" in prompt_lower or "create" in prompt_lower
+        ):
+            return self._mock_script_generation(prompt)
 
         # Content analysis request
         if "analyze" in prompt_lower and (
             "content" in prompt_lower or "document" in prompt_lower
         ):
             return self._mock_content_analysis(prompt)
-
-        # Storyboard generation request
-        if "storyboard" in prompt_lower or "scene id:" in prompt_lower:
-            return self._mock_storyboard_generation(prompt)
-
-        # Script generation request
-        if "script" in prompt_lower and (
-            "generate" in prompt_lower or "create" in prompt_lower
-        ):
-            return self._mock_script_generation(prompt)
 
         # Default empty response
         return {}

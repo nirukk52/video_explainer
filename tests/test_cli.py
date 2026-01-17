@@ -593,22 +593,22 @@ class TestCmdNarration:
         assert "Loaded source: notes.md" in captured.out
         assert "Loaded source: paper.pdf" in captured.out
 
-    def test_narration_prompt_contains_prioritization(self):
-        """Test that the narration prompt contains content prioritization guidance."""
+    def test_narration_prompt_contains_understanding_focus(self):
+        """Test that the narration prompt focuses on deep understanding."""
         from src.cli.main import cmd_narration
         import inspect
 
         source = inspect.getsource(cmd_narration)
 
-        # Check for critical prioritization keywords
-        assert "PRIMARY SOURCE IS THE SCRIPT" in source, \
-            "Prompt must indicate script is the primary source"
-        assert "SOURCE DOCUMENT IS SUPPLEMENTARY" in source, \
-            "Prompt must indicate source document is supplementary"
-        assert "do NOT add or remove scenes" in source, \
-            "Prompt must instruct not to change scene structure"
-        assert "NEVER" in source, \
-            "Prompt must have NEVER section with restrictions"
+        # Check for understanding-focused keywords
+        assert "Generate Narrations That Create Deep Understanding" in source, \
+            "Prompt must focus on creating deep understanding"
+        assert "Make Math Intuitive" in source, \
+            "Prompt must have math intuition guidance"
+        assert "Match the script's scene structure exactly" in source, \
+            "Prompt must instruct to follow script structure"
+        assert "Explain Mechanisms, Not Just Outcomes" in source, \
+            "Prompt must have mechanism explanation guidance"
 
     def test_narration_prompt_includes_script_structure(self):
         """Test that the prompt includes script structure when available."""
@@ -723,10 +723,9 @@ class TestCmdNarration:
         prompt = call_args[0][0]  # First positional argument
 
         # Verify prompt structure
-        assert "Generate High-Quality Video Narrations" in prompt
-        assert "CRITICAL: Content Prioritization" in prompt
-        assert "PRIMARY SOURCE IS THE SCRIPT" in prompt
-        assert "SOURCE DOCUMENT IS SUPPLEMENTARY" in prompt
+        assert "Generate Narrations That Create Deep Understanding" in prompt
+        assert "Make Math Intuitive" in prompt
+        assert "Explain Mechanisms, Not Just Outcomes" in prompt
         assert "Existing Script Structure" in prompt  # Script should be included
         assert "scene1" in prompt or "Hook" in prompt  # Script content
 

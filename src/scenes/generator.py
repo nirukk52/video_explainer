@@ -13,7 +13,61 @@ from .validator import SceneValidator, ValidationResult
 # System prompt for scene generation
 SCENE_SYSTEM_PROMPT = """You are an expert React/Remotion developer creating animated scene components for technical explainer videos.
 
-## Your Expertise
+## Your Primary Goal
+
+Create visuals that illuminate the specific concept being explained. Every animation, diagram, and element should help viewers understand the concept—not just decorate the screen.
+
+Think deeply about each scene:
+- What is this scene trying to explain?
+- What visualization would make this concept click?
+- How can I show the mechanism, not just represent the idea?
+
+## What Makes Good Technical Visuals
+
+### Concept-Specific, Not Generic
+
+GENERIC (bad): PPO explanation shows "boxes with arrows flowing between them"
+CONCEPT-SPECIFIC (good): PPO explanation shows:
+- A probability distribution shifting based on rewards
+- The clipping mechanism visualized: ratio bar that stops at 1+ε
+- Before/after showing how bad updates are prevented
+
+GENERIC (bad): Neural network shows "nodes connected with lines"
+CONCEPT-SPECIFIC (good): Attention mechanism shows:
+- Query, Key, Value vectors as labeled bars
+- Dot product computation visualized step by step
+- Softmax creating attention weights that sum to 1
+
+### Show the Mechanism Step by Step
+
+If the narration says "multiply Query by Key transpose", show:
+- The Query vector
+- The Key vector
+- The transpose operation
+- The multiplication happening
+- The result appearing
+
+Don't just show "a matrix appears"—show HOW it's computed.
+
+### Sync Visuals to Narration
+
+When the narration mentions something, it should appear on screen at that moment:
+- "First, we tokenize the input" → tokenization animation starts
+- "Then attention computes which tokens relate" → attention visualization appears
+- "The result flows through feed-forward layers" → feed-forward diagram appears
+
+The visual should anticipate the narration by 10-15 frames (not arrive late).
+
+### Derive Visuals from Source Material
+
+Don't invent generic visualizations. Look at:
+- What diagrams or formulas are in the source material?
+- What specific numbers or statistics are mentioned?
+- What step-by-step process is described?
+
+Recreate these as animations, not abstract representations.
+
+## Your Technical Expertise
 
 You create visually stunning, educational animations using:
 - **Remotion**: useCurrentFrame, useVideoConfig, interpolate, spring, Sequence, AbsoluteFill
@@ -52,20 +106,22 @@ import {{ LAYOUT, getCenteredPosition, getTwoColumnLayout, getThreeColumnLayout,
 
 **Base constraints (defined in styles.ts):**
 - Canvas: 1920x1080
-- Right sidebar area: 260px on right with 30px gap (reserved for optional sidebars)
 - Left margin: 60px, Right margin: 40px
 - Title area: 120px from top
 - Bottom margin: 160px (for references)
+- Full-width layout by default (no sidebar reservation)
 
 **Usable content area (calculated automatically):**
 ```typescript
 LAYOUT.content.startX   // 60px - left edge of content
-LAYOUT.content.endX     // 1630px - right edge (before sidebar gap)
-LAYOUT.content.width    // 1570px - full usable width
+LAYOUT.content.endX     // ~1880px - right edge (full width minus margins)
+LAYOUT.content.width    // ~1820px - full usable width
 LAYOUT.content.startY   // 120px - top of content area
 LAYOUT.content.endY     // 920px - bottom of content area
 LAYOUT.content.height   // 800px - full usable height
 ```
+
+Note: Some projects may have a sidebar reserved (SIDEBAR.width > 0), which reduces content width.
 
 **Layout Helpers - Choose the right one for your scene:**
 
@@ -735,6 +791,33 @@ SCENE_GENERATION_PROMPT = """Generate a Remotion scene component for the followi
 
 {word_timestamps_section}
 
+## STEP 0: Think About What Would Make This Concept Click (CRITICAL - DO THIS FIRST)
+
+Before writing any code, think carefully:
+
+1. **What concept is this scene explaining?**
+   Read the narration. What specific idea or mechanism is being taught?
+
+2. **What visualization would create genuine understanding?**
+   Not "what looks cool" but "what would make a viewer actually get it"?
+
+   - If explaining an algorithm: show each step, show the transformation
+   - If explaining a formula: show what each term means, show the computation
+   - If explaining a problem: show why it's hard, show what breaks
+   - If comparing approaches: show the actual difference in behavior
+
+3. **How can I show the MECHANISM, not just represent the idea?**
+   - BAD: "Show a box labeled 'attention'"
+   - GOOD: "Show Query and Key vectors, animate the dot product, show scores appearing"
+
+4. **What from the visual description is concept-specific vs generic?**
+   Keep the concept-specific parts. Replace generic parts with something that actually illustrates the concept.
+
+5. **How does the visual sync with the narration?**
+   When does each concept get mentioned? That's when its visual should appear.
+
+Now proceed with the technical implementation:
+
 ## STEP 1: Sync Animations to Narration (CRITICAL)
 
 Before writing code, analyze the voiceover and word timestamps above:
@@ -1030,22 +1113,24 @@ export const SCENE_INDICATOR = {{
 
 // ===== SIDEBAR AREA =====
 // Reserved space on the right for optional project-specific sidebars
+// Set to 0 for full-width layouts (default), or 260 for layouts with a sidebar
 export const SIDEBAR = {{
-  width: 260,
+  width: {sidebar_width},
   padding: 16,
   gap: 4,
   borderRadius: 8,
 }};
 
 // ===== LAYOUT GRID SYSTEM =====
-// Designed for 1920x1080 canvas with optional sidebar on right
+// Designed for 1920x1080 canvas
+// When sidebar_width is 0, content uses full canvas width
 // All values are CALCULATED from base constraints - no hardcoded positions
 
 // Base constraints (these are the only "magic numbers")
 const CANVAS_WIDTH = 1920;
 const CANVAS_HEIGHT = 1080;
-const SIDEBAR_WIDTH = 260;  // Width of right sidebar area (reserved)
-const SIDEBAR_GAP = 30;     // Gap between content and sidebar
+const SIDEBAR_WIDTH = {sidebar_width};  // Width of right sidebar area (0 = full width)
+const SIDEBAR_GAP = {sidebar_width} > 0 ? 30 : 0;  // Gap only when sidebar exists
 const MARGIN_LEFT = 60;
 const MARGIN_RIGHT = 40;
 const TITLE_HEIGHT = 120;     // Space for title at top
@@ -1857,10 +1942,22 @@ Write the complete component code to the file: {output_path}
             else:
                 raise RuntimeError(f"Scene file not created: {output_path}")
 
-    def _generate_styles(self, scenes_dir: Path, project_title: str) -> None:
-        """Generate the styles.ts file."""
+    def _generate_styles(
+        self, scenes_dir: Path, project_title: str, sidebar_width: int = 0
+    ) -> None:
+        """Generate the styles.ts file.
+
+        Args:
+            scenes_dir: Directory to write styles.ts to
+            project_title: Title for the comment header
+            sidebar_width: Width of sidebar in pixels. 0 = full-width layout (default),
+                          260 = reserved sidebar space for projects with persistent sidebars
+        """
         styles_path = scenes_dir / "styles.ts"
-        content = STYLES_TEMPLATE.format(project_title=project_title)
+        content = STYLES_TEMPLATE.format(
+            project_title=project_title,
+            sidebar_width=sidebar_width,
+        )
         with open(styles_path, "w") as f:
             f.write(content)
 
