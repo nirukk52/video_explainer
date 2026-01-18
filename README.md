@@ -263,7 +263,10 @@ python -m src.cli short voiceover llm-inference
 # 4. Create storyboard with beat timing
 python -m src.cli short storyboard llm-inference
 
-# 5. Render the short
+# 5. (Optional) Generate punchy background music
+python -m src.cli music llm-inference short
+
+# 6. Render the short
 python -m src.cli render llm-inference --short
 ```
 
@@ -329,12 +332,39 @@ python -m src.cli sound llm-inference mix         # Mix voiceover + SFX + music
 
 #### AI Background Music
 
+Generate ambient background music for full videos using Meta's MusicGen:
+
 ```bash
 python -m src.cli music llm-inference generate    # Generate background music
 python -m src.cli music llm-inference generate --duration 120  # 120s target
 python -m src.cli music llm-inference generate --style "ambient electronic"
-python -m src.cli music llm-inference info        # Show device support
+python -m src.cli music llm-inference info        # Show device support & presets
 ```
+
+**Shorts Music Generation:**
+
+Generate punchy, energetic background music optimized for YouTube Shorts:
+
+```bash
+python -m src.cli music llm-inference short       # Generate punchy music for short
+python -m src.cli music llm-inference short --variant teaser  # Specific variant
+python -m src.cli music llm-inference short --style "upbeat electronic, driving bass"
+```
+
+The shorts music generator:
+- Analyzes beat captions to detect content mood (tech, dramatic, hook, etc.)
+- Detects emotional arc (problem → solution journey, tension, triumphant)
+- Uses punchy, attention-grabbing presets (120 BPM, bold synths, driving rhythm)
+- Applies slightly higher volume (0.35 vs 0.3) for mobile playback
+- Enhances prompt based on detected mood (building energy, tension release, etc.)
+
+**Mood Detection:**
+| Mood | Trigger | Music Enhancement |
+|------|---------|-------------------|
+| Journey | Problem + solution detected | Building energy, tension to release |
+| Tension | Only problems detected | Building tension, suspenseful |
+| Triumphant | Only solutions detected | Uplifting, positive energy |
+| Energetic | Default | Standard punchy preset |
 
 #### Fact Checking
 

@@ -1503,7 +1503,8 @@ def cmd_music(args: argparse.Namespace) -> int:
     if not args.music_command:
         print("Usage: python -m src.cli music <project> <command>")
         print("\nCommands:")
-        print("  generate    Generate background music using AI")
+        print("  generate    Generate background music for full video")
+        print("  short       Generate punchy background music for YouTube Short")
         print("  info        Show music generation info")
         return 1
 
@@ -1559,6 +1560,62 @@ def cmd_music(args: argparse.Namespace) -> int:
             print(f"Error: {result.error_message}", file=sys.stderr)
             return 1
 
+    elif args.music_command == "short":
+        # Generate punchy music for YouTube Short
+        from ..music.generator import generate_for_short, get_shorts_music_prompt, analyze_shorts_mood, SHORTS_STYLE_PRESETS
+
+        variant = getattr(args, 'variant', 'default') or 'default'
+        print(f"Generating punchy background music for {project.id} short (variant: {variant})")
+        print()
+
+        # Check if shorts storyboard exists
+        storyboard_path = project.root_dir / "short" / variant / "storyboard" / "shorts_storyboard.json"
+        if not storyboard_path.exists():
+            print(f"Error: Shorts storyboard not found at {storyboard_path}", file=sys.stderr)
+            print("Run 'python -m src.cli short storyboard <project>' first.", file=sys.stderr)
+            return 1
+
+        # Determine topic
+        topic = args.topic or project.title
+        print(f"Topic: {topic}")
+
+        # Show what style will be used
+        with open(storyboard_path) as f:
+            storyboard = json.load(f)
+        beats = storyboard.get("beats", [])
+
+        mood = analyze_shorts_mood(beats)
+        print(f"Detected mood: {mood['primary_mood']}")
+
+        style = args.style or get_shorts_music_prompt(topic, beats)
+        print(f"Style: {style}")
+        print()
+
+        # Generate music
+        result = generate_for_short(
+            project_dir=project.root_dir,
+            topic=topic,
+            variant=variant,
+            target_duration=args.duration,
+            custom_style=args.style,
+            update_storyboard=not args.no_update,
+        )
+
+        if result.success:
+            print()
+            print(f"Generated: {result.output_path}")
+            print(f"Duration: {result.duration_seconds:.1f}s")
+            print(f"Segments: {result.segments_generated}")
+
+            if not args.no_update:
+                print()
+                print("Shorts storyboard updated with background music config.")
+                print("Run render to include music in short.")
+            return 0
+        else:
+            print(f"Error: {result.error_message}", file=sys.stderr)
+            return 1
+
     elif args.music_command == "info":
         # Show music generation info
         print("Music Generation Info")
@@ -1585,9 +1642,14 @@ def cmd_music(args: argparse.Namespace) -> int:
             print("No background music generated yet.")
 
         print()
-        print("Available style presets:")
-        from ..music.generator import MUSIC_STYLE_PRESETS
+        print("Available style presets (full video):")
+        from ..music.generator import MUSIC_STYLE_PRESETS, SHORTS_STYLE_PRESETS
         for name, desc in MUSIC_STYLE_PRESETS.items():
+            print(f"  {name}: {desc[:60]}...")
+
+        print()
+        print("Available style presets (shorts - more punchy):")
+        for name, desc in SHORTS_STYLE_PRESETS.items():
             print(f"  {name}: {desc[:60]}...")
 
         print()
@@ -3010,6 +3072,35 @@ For manual voiceover recording:
         "--no-update",
         action="store_true",
         help="Don't update storyboard.json with music config",
+    )
+
+    # music short
+    music_short_parser = music_subparsers.add_parser(
+        "short",
+        help="Generate punchy background music for YouTube Short",
+    )
+    music_short_parser.add_argument(
+        "--variant",
+        default="default",
+        help="Short variant name (default: 'default')",
+    )
+    music_short_parser.add_argument(
+        "--duration",
+        type=int,
+        help="Target duration in seconds (default: from shorts storyboard)",
+    )
+    music_short_parser.add_argument(
+        "--topic",
+        help="Topic for music style (default: project title)",
+    )
+    music_short_parser.add_argument(
+        "--style",
+        help="Custom music style prompt (overrides auto-detection)",
+    )
+    music_short_parser.add_argument(
+        "--no-update",
+        action="store_true",
+        help="Don't update shorts_storyboard.json with music config",
     )
 
     # music info

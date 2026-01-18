@@ -60,6 +60,16 @@ MUSIC_STYLE_PRESETS = {
     "default": "ambient electronic, subtle, no vocals, professional documentary background music",
 }
 
+# Punchy style presets for YouTube Shorts (more energetic, attention-grabbing)
+SHORTS_STYLE_PRESETS = {
+    "tech": "electronic beats, punchy synths, energetic, no vocals, tech explainer, modern bass, driving rhythm, 120 bpm",
+    "science": "electronic, wonder, discovery vibes, punchy drums, no vocals, energetic pads, rising energy",
+    "tutorial": "upbeat lo-fi, punchy beats, no vocals, energetic but focused, modern, catchy rhythm",
+    "dramatic": "cinematic electronic, building intensity, punchy drums, no vocals, epic drops, tension release",
+    "hook": "attention-grabbing electronic, punchy intro, energetic drop, no vocals, bold synths, impactful",
+    "default": "punchy electronic beats, energetic, no vocals, modern, driving rhythm, attention-grabbing, 115 bpm",
+}
+
 
 def get_music_prompt(topic: str, custom_style: Optional[str] = None) -> str:
     """Generate a music prompt based on video topic.
@@ -89,6 +99,108 @@ def get_music_prompt(topic: str, custom_style: Optional[str] = None) -> str:
         preset = "default"
 
     return MUSIC_STYLE_PRESETS[preset]
+
+
+def get_shorts_music_prompt(
+    topic: str,
+    beats: Optional[list] = None,
+    custom_style: Optional[str] = None,
+) -> str:
+    """Generate a punchy music prompt for YouTube Shorts.
+
+    Analyzes the beats content to determine the best music style.
+
+    Args:
+        topic: The video topic
+        beats: List of beat dictionaries from shorts storyboard
+        custom_style: Optional custom style override
+
+    Returns:
+        A prompt string optimized for shorts
+    """
+    if custom_style:
+        return custom_style
+
+    topic_lower = topic.lower()
+
+    # Analyze beats for content keywords if available
+    beat_keywords = []
+    if beats:
+        for beat in beats:
+            caption = beat.get("caption_text", "").lower()
+            beat_keywords.extend(caption.split())
+
+    all_text = topic_lower + " " + " ".join(beat_keywords)
+
+    # Determine preset based on content analysis
+    if any(kw in all_text for kw in ["hook", "question", "why", "how", "secret", "truth"]):
+        preset = "hook"
+    elif any(kw in all_text for kw in ["llm", "ai", "machine learning", "neural", "gpu", "transformer", "token"]):
+        preset = "tech"
+    elif any(kw in all_text for kw in ["science", "physics", "biology", "chemistry", "research"]):
+        preset = "science"
+    elif any(kw in all_text for kw in ["tutorial", "how to", "guide", "learn", "step"]):
+        preset = "tutorial"
+    elif any(kw in all_text for kw in ["dramatic", "impact", "revolution", "breakthrough", "billion", "impossible"]):
+        preset = "dramatic"
+    else:
+        preset = "default"
+
+    return SHORTS_STYLE_PRESETS[preset]
+
+
+def analyze_shorts_mood(beats: list) -> dict:
+    """Analyze shorts beats to understand the emotional arc.
+
+    Args:
+        beats: List of beat dictionaries from shorts storyboard
+
+    Returns:
+        Dictionary with mood analysis
+    """
+    if not beats:
+        return {"primary_mood": "energetic", "has_hook": False, "has_cta": False}
+
+    # Keywords for different moods
+    problem_keywords = ["problem", "issue", "impossible", "billion", "million", "complex", "difficult"]
+    solution_keywords = ["solution", "answer", "solve", "insight", "elegant", "simple"]
+    hook_keywords = ["?", "how", "why", "what", "secret", "truth", "actually"]
+    cta_keywords = ["description", "link", "subscribe", "full video", "watch"]
+
+    has_problem = False
+    has_solution = False
+    has_hook = False
+    has_cta = False
+
+    for beat in beats:
+        caption = beat.get("caption_text", "").lower()
+
+        if any(kw in caption for kw in problem_keywords):
+            has_problem = True
+        if any(kw in caption for kw in solution_keywords):
+            has_solution = True
+        if any(kw in caption for kw in hook_keywords):
+            has_hook = True
+        if any(kw in caption for kw in cta_keywords):
+            has_cta = True
+
+    # Determine primary mood
+    if has_problem and has_solution:
+        primary_mood = "journey"  # Problem → Solution arc
+    elif has_problem:
+        primary_mood = "tension"
+    elif has_solution:
+        primary_mood = "triumphant"
+    else:
+        primary_mood = "energetic"
+
+    return {
+        "primary_mood": primary_mood,
+        "has_hook": has_hook,
+        "has_cta": has_cta,
+        "has_problem": has_problem,
+        "has_solution": has_solution,
+    }
 
 
 class MusicGenerator:
@@ -423,6 +535,135 @@ def _update_storyboard_with_music(project_dir: Path, music_path: Path):
 
     except (json.JSONDecodeError, KeyError) as e:
         print(f"Warning: Could not update storyboard: {e}")
+
+
+def generate_for_short(
+    project_dir: Path,
+    topic: str,
+    variant: str = "default",
+    target_duration: Optional[int] = None,
+    custom_style: Optional[str] = None,
+    update_storyboard: bool = True,
+) -> MusicGenerationResult:
+    """Generate punchy background music for a YouTube Short.
+
+    Analyzes the shorts storyboard to understand content and generates
+    appropriate energetic music.
+
+    Args:
+        project_dir: Path to project directory
+        topic: Video topic for style selection
+        variant: Short variant name (default: "default")
+        target_duration: Target duration in seconds (reads from storyboard if not provided)
+        custom_style: Optional custom style override
+        update_storyboard: Whether to update shorts_storyboard.json with music config
+
+    Returns:
+        MusicGenerationResult
+    """
+    # Load shorts storyboard
+    storyboard_path = project_dir / "short" / variant / "storyboard" / "shorts_storyboard.json"
+
+    beats = []
+    if storyboard_path.exists():
+        try:
+            with open(storyboard_path) as f:
+                storyboard = json.load(f)
+            beats = storyboard.get("beats", [])
+
+            # Get duration from storyboard if not provided
+            if not target_duration:
+                target_duration = int(storyboard.get("total_duration_seconds", 60))
+                print(f"Duration from storyboard: {target_duration}s")
+        except (json.JSONDecodeError, KeyError) as e:
+            print(f"Warning: Could not read storyboard: {e}")
+
+    if not target_duration:
+        target_duration = 60
+
+    # Analyze mood
+    mood_analysis = analyze_shorts_mood(beats)
+    print(f"Mood analysis: {mood_analysis}")
+
+    # Get shorts-optimized prompt
+    prompt = get_shorts_music_prompt(topic, beats, custom_style)
+
+    # Enhance prompt based on mood analysis
+    if mood_analysis["primary_mood"] == "journey":
+        prompt += ", building energy, tension to release, satisfying progression"
+    elif mood_analysis["primary_mood"] == "tension":
+        prompt += ", building tension, dramatic, suspenseful undertones"
+    elif mood_analysis["primary_mood"] == "triumphant":
+        prompt += ", triumphant feel, uplifting, positive energy"
+
+    print(f"Generated prompt: {prompt}")
+
+    # Create music directory in short variant
+    music_dir = project_dir / "short" / variant / "music"
+    music_dir.mkdir(parents=True, exist_ok=True)
+
+    output_path = music_dir / "background.mp3"
+
+    # Configure for shorts: slightly higher volume, shorter fades
+    config = MusicConfig(
+        volume=0.35,  # Slightly louder for shorts
+    )
+
+    # Generate music
+    generator = MusicGenerator(config)
+    result = generator.generate(
+        output_path=output_path,
+        topic=topic,
+        target_duration=target_duration,
+        custom_style=prompt,
+    )
+
+    # Update storyboard if requested and generation succeeded
+    if result.success and update_storyboard:
+        _update_shorts_storyboard_with_music(project_dir, variant, output_path)
+
+    return result
+
+
+def _update_shorts_storyboard_with_music(project_dir: Path, variant: str, music_path: Path):
+    """Update shorts_storyboard.json to include background music.
+
+    Args:
+        project_dir: Path to project directory
+        variant: Short variant name
+        music_path: Path to the generated music file
+    """
+    storyboard_path = project_dir / "short" / variant / "storyboard" / "shorts_storyboard.json"
+
+    if not storyboard_path.exists():
+        print(f"Warning: Shorts storyboard not found at {storyboard_path}")
+        return
+
+    try:
+        with open(storyboard_path) as f:
+            storyboard = json.load(f)
+
+        # Get relative path from short variant root
+        short_variant_dir = project_dir / "short" / variant
+        relative_path = music_path.relative_to(short_variant_dir)
+
+        # Update audio config
+        if "audio" not in storyboard:
+            storyboard["audio"] = {}
+
+        storyboard["audio"]["background_music"] = {
+            "path": str(relative_path),
+            "volume": 0.35,
+        }
+
+        # Save updated storyboard
+        with open(storyboard_path, "w") as f:
+            json.dump(storyboard, f, indent=2)
+
+        print(f"Updated shorts storyboard with background music config")
+
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Warning: Could not update shorts storyboard: {e}")
 
 
 # Import numpy for type hints
