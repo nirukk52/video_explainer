@@ -1952,6 +1952,327 @@ def cmd_short(args: argparse.Namespace) -> int:
     return 0
 
 
+# ============================================================================
+# Short Subcommands (YouTube Shorts Pipeline)
+# ============================================================================
+
+
+def cmd_short_script(args: argparse.Namespace) -> int:
+    """Generate short script from full video project.
+
+    Analyzes the full video script to find the best hook and generates
+    a condensed narration optimized for YouTube Shorts.
+    """
+    import json
+    from ..project import load_project
+    from ..short import ShortGenerator
+    from ..short.generator import normalize_script_format
+    from ..models import Script
+
+    try:
+        project = load_project(Path(args.projects_dir) / args.project)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    # Validate prerequisites
+    narration_path = project.get_path("narration")
+    if not narration_path.exists():
+        print("Error: Narrations not found. Run 'narration' command first.", file=sys.stderr)
+        return 1
+
+    script_path = project.get_path("script")
+    if not script_path.exists():
+        print("Error: Script not found. Run 'script' command first.", file=sys.stderr)
+        return 1
+
+    print(f"Generating short script for: {project.id}")
+    print(f"  Variant: {args.variant}")
+    print(f"  Duration: {args.duration}s")
+    print()
+
+    # Parse scene override if provided
+    scene_ids = None
+    if args.scenes:
+        scene_ids = [s.strip() for s in args.scenes.split(",")]
+        print(f"  Using specified scenes: {scene_ids}")
+
+    generator = ShortGenerator()
+
+    print("Analyzing script for best hook...")
+    result = generator.generate_short(
+        project,
+        variant=args.variant,
+        duration=args.duration,
+        scene_ids=scene_ids,
+        force=args.force,
+        mock=args.mock,
+    )
+
+    if not result.success:
+        print(f"Error: {result.error}", file=sys.stderr)
+        return 1
+
+    print(f"  Generated short script: {result.short_script_path}")
+    print()
+    print("Next step: python -m src.cli short scenes " + project.id)
+
+    return 0
+
+
+def cmd_short_scenes(args: argparse.Namespace) -> int:
+    """Generate vertical scene components for shorts.
+
+    Creates the styles.ts and CTA scene components needed for
+    vertical 1080x1920 rendering.
+    """
+    from ..project import load_project
+    from ..short import ShortGenerator, ShortSceneGenerator
+
+    try:
+        project = load_project(Path(args.projects_dir) / args.project)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    # Check if short script exists
+    variant_dir = project.short_dir / args.variant
+    short_script_path = variant_dir / "short_script.json"
+
+    if not short_script_path.exists():
+        print(f"Error: Short script not found at {short_script_path}", file=sys.stderr)
+        print("Run 'short script' command first.", file=sys.stderr)
+        return 1
+
+    short_script = ShortGenerator.load_short_script(short_script_path)
+
+    print(f"Setting up vertical scenes for: {project.id}")
+    print(f"  Variant: {args.variant}")
+    print()
+
+    scene_generator = ShortSceneGenerator()
+    scene_paths = scene_generator.setup_short_scenes(
+        project, short_script, variant=args.variant
+    )
+
+    print(f"  Generated styles: {scene_paths['styles_path']}")
+    print(f"  Generated CTA scene: {scene_paths['cta_path']}")
+    print(f"  Generated index: {scene_paths['index_path']}")
+    print()
+    print("Next step: python -m src.cli short voiceover " + project.id)
+
+    return 0
+
+
+def cmd_short_voiceover(args: argparse.Namespace) -> int:
+    """Generate or process voiceover for shorts.
+
+    Can either:
+    - Generate TTS voiceover from the short script
+    - Export a recording script for manual recording
+    - Process a manually recorded audio file with Whisper
+    """
+    from ..project import load_project
+    from ..short import ShortGenerator
+    from ..voiceover import VoiceoverGenerator
+
+    try:
+        project = load_project(Path(args.projects_dir) / args.project)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    # Check if short script exists
+    variant_dir = project.short_dir / args.variant
+    short_script_path = variant_dir / "short_script.json"
+
+    if not short_script_path.exists():
+        print(f"Error: Short script not found at {short_script_path}", file=sys.stderr)
+        print("Run 'short script' command first.", file=sys.stderr)
+        return 1
+
+    short_script = ShortGenerator.load_short_script(short_script_path)
+    voiceover_dir = variant_dir / "voiceover"
+
+    # Handle --export-script
+    if args.export_script:
+        output_path = args.output if args.output else variant_dir / "recording_script.txt"
+        script_path = VoiceoverGenerator.export_short_recording_script(
+            short_script, output_path
+        )
+        print(f"Recording script exported to: {script_path}")
+        print()
+        print("Next steps:")
+        print("  1. Record your voiceover following the script")
+        print("  2. Save as short_voiceover.mp3 (or .wav, .m4a)")
+        print(f"  3. Run: python -m src.cli short voiceover {project.id} --audio <path>")
+        return 0
+
+    # Determine provider
+    provider = args.provider
+    if args.mock:
+        provider = "mock"
+
+    voiceover_generator = VoiceoverGenerator(provider=provider)
+
+    # Handle --audio (manual recording)
+    if args.audio:
+        print(f"Processing manual voiceover for: {project.id}")
+        print(f"  Variant: {args.variant}")
+        print(f"  Audio: {args.audio}")
+        print()
+
+        try:
+            short_voiceover = voiceover_generator.process_manual_short_voiceover(
+                Path(args.audio),
+                voiceover_dir,
+                whisper_model=args.whisper_model,
+            )
+            print()
+            print("Next step: python -m src.cli short storyboard " + project.id)
+            return 0
+        except Exception as e:
+            print(f"Error processing audio: {e}", file=sys.stderr)
+            return 1
+
+    # Default: generate TTS voiceover
+    print(f"Generating voiceover for: {project.id}")
+    print(f"  Variant: {args.variant}")
+    print(f"  Provider: {provider}")
+    print()
+
+    try:
+        short_voiceover = voiceover_generator.generate_short_voiceover(
+            short_script,
+            voiceover_dir,
+        )
+        print()
+        print("Next step: python -m src.cli short storyboard " + project.id)
+        return 0
+    except Exception as e:
+        print(f"Error generating voiceover: {e}", file=sys.stderr)
+        return 1
+
+
+def cmd_short_storyboard(args: argparse.Namespace) -> int:
+    """Generate storyboard for shorts from voiceover.
+
+    Creates the storyboard with beat timing synced to the voiceover,
+    and optionally generates custom scene components.
+    """
+    import json
+    from ..project import load_project
+    from ..short import ShortGenerator
+    from ..short.generator import normalize_script_format
+    from ..short.custom_scene_generator import ShortsCustomSceneGenerator
+    from ..voiceover.generator import ShortVoiceover
+    from ..models import Script
+
+    try:
+        project = load_project(Path(args.projects_dir) / args.project)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    variant_dir = project.short_dir / args.variant
+    short_script_path = variant_dir / "short_script.json"
+    voiceover_manifest_path = variant_dir / "voiceover" / "short_voiceover_manifest.json"
+    storyboard_dir = variant_dir / "storyboard"
+    storyboard_path = storyboard_dir / "shorts_storyboard.json"
+    scenes_dir = variant_dir / "scenes"
+
+    # Check prerequisites
+    if not short_script_path.exists():
+        print(f"Error: Short script not found. Run 'short script' first.", file=sys.stderr)
+        return 1
+
+    short_script = ShortGenerator.load_short_script(short_script_path)
+
+    # Load voiceover manifest if it exists
+    short_voiceover = None
+    if voiceover_manifest_path.exists():
+        short_voiceover = ShortVoiceover.load_manifest(voiceover_manifest_path)
+    else:
+        print("Warning: Voiceover not found. Run 'short voiceover' first for synced captions.")
+        print("Generating storyboard without voiceover sync...")
+
+    # Load source script for visual descriptions
+    source_script = None
+    script_path = project.get_path("script")
+    if script_path.exists():
+        try:
+            with open(script_path) as f:
+                script_data = json.load(f)
+            script_data = normalize_script_format(script_data)
+            source_script = Script(**script_data)
+        except Exception:
+            pass
+
+    print(f"Generating storyboard for: {project.id}")
+    print(f"  Variant: {args.variant}")
+    print(f"  Custom scenes: {not args.skip_custom_scenes}")
+    print()
+
+    storyboard_dir.mkdir(parents=True, exist_ok=True)
+    generator = ShortGenerator()
+
+    if short_voiceover:
+        # Convert WordTimestamp objects to dicts
+        word_timestamps = [
+            {
+                "word": ts.word,
+                "start_seconds": ts.start_seconds,
+                "end_seconds": ts.end_seconds,
+            }
+            for ts in short_voiceover.word_timestamps
+        ]
+
+        if not args.skip_custom_scenes and source_script:
+            print("Generating storyboard with custom scenes...")
+            project_scenes_dir = project.root_dir / "scenes"
+            shorts_storyboard = generator.generate_shorts_with_custom_scenes(
+                short_script,
+                word_timestamps,
+                short_voiceover.duration_seconds,
+                source_script,
+                scenes_dir,
+                project_scenes_dir=project_scenes_dir if project_scenes_dir.exists() else None,
+                mock=args.mock,
+            )
+        else:
+            print("Generating storyboard from voiceover...")
+            shorts_storyboard = generator.generate_shorts_storyboard_from_voiceover(
+                short_script,
+                word_timestamps,
+                short_voiceover.duration_seconds,
+                mock=args.mock,
+            )
+
+        # Set voiceover path relative to project root
+        relative_voiceover_path = short_voiceover.audio_path.relative_to(project.root_dir)
+        shorts_storyboard.voiceover_path = str(relative_voiceover_path)
+    else:
+        # Fallback without voiceover
+        shorts_storyboard = generator.generate_shorts_storyboard(
+            short_script,
+            mock=args.mock,
+        )
+
+    # Save storyboard
+    generator.save_shorts_storyboard(shorts_storyboard, storyboard_path)
+    print(f"  Generated storyboard: {storyboard_path}")
+    print(f"  Total beats: {len(shorts_storyboard.beats)}")
+
+    custom_scene_count = sum(1 for b in shorts_storyboard.beats if b.component_name)
+    if custom_scene_count > 0:
+        print(f"  Custom scenes: {custom_scene_count}")
+
+    print()
+    print("Next step: python -m src.cli render " + project.id + " --short")
+
+    return 0
+
+
 def cmd_generate(args: argparse.Namespace) -> int:
     """Run the full video generation pipeline end-to-end.
 
@@ -2513,60 +2834,146 @@ Use --force to regenerate all steps.
     )
     factcheck_parser.set_defaults(func=cmd_factcheck)
 
-    # short command
+    # short command (with subcommands)
     short_parser = subparsers.add_parser(
         "short",
-        help="Generate YouTube Short from existing project",
+        help="YouTube Shorts generation pipeline",
         description="""
-Generate a YouTube Short (vertical 1080x1920, 30-60 seconds) from an existing
-full-length video project. The short hooks viewers with intriguing content
-and drives them to watch the full video.
+YouTube Shorts generation pipeline. Use subcommands to run each step:
 
-Prerequisites:
-- Run 'script' command first to generate the script
-- Run 'narration' command first to generate narrations
+  python -m src.cli short script <project>      # 1. Generate short script
+  python -m src.cli short scenes <project>      # 2. Generate scene components
+  python -m src.cli short voiceover <project>   # 3. Generate voiceover
+  python -m src.cli short storyboard <project>  # 4. Create storyboard
 
-The LLM will automatically select the most intriguing scenes for the hook,
-or you can override with --scenes to specify exact scenes.
+Then render with:
+  python -m src.cli render <project> --short
+
+For manual voiceover recording:
+  python -m src.cli short voiceover <project> --export-script
+  # Record your voiceover
+  python -m src.cli short voiceover <project> --audio <recording.mp3>
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    short_parser.add_argument("project", help="Project ID")
-    short_parser.add_argument(
+    short_subparsers = short_parser.add_subparsers(
+        dest="short_command",
+        help="Short generation commands",
+    )
+
+    # short script
+    short_script_parser = short_subparsers.add_parser(
+        "script",
+        help="Generate short script (hook analysis + condensed narration)",
+    )
+    short_script_parser.add_argument("project", help="Project ID")
+    short_script_parser.add_argument(
         "--duration", "-d",
         type=int,
         default=45,
         help="Target duration in seconds (default: 45, range: 30-60)",
     )
-    short_parser.add_argument(
+    short_script_parser.add_argument(
         "--variant",
         default="default",
         help="Variant name for multiple shorts from same project",
     )
-    short_parser.add_argument(
+    short_script_parser.add_argument(
         "--scenes",
         help="Override scene selection (comma-separated scene IDs)",
     )
-    short_parser.add_argument(
+    short_script_parser.add_argument(
         "--force", "-f",
         action="store_true",
         help="Force regenerate even if files exist",
     )
-    short_parser.add_argument(
+    short_script_parser.add_argument(
         "--mock",
         action="store_true",
         help="Use mock LLM for testing (no API calls)",
     )
-    short_parser.add_argument(
-        "--skip-voiceover",
-        action="store_true",
-        help="Skip voiceover generation (useful for faster iteration)",
+    short_script_parser.set_defaults(func=cmd_short_script)
+
+    # short scenes
+    short_scenes_parser = short_subparsers.add_parser(
+        "scenes",
+        help="Generate vertical scene components (styles, CTA)",
     )
-    short_parser.add_argument(
+    short_scenes_parser.add_argument("project", help="Project ID")
+    short_scenes_parser.add_argument(
+        "--variant",
+        default="default",
+        help="Variant name",
+    )
+    short_scenes_parser.set_defaults(func=cmd_short_scenes)
+
+    # short voiceover
+    short_voiceover_parser = short_subparsers.add_parser(
+        "voiceover",
+        help="Generate or process voiceover for shorts",
+    )
+    short_voiceover_parser.add_argument("project", help="Project ID")
+    short_voiceover_parser.add_argument(
+        "--variant",
+        default="default",
+        help="Variant name",
+    )
+    short_voiceover_parser.add_argument(
+        "--provider",
+        choices=["elevenlabs", "edge", "mock"],
+        default="edge",
+        help="TTS provider to use (default: edge)",
+    )
+    short_voiceover_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock TTS (for testing)",
+    )
+    short_voiceover_parser.add_argument(
+        "--export-script",
+        action="store_true",
+        help="Export a recording script for manual voiceover",
+    )
+    short_voiceover_parser.add_argument(
+        "--audio",
+        help="Path to manually recorded audio file (uses Whisper for timestamps)",
+    )
+    short_voiceover_parser.add_argument(
+        "--whisper-model",
+        choices=["tiny", "base", "small", "medium", "large"],
+        default="base",
+        help="Whisper model size for transcription (default: base)",
+    )
+    short_voiceover_parser.add_argument(
+        "--output", "-o",
+        help="Output path for recording script (with --export-script)",
+    )
+    short_voiceover_parser.set_defaults(func=cmd_short_voiceover)
+
+    # short storyboard
+    short_storyboard_parser = short_subparsers.add_parser(
+        "storyboard",
+        help="Generate storyboard from voiceover timing",
+    )
+    short_storyboard_parser.add_argument("project", help="Project ID")
+    short_storyboard_parser.add_argument(
+        "--variant",
+        default="default",
+        help="Variant name",
+    )
+    short_storyboard_parser.add_argument(
         "--skip-custom-scenes",
         action="store_true",
-        help="Skip custom scene generation (use generic pre-built components)",
+        help="Skip custom scene generation (use generic components)",
     )
+    short_storyboard_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock LLM for testing",
+    )
+    short_storyboard_parser.set_defaults(func=cmd_short_storyboard)
+
+    # Keep legacy cmd_short for backward compatibility (runs full pipeline)
     short_parser.set_defaults(func=cmd_short)
 
     # music command

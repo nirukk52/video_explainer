@@ -244,19 +244,44 @@ Output: `projects/<project>/output/video.mp4`
 
 #### Shorts Generation
 
-Generate vertical shorts (1080x1920) optimized for YouTube Shorts, Instagram Reels, and TikTok:
-
-```bash
-python -m src.cli short llm-inference           # Generate short from project
-python -m src.cli short llm-inference --force   # Regenerate everything
-python -m src.cli short llm-inference --variant teaser  # Create named variant
-python -m src.cli short llm-inference --duration 30     # Target 30 seconds
-python -m src.cli short llm-inference --mock    # Use mock for testing
-```
+Generate vertical shorts (1080x1920) optimized for YouTube Shorts, Instagram Reels, and TikTok.
 
 **Prerequisites:** Run `script` and `narration` commands first.
 
-**Options:**
+**Step-by-step pipeline:**
+
+```bash
+# 1. Generate short script (hook analysis + condensed narration)
+python -m src.cli short script llm-inference
+
+# 2. Generate vertical scene components
+python -m src.cli short scenes llm-inference
+
+# 3. Generate voiceover (TTS)
+python -m src.cli short voiceover llm-inference
+
+# 4. Create storyboard with beat timing
+python -m src.cli short storyboard llm-inference
+
+# 5. Render the short
+python -m src.cli render llm-inference --short
+```
+
+**Manual voiceover workflow:**
+
+```bash
+# Export recording script for voice actor
+python -m src.cli short voiceover llm-inference --export-script
+
+# After recording, process with Whisper for word timestamps
+python -m src.cli short voiceover llm-inference --audio recording.mp3
+
+# Continue with storyboard and render
+python -m src.cli short storyboard llm-inference
+python -m src.cli render llm-inference --short
+```
+
+**Script options:**
 
 | Option | Description |
 |--------|-------------|
@@ -264,8 +289,16 @@ python -m src.cli short llm-inference --mock    # Use mock for testing
 | `--variant` | Variant name for multiple shorts from same project |
 | `--scenes` | Override scene selection (comma-separated scene IDs) |
 | `--force` | Force regenerate even if files exist |
-| `--skip-voiceover` | Skip voiceover generation for faster iteration |
-| `--skip-custom-scenes` | Use generic components instead of custom scenes |
+| `--mock` | Use mock LLM for testing |
+
+**Voiceover options:**
+
+| Option | Description |
+|--------|-------------|
+| `--provider` | TTS provider: `elevenlabs`, `edge`, `mock` (default: edge) |
+| `--export-script` | Export recording script for manual voiceover |
+| `--audio` | Process manually recorded audio with Whisper |
+| `--whisper-model` | Whisper model size: `tiny`, `base`, `small`, `medium`, `large` |
 
 **Features:**
 - Single-word captions (72px bold, uppercase, glow effect)

@@ -153,19 +153,25 @@ class VoiceoverGenerator:
         self,
         config: Config | None = None,
         voice: str = "en-US-GuyNeural",
+        provider: str | None = None,
     ):
         """Initialize voiceover generator.
 
         Args:
             config: Configuration object. If None, uses default config.
             voice: Voice to use for TTS (Edge TTS voice name).
+            provider: TTS provider to use (elevenlabs, edge, mock). Defaults to edge.
         """
         self.config = config or load_config()
         self.voice = voice
 
-        # Force Edge TTS for voiceover generation
-        tts_config = TTSConfig(provider="edge", voice_id=voice)
-        self.tts = EdgeTTS(tts_config, voice=voice)
+        # Set provider in config if specified
+        provider_name = provider or "edge"
+        self.config.tts.provider = provider_name
+        self.config.tts.voice_id = voice
+
+        # Get the appropriate TTS provider
+        self.tts = get_tts_provider(self.config)
 
     def generate_scene_voiceover(
         self,
@@ -297,3 +303,136 @@ class VoiceoverGenerator:
         print(f"  Words: {len(result.word_timestamps)}")
 
         return short_voiceover
+
+    def process_manual_short_voiceover(
+        self,
+        audio_path: Path | str,
+        output_dir: Path,
+        whisper_model: str = "base",
+    ) -> ShortVoiceover:
+        """Process a manually recorded short voiceover.
+
+        Uses Whisper to transcribe and generate word timestamps from
+        a user-recorded audio file.
+
+        Args:
+            audio_path: Path to the recorded audio file.
+            output_dir: Directory to save manifest and copy audio.
+            whisper_model: Whisper model size for transcription.
+
+        Returns:
+            ShortVoiceover with audio path and word timestamps.
+        """
+        from ..audio.transcribe import get_transcriber
+
+        audio_path = Path(audio_path)
+        if not audio_path.exists():
+            raise FileNotFoundError(f"Audio file not found: {audio_path}")
+
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy audio to output directory if not already there
+        output_audio = output_dir / "short_voiceover.mp3"
+        if audio_path.resolve() != output_audio.resolve():
+            import shutil
+            # Convert to mp3 if needed, or just copy
+            if audio_path.suffix.lower() != ".mp3":
+                # Use ffmpeg to convert
+                import subprocess
+                subprocess.run(
+                    ["ffmpeg", "-y", "-i", str(audio_path), "-codec:a", "libmp3lame", "-q:a", "2", str(output_audio)],
+                    check=True,
+                    capture_output=True,
+                )
+                print(f"  Converted {audio_path.suffix} to mp3")
+            else:
+                shutil.copy(audio_path, output_audio)
+
+        print(f"Processing manual voiceover: {audio_path.name}")
+        print(f"  Using Whisper model: {whisper_model}")
+
+        # Transcribe with Whisper
+        transcriber = get_transcriber(model=whisper_model)
+        result = transcriber.transcribe(output_audio)
+
+        short_voiceover = ShortVoiceover(
+            audio_path=output_audio,
+            duration_seconds=result.duration_seconds,
+            word_timestamps=result.word_timestamps,
+        )
+
+        # Save manifest
+        manifest_path = output_dir / "short_voiceover_manifest.json"
+        short_voiceover.save_manifest(manifest_path)
+
+        print(f"  Audio: {output_audio}")
+        print(f"  Duration: {result.duration_seconds:.2f}s")
+        print(f"  Words transcribed: {len(result.word_timestamps)}")
+
+        return short_voiceover
+
+    @staticmethod
+    def export_short_recording_script(
+        short_script: "ShortScript",
+        output_path: Path | str,
+        with_tags: bool = False,
+    ) -> Path:
+        """Export a recording script for manual voiceover recording.
+
+        Creates a text file with the full narration text that a voice
+        actor can read to record the short's audio.
+
+        Args:
+            short_script: The short script with condensed narrations.
+            output_path: Path to save the recording script.
+            with_tags: Include delivery tags for voice direction.
+
+        Returns:
+            Path to the saved recording script.
+        """
+        output_path = Path(output_path)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        lines = [
+            f"# Recording Script: {short_script.title}",
+            f"# Duration target: ~{short_script.total_duration_seconds}s",
+            "",
+            "=" * 60,
+            "FULL NARRATION",
+            "=" * 60,
+            "",
+        ]
+
+        # Combine narrations
+        for i, scene in enumerate(short_script.scenes, 1):
+            if with_tags:
+                lines.append(f"[Scene {i} - {scene.source_scene_id}]")
+            lines.append(scene.condensed_narration.strip())
+            lines.append("")
+
+        # Add CTA
+        if short_script.cta_narration:
+            if with_tags:
+                lines.append("[CTA - Call to Action]")
+            lines.append(short_script.cta_narration.strip())
+            lines.append("")
+
+        lines.extend([
+            "",
+            "=" * 60,
+            "RECORDING TIPS",
+            "=" * 60,
+            "",
+            "1. Speak clearly and at a natural pace",
+            "2. Keep energy high - this is a short-form video",
+            "3. Pause briefly between sections for natural breaks",
+            f"4. Total duration should be around {short_script.total_duration_seconds}s",
+            "",
+            "Save the recording as: short_voiceover.mp3 (or .wav, .m4a)",
+        ])
+
+        with open(output_path, "w") as f:
+            f.write("\n".join(lines))
+
+        return output_path

@@ -18,6 +18,10 @@ from src.cli.main import (
     cmd_render,
     cmd_script,
     cmd_generate,
+    cmd_short_script,
+    cmd_short_scenes,
+    cmd_short_voiceover,
+    cmd_short_storyboard,
     main,
     RESOLUTION_PRESETS,
 )
@@ -2263,3 +2267,632 @@ class TestCmdGeneratePipelineArgs:
 
         assert "step_args.resolution" in source, \
             "cmd_generate must set step_args.resolution for render step"
+
+
+# ============================================================================
+# Short Subcommands Tests
+# ============================================================================
+
+
+class TestCmdShortScript:
+    """Tests for the short script subcommand."""
+
+    @pytest.fixture
+    def mock_project_with_prereqs(self, tmp_path):
+        """Create a mock project with script and narrations."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        # Create config
+        config = {
+            "id": "test-project",
+            "title": "Test Project",
+            "description": "A test project",
+            "version": "1.0.0",
+            "video": {"resolution": {"width": 1920, "height": 1080}, "fps": 30},
+            "tts": {"provider": "mock"},
+            "style": {},
+            "paths": {
+                "script": "script/script.json",
+                "narration": "narration/narrations.json",
+            },
+        }
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        # Create script
+        script_dir = project_dir / "script"
+        script_dir.mkdir()
+        script = {
+            "title": "Test Video",
+            "total_duration_seconds": 120,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "scene_type": "hook",
+                    "title": "The Hook",
+                    "voiceover": "Amazing discovery!",
+                    "visual_cue": {
+                        "description": "Reveal",
+                        "visual_type": "animation",
+                        "elements": [],
+                        "duration_seconds": 15,
+                    },
+                    "duration_seconds": 15,
+                }
+            ],
+            "source_document": "test.md",
+        }
+        with open(script_dir / "script.json", "w") as f:
+            json.dump(script, f)
+
+        # Create narrations
+        narration_dir = project_dir / "narration"
+        narration_dir.mkdir()
+        narrations = {
+            "scenes": [
+                {
+                    "scene_id": "scene1_hook",
+                    "title": "The Hook",
+                    "duration_seconds": 15,
+                    "narration": "This is an amazing discovery.",
+                }
+            ],
+            "total_duration_seconds": 15,
+        }
+        with open(narration_dir / "narrations.json", "w") as f:
+            json.dump(narrations, f)
+
+        return project_dir
+
+    def test_short_script_generates_script(self, mock_project_with_prereqs):
+        """Test that short script command generates a short script."""
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(mock_project_with_prereqs.parent)
+        args.variant = "default"
+        args.duration = 45
+        args.scenes = None
+        args.force = False
+        args.mock = True
+
+        result = cmd_short_script(args)
+
+        assert result == 0
+        short_script_path = mock_project_with_prereqs / "short" / "default" / "short_script.json"
+        assert short_script_path.exists()
+
+    def test_short_script_nonexistent_project(self, tmp_path):
+        """Test error handling for non-existent project."""
+        args = MagicMock()
+        args.project = "nonexistent"
+        args.projects_dir = str(tmp_path)
+
+        result = cmd_short_script(args)
+
+        assert result == 1
+
+    def test_short_script_missing_narrations(self, tmp_path):
+        """Test error when narrations are missing."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        # Create minimal config without narrations
+        config = {
+            "id": "test-project",
+            "title": "Test",
+            "description": "Test",
+            "version": "1.0.0",
+            "video": {"resolution": {"width": 1920, "height": 1080}, "fps": 30},
+            "tts": {"provider": "mock"},
+            "style": {},
+            "paths": {},
+        }
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(tmp_path)
+        args.variant = "default"
+        args.duration = 45
+        args.scenes = None
+        args.force = False
+        args.mock = True
+
+        result = cmd_short_script(args)
+
+        assert result == 1
+
+
+class TestCmdShortScenes:
+    """Tests for the short scenes subcommand."""
+
+    @pytest.fixture
+    def mock_project_with_short_script(self, tmp_path):
+        """Create a mock project with short script."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        # Create config
+        config = {
+            "id": "test-project",
+            "title": "Test Project",
+            "description": "A test project",
+            "version": "1.0.0",
+            "video": {"resolution": {"width": 1920, "height": 1080}, "fps": 30},
+            "tts": {"provider": "mock"},
+            "style": {},
+            "paths": {},
+        }
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        # Create short script
+        short_dir = project_dir / "short" / "default"
+        short_dir.mkdir(parents=True)
+        short_script = {
+            "source_project": "test-project",
+            "title": "Test Short",
+            "hook_question": "How did they do it?",
+            "scenes": [
+                {
+                    "source_scene_id": "scene1",
+                    "condensed_narration": "Test content.",
+                    "duration_seconds": 20.0,
+                }
+            ],
+            "cta_text": "Full breakdown in description",
+            "cta_narration": "Check the description.",
+            "total_duration_seconds": 45.0,
+        }
+        with open(short_dir / "short_script.json", "w") as f:
+            json.dump(short_script, f)
+
+        return project_dir
+
+    def test_short_scenes_generates_components(self, mock_project_with_short_script):
+        """Test that short scenes command generates scene components."""
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(mock_project_with_short_script.parent)
+        args.variant = "default"
+
+        result = cmd_short_scenes(args)
+
+        assert result == 0
+        scenes_dir = mock_project_with_short_script / "short" / "default" / "scenes"
+        assert (scenes_dir / "styles.ts").exists()
+        assert (scenes_dir / "CTAScene.tsx").exists()
+        assert (scenes_dir / "index.ts").exists()
+
+    def test_short_scenes_missing_short_script(self, tmp_path):
+        """Test error when short script is missing."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        config = {
+            "id": "test-project",
+            "title": "Test",
+            "description": "Test",
+            "version": "1.0.0",
+            "video": {"resolution": {"width": 1920, "height": 1080}, "fps": 30},
+            "tts": {"provider": "mock"},
+            "style": {},
+            "paths": {},
+        }
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(tmp_path)
+        args.variant = "default"
+
+        result = cmd_short_scenes(args)
+
+        assert result == 1
+
+
+class TestCmdShortVoiceover:
+    """Tests for the short voiceover subcommand."""
+
+    @pytest.fixture
+    def mock_project_with_short_script(self, tmp_path):
+        """Create a mock project with short script."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        config = {
+            "id": "test-project",
+            "title": "Test Project",
+            "description": "A test project",
+            "version": "1.0.0",
+            "video": {"resolution": {"width": 1920, "height": 1080}, "fps": 30},
+            "tts": {"provider": "mock"},
+            "style": {},
+            "paths": {},
+        }
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        short_dir = project_dir / "short" / "default"
+        short_dir.mkdir(parents=True)
+        short_script = {
+            "source_project": "test-project",
+            "title": "Test Short",
+            "hook_question": "How did they do it?",
+            "scenes": [
+                {
+                    "source_scene_id": "scene1",
+                    "condensed_narration": "Test content here.",
+                    "duration_seconds": 20.0,
+                }
+            ],
+            "cta_text": "Full breakdown in description",
+            "cta_narration": "Check the description.",
+            "total_duration_seconds": 45.0,
+        }
+        with open(short_dir / "short_script.json", "w") as f:
+            json.dump(short_script, f)
+
+        return project_dir
+
+    def test_short_voiceover_export_script(self, mock_project_with_short_script):
+        """Test that export-script generates recording script."""
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(mock_project_with_short_script.parent)
+        args.variant = "default"
+        args.export_script = True
+        args.audio = None
+        args.output = None
+
+        result = cmd_short_voiceover(args)
+
+        assert result == 0
+        recording_script = mock_project_with_short_script / "short" / "default" / "recording_script.txt"
+        assert recording_script.exists()
+
+        content = recording_script.read_text()
+        assert "Test Short" in content
+        assert "Test content here" in content
+        assert "RECORDING TIPS" in content
+
+    def test_short_voiceover_export_script_custom_output(self, mock_project_with_short_script, tmp_path):
+        """Test export-script with custom output path."""
+        custom_output = tmp_path / "custom_script.txt"
+
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(mock_project_with_short_script.parent)
+        args.variant = "default"
+        args.export_script = True
+        args.audio = None
+        args.output = str(custom_output)
+
+        result = cmd_short_voiceover(args)
+
+        assert result == 0
+        assert custom_output.exists()
+
+    def test_short_voiceover_missing_short_script(self, tmp_path):
+        """Test error when short script is missing."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        config = {
+            "id": "test-project",
+            "title": "Test",
+            "description": "Test",
+            "version": "1.0.0",
+            "video": {"resolution": {"width": 1920, "height": 1080}, "fps": 30},
+            "tts": {"provider": "mock"},
+            "style": {},
+            "paths": {},
+        }
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(tmp_path)
+        args.variant = "default"
+        args.export_script = False
+        args.audio = None
+
+        result = cmd_short_voiceover(args)
+
+        assert result == 1
+
+
+class TestCmdShortStoryboard:
+    """Tests for the short storyboard subcommand."""
+
+    @pytest.fixture
+    def mock_project_with_voiceover(self, tmp_path):
+        """Create a mock project with short script and voiceover manifest."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        config = {
+            "id": "test-project",
+            "title": "Test Project",
+            "description": "A test project",
+            "version": "1.0.0",
+            "video": {"resolution": {"width": 1920, "height": 1080}, "fps": 30},
+            "tts": {"provider": "mock"},
+            "style": {},
+            "paths": {},
+        }
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        # Create short script
+        short_dir = project_dir / "short" / "default"
+        short_dir.mkdir(parents=True)
+        short_script = {
+            "source_project": "test-project",
+            "title": "Test Short",
+            "hook_question": "How did they do it?",
+            "scenes": [
+                {
+                    "source_scene_id": "scene1",
+                    "condensed_narration": "Test content here.",
+                    "duration_seconds": 20.0,
+                }
+            ],
+            "cta_text": "Full breakdown in description",
+            "cta_narration": "Check the description.",
+            "total_duration_seconds": 45.0,
+        }
+        with open(short_dir / "short_script.json", "w") as f:
+            json.dump(short_script, f)
+
+        # Create voiceover manifest
+        voiceover_dir = short_dir / "voiceover"
+        voiceover_dir.mkdir()
+        voiceover_manifest = {
+            "audio_path": str(voiceover_dir / "short_voiceover.mp3"),
+            "duration_seconds": 20.0,
+            "word_timestamps": [
+                {"word": "Test", "start_seconds": 0.0, "end_seconds": 0.5},
+                {"word": "content", "start_seconds": 0.6, "end_seconds": 1.2},
+                {"word": "here.", "start_seconds": 1.3, "end_seconds": 1.8},
+            ],
+        }
+        with open(voiceover_dir / "short_voiceover_manifest.json", "w") as f:
+            json.dump(voiceover_manifest, f)
+
+        return project_dir
+
+    def test_short_storyboard_generates_storyboard(self, mock_project_with_voiceover):
+        """Test that storyboard command generates storyboard."""
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(mock_project_with_voiceover.parent)
+        args.variant = "default"
+        args.skip_custom_scenes = True
+        args.mock = True
+
+        result = cmd_short_storyboard(args)
+
+        assert result == 0
+        storyboard_path = mock_project_with_voiceover / "short" / "default" / "storyboard" / "shorts_storyboard.json"
+        assert storyboard_path.exists()
+
+        with open(storyboard_path) as f:
+            storyboard = json.load(f)
+        assert "beats" in storyboard
+        assert len(storyboard["beats"]) > 0
+
+    def test_short_storyboard_missing_short_script(self, tmp_path):
+        """Test error when short script is missing."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        config = {
+            "id": "test-project",
+            "title": "Test",
+            "description": "Test",
+            "version": "1.0.0",
+            "video": {"resolution": {"width": 1920, "height": 1080}, "fps": 30},
+            "tts": {"provider": "mock"},
+            "style": {},
+            "paths": {},
+        }
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(tmp_path)
+        args.variant = "default"
+        args.skip_custom_scenes = True
+        args.mock = True
+
+        result = cmd_short_storyboard(args)
+
+        assert result == 1
+
+    def test_short_storyboard_without_voiceover(self, tmp_path):
+        """Test storyboard generation without voiceover (fallback mode)."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        config = {
+            "id": "test-project",
+            "title": "Test Project",
+            "description": "A test project",
+            "version": "1.0.0",
+            "video": {"resolution": {"width": 1920, "height": 1080}, "fps": 30},
+            "tts": {"provider": "mock"},
+            "style": {},
+            "paths": {},
+        }
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        # Create short script but no voiceover
+        short_dir = project_dir / "short" / "default"
+        short_dir.mkdir(parents=True)
+        short_script = {
+            "source_project": "test-project",
+            "title": "Test Short",
+            "hook_question": "How?",
+            "scenes": [
+                {
+                    "source_scene_id": "scene1",
+                    "condensed_narration": "Content.",
+                    "duration_seconds": 20.0,
+                }
+            ],
+            "cta_text": "Check description",
+            "cta_narration": "Check it.",
+            "total_duration_seconds": 45.0,
+        }
+        with open(short_dir / "short_script.json", "w") as f:
+            json.dump(short_script, f)
+
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(tmp_path)
+        args.variant = "default"
+        args.skip_custom_scenes = True
+        args.mock = True
+
+        result = cmd_short_storyboard(args)
+
+        # Should succeed but generate without voiceover sync
+        assert result == 0
+        storyboard_path = project_dir / "short" / "default" / "storyboard" / "shorts_storyboard.json"
+        assert storyboard_path.exists()
+
+
+class TestShortSubcommandsIntegration:
+    """Integration tests for the short subcommands pipeline."""
+
+    @pytest.fixture
+    def mock_full_project(self, tmp_path):
+        """Create a mock project with all prerequisites for shorts."""
+        project_dir = tmp_path / "test-project"
+        project_dir.mkdir()
+
+        config = {
+            "id": "test-project",
+            "title": "Test Project",
+            "description": "A test project",
+            "version": "1.0.0",
+            "video": {"resolution": {"width": 1920, "height": 1080}, "fps": 30},
+            "tts": {"provider": "mock"},
+            "style": {},
+            "paths": {
+                "script": "script/script.json",
+                "narration": "narration/narrations.json",
+            },
+        }
+        with open(project_dir / "config.json", "w") as f:
+            json.dump(config, f)
+
+        # Create script
+        script_dir = project_dir / "script"
+        script_dir.mkdir()
+        script = {
+            "title": "Test Video",
+            "total_duration_seconds": 120,
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "scene_type": "hook",
+                    "title": "The Hook",
+                    "voiceover": "Amazing discovery!",
+                    "visual_cue": {
+                        "description": "Reveal",
+                        "visual_type": "animation",
+                        "elements": [],
+                        "duration_seconds": 15,
+                    },
+                    "duration_seconds": 15,
+                }
+            ],
+            "source_document": "test.md",
+        }
+        with open(script_dir / "script.json", "w") as f:
+            json.dump(script, f)
+
+        # Create narrations
+        narration_dir = project_dir / "narration"
+        narration_dir.mkdir()
+        narrations = {
+            "scenes": [
+                {
+                    "scene_id": "scene1_hook",
+                    "title": "The Hook",
+                    "duration_seconds": 15,
+                    "narration": "This is an amazing discovery that will change everything.",
+                }
+            ],
+            "total_duration_seconds": 15,
+        }
+        with open(narration_dir / "narrations.json", "w") as f:
+            json.dump(narrations, f)
+
+        return project_dir
+
+    def test_full_short_pipeline_with_mock(self, mock_full_project):
+        """Test running the full short pipeline: script -> scenes -> storyboard."""
+        # Step 1: Generate short script
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(mock_full_project.parent)
+        args.variant = "test-variant"
+        args.duration = 45
+        args.scenes = None
+        args.force = False
+        args.mock = True
+
+        result = cmd_short_script(args)
+        assert result == 0
+
+        # Step 2: Generate scenes
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(mock_full_project.parent)
+        args.variant = "test-variant"
+
+        result = cmd_short_scenes(args)
+        assert result == 0
+
+        # Step 3: Export recording script
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(mock_full_project.parent)
+        args.variant = "test-variant"
+        args.export_script = True
+        args.audio = None
+        args.output = None
+
+        result = cmd_short_voiceover(args)
+        assert result == 0
+
+        # Verify recording script was created
+        recording_script = mock_full_project / "short" / "test-variant" / "recording_script.txt"
+        assert recording_script.exists()
+
+        # Step 4: Generate storyboard (without voiceover)
+        args = MagicMock()
+        args.project = "test-project"
+        args.projects_dir = str(mock_full_project.parent)
+        args.variant = "test-variant"
+        args.skip_custom_scenes = True
+        args.mock = True
+
+        result = cmd_short_storyboard(args)
+        assert result == 0
+
+        # Verify all outputs exist
+        variant_dir = mock_full_project / "short" / "test-variant"
+        assert (variant_dir / "short_script.json").exists()
+        assert (variant_dir / "scenes" / "styles.ts").exists()
+        assert (variant_dir / "scenes" / "CTAScene.tsx").exists()
+        assert (variant_dir / "storyboard" / "shorts_storyboard.json").exists()
