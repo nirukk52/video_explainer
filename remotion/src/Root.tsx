@@ -117,20 +117,38 @@ export const RemotionRoot: React.FC = () => {
       <Composition
         id="SingleScenePlayer"
         component={SingleScenePlayer}
-        durationInFrames={30 * 60} // 1 min max - actual duration set by props
+        durationInFrames={30 * 60} // Default 1 min, overridden by calculateMetadata
         fps={30}
         width={1920}
         height={1080}
         defaultProps={{
           sceneType: "unknown",
-          durationInSeconds: 30,
+          durationInSeconds: 60,
           voiceoverBasePath: "voiceover",
           backgroundColor: "#0f0f1a",
         }}
         calculateMetadata={async ({ props }) => {
-          const p = props as SingleScenePlayerProps;
+          let duration = (props as SingleScenePlayerProps).durationInSeconds || 60;
+
+          // In browser context (Studio), try to read from URL directly
+          if (typeof window !== "undefined") {
+            try {
+              const params = new URLSearchParams(window.location.search);
+              const propsJson = params.get("props");
+              if (propsJson) {
+                const parsed = JSON.parse(propsJson);
+                if (parsed.durationInSeconds) {
+                  duration = parsed.durationInSeconds;
+                  console.log("[calculateMetadata] Got duration from URL:", duration);
+                }
+              }
+            } catch (e) {
+              console.warn("[calculateMetadata] Failed to parse URL props:", e);
+            }
+          }
+
           return {
-            durationInFrames: calculateSingleSceneDuration(p, 30),
+            durationInFrames: Math.ceil(duration * 30),
           };
         }}
       />

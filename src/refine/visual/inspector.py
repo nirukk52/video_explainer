@@ -484,14 +484,17 @@ class ClaudeCodeVisualInspector:
         if not self._ensure_remotion_running():
             return {"error": "Failed to start Remotion. Please start it manually with: cd remotion && npm run dev"}
 
-        # Step 2: Build SingleScenePlayer URL with scene props as query params
+        # Step 2: Build SingleScenePlayer URL with scene props
         # Scene type is like "thinking-models/beyond_linear_thinking"
         scene_type = scene_info.get("type", f"{self.project.id}/{scene_info['id']}")
-        # Use simple query params (easier to parse than JSON props)
+        # Use Remotion's native ?props={JSON} format so calculateMetadata receives correct duration
+        props_json = json.dumps({
+            "sceneType": scene_type,
+            "durationInSeconds": duration_seconds,
+        })
         remotion_url = (
             f"{SINGLE_SCENE_PLAYER_URL}"
-            f"?sceneType={urllib.parse.quote(scene_type)}"
-            f"&durationInSeconds={duration_seconds}"
+            f"?props={urllib.parse.quote(props_json)}"
         )
 
         # Build beats info - frames are now RELATIVE to scene start (frame 0)
