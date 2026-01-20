@@ -225,37 +225,140 @@ The storyboard combines:
 
 Output: `projects/<project>/storyboard/storyboard.json`
 
-#### Visual Refinement
+#### Refinement (3-Phase Process)
 
-Refine scene quality through AI-powered visual inspection. Uses Claude Code with browser access to view Remotion scenes and identify/fix visual issues.
+The refinement system helps elevate video quality to professional standards (3Blue1Brown / Veritasium level) through a 3-phase process:
+
+1. **Phase 1: Analyze** - Gap analysis that generates patches to fix script issues
+2. **Phase 2: Script** - Loads patches from Phase 1, adds storytelling refinements, applies changes
+3. **Phase 3: Visual** - AI-powered visual inspection and fixes
+
+**Key Design: Phases 1 and 2 are connected.** Phase 1 outputs patches that Phase 2 consumes and applies.
 
 **Prerequisites:**
-- Scene components generated (`scenes` command)
-- Storyboard created (`storyboard` command)
-- Remotion dev server running or the command will start it automatically
+- For Phase 1: Input source material (`input/*.md` or `input/*.txt`) and narrations
+- For Phase 2: Run Phase 1 first to generate patches
+- For Phase 3: Scene components generated (`scenes` command) and storyboard created
 
 ```bash
-# Refine a specific scene
-python -m src.cli refine llm-inference --scene 3      # Refine scene 3
-python -m src.cli refine llm-inference --scene 3 --live  # Stream Claude Code output
+# Phase 1: Gap Analysis (generates patches)
+python -m src.cli refine llm-inference --phase analyze
 
-# Full project refinement (all scenes)
-python -m src.cli refine llm-inference                # Refine all scenes
+# Phase 2: Apply patches + storytelling refinement
+python -m src.cli refine llm-inference --phase script              # Interactive approval
+python -m src.cli refine llm-inference --phase script --batch-approve  # Auto-approve all
+
+# Phase 3: Visual Refinement (inspect and fix scenes)
+python -m src.cli refine llm-inference --phase visual
+python -m src.cli refine llm-inference --phase visual --scene 3  # Specific scene
+
+# Default (no --phase): runs visual refinement
+python -m src.cli refine llm-inference
 ```
 
 **Options:**
 
 | Option | Description |
 |--------|-------------|
-| `--scene N` | Refine only scene N (1-indexed) |
+| `--phase` | Phase to run: `analyze`, `script`, or `visual` (default: visual) |
+| `--scene N` | Refine only scene N (1-indexed, visual phase only) |
+| `--batch-approve` | Auto-approve all suggested changes (script phase) |
 | `--live` | Stream Claude Code output in real-time |
 | `-v, --verbose` | Show detailed progress |
+
+---
+
+##### Phase 1: Gap Analysis (`--phase analyze`)
+
+Compares source material against the generated script to identify gaps and **generates patches** to fix them:
+- **Missing concepts**: Important topics from source not covered in script
+- **Shallow coverage**: Concepts mentioned but not explained deeply enough
+- **Narrative gaps**: Logical jumps between scenes that confuse viewers
+
+```bash
+python -m src.cli refine llm-inference --phase analyze
+```
+
+**How it works:**
+1. Loads source material from `input/*.md` or `input/*.txt`
+2. Extracts key concepts with importance ratings (critical, high, medium, low)
+3. Analyzes script coverage depth (not_covered, mentioned, explained, deep_dive)
+4. Identifies narrative gaps between scenes
+5. **Generates patches** to fix identified gaps
+
+**Patch Types:**
+
+| Type | Description |
+|------|-------------|
+| `add_scene` | Insert a new scene to cover missing concepts |
+| `modify_scene` | Update existing scene content |
+| `expand_scene` | Add more detail to shallow coverage |
+| `add_bridge` | Add transitional content between scenes |
+
+**Output:** `projects/<project>/refine/gap_analysis.json` (includes `patches` array)
+
+Returns exit code 1 if critical gaps are found (missing critical concepts or high-severity narrative gaps).
+
+---
+
+##### Phase 2: Script Refinement (`--phase script`)
+
+Loads patches from Phase 1, generates additional storytelling refinements, and applies approved changes to the script:
+
+```bash
+python -m src.cli refine llm-inference --phase script              # Interactive approval
+python -m src.cli refine llm-inference --phase script --batch-approve  # Auto-approve
+```
+
+**How it works:**
+1. **Loads patches from Phase 1** (`gap_analysis.json`)
+2. Analyzes each scene against 10 narration principles
+3. Generates additional storytelling patches for quality issues
+4. Combines Phase 1 patches + storytelling patches
+5. **Interactive mode**: Presents each patch for approval (y/n/e to edit)
+6. **Batch mode**: Auto-approves all patches
+7. Applies approved patches to update `script.json` and `narrations.json`
+
+**10 Narration Principles:**
+
+1. **Hook in the first sentence** - Grab attention immediately with surprising facts, questions, or stakes
+2. **Build tension before release** - Create anticipation before revealing solutions
+3. **Seamless transitions** - Connect scenes with callback phrases that bridge ideas
+4. **One insight per scene** - Focus each scene on a single memorable takeaway
+5. **Concrete analogies** - Use familiar comparisons to explain abstract concepts
+6. **Emotional beats** - Include moments that create wonder, surprise, or satisfaction
+7. **Match length to complexity** - Simple ideas = short scenes, complex ideas = more time
+8. **Rhetorical questions** - Plant questions in viewers' minds before answering
+9. **Clear stakes** - Explain why the audience should care
+10. **Strong scene endings** - End with memorable phrases or setup for next scene
+
+**Scoring weights:**
+- Hook strength: 15%
+- Flow quality: 15%
+- Tension/buildup: 15%
+- Insight clarity: 20%
+- Emotional engagement: 15%
+- Factual accuracy: 10%
+- Length appropriateness: 10%
+
+**Output:** Updates `script/script.json` and `narration/narrations.json` with approved patches
+
+---
+
+##### Phase 3: Visual Refinement (`--phase visual`)
+
+AI-powered visual inspection using Claude Code with browser access.
+
+```bash
+python -m src.cli refine llm-inference --phase visual
+python -m src.cli refine llm-inference --phase visual --scene 3 --live
+```
 
 **How it works:**
 
 1. **Beat Parsing**: Narration is analyzed to identify key visual moments (beats)
 2. **Visual Inspection**: Claude Code opens the scene in Remotion Studio (SingleScenePlayer)
-3. **Quality Assessment**: Screenshots are analyzed against 10 guiding principles:
+3. **Quality Assessment**: Screenshots are analyzed against 11 guiding principles:
    - Show Don't Tell - Use visuals, not just text
    - Animation Reveals - Animate elements in sync with narration
    - Progressive Disclosure - Show info as it's mentioned
@@ -266,14 +369,15 @@ python -m src.cli refine llm-inference                # Refine all scenes
    - Emotional Resonance - Connect with viewer
    - Professional Polish - Clean, consistent
    - Sync with Narration - Timing matches speech
+   - Screen Space Utilization - Use full canvas effectively
 4. **Fix Application**: Claude Code edits the scene component to fix identified issues
 5. **Verification**: New screenshots verify improvements
 
 **Technical Details:**
 
-The refine command uses a `SingleScenePlayer` Remotion composition that loads individual scenes starting at frame 0, eliminating the need to navigate through the entire video. This speeds up inspection significantly.
+The refine command uses a `SingleScenePlayer` Remotion composition that loads individual scenes starting at frame 0, eliminating the need to navigate through the entire video.
 
-Output: Scene files are modified in place (`projects/<project>/scenes/*.tsx`)
+**Output:** Scene files are modified in place (`projects/<project>/scenes/*.tsx`)
 
 #### Rendering
 

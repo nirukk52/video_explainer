@@ -11,9 +11,21 @@ from pathlib import Path
 from typing import Optional
 
 from ..project import Project, load_project
-from .models import RefinementPhase, RefinementResult
+from .models import (
+    RefinementPhase,
+    RefinementResult,
+    GapAnalysisResult,
+    NarrationRefinementResult,
+    ScriptPatch,
+    ScriptPatchType,
+    AddScenePatch,
+    ModifyScenePatch,
+    ExpandScenePatch,
+    AddBridgePatch,
+)
 from .validation import validate_project_sync, ProjectValidator
 from .visual import VisualInspector, ClaudeCodeVisualInspector
+from .script import ScriptAnalyzer, ScriptRefiner
 
 
 def cmd_refine(args: argparse.Namespace) -> int:
@@ -74,20 +86,279 @@ def _run_analyze_phase(project: Project, args: argparse.Namespace) -> int:
     """Run Phase 1: Gap analysis."""
     print("\n📊 Phase 1: Analyze (Gap Analysis)")
     print("   " + "=" * 40)
-    print("\n   ⚠️ Phase 1 not yet implemented.")
-    print("   This phase will compare source material against script to identify gaps.")
-    print("\n   For now, please use the existing 'script' command to generate/update scripts.")
+
+    verbose = not getattr(args, "quiet", False)
+    analyzer = ScriptAnalyzer(project=project, verbose=verbose)
+
+    # Run analysis
+    result = analyzer.analyze()
+
+    # Print results
+    _print_gap_analysis(result)
+
+    # Save results
+    output_path = analyzer.save_result(result)
+    print(f"\n   📄 Results saved to: {output_path}")
+
+    # Return based on critical gaps
+    if result.has_critical_gaps:
+        print("\n   ⚠️  Critical gaps found. Consider addressing these before proceeding.")
+        return 1
+
     return 0
+
+
+def _print_gap_analysis(result: GapAnalysisResult) -> None:
+    """Print gap analysis results."""
+    print("\n" + "=" * 60)
+    print("📋 GAP ANALYSIS RESULTS")
+    print("=" * 60)
+
+    print(f"\n   Source: {result.source_file}")
+    print(f"   Coverage Score: {result.overall_coverage_score:.1f}%")
+    print(f"   Total Concepts: {len(result.concepts)}")
+
+    # Show covered concepts count
+    covered = [c for c in result.concepts if c.is_covered]
+    if covered:
+        print(f"\n   ✅ Covered Concepts ({len(covered)}):")
+        for cov in covered[:5]:  # Show first 5
+            depth_icon = "🎯" if cov.depth.value == "deep_dive" else "📖" if cov.depth.value == "explained" else "📌"
+            print(f"      {depth_icon} {cov.concept.name} ({cov.depth.value})")
+        if len(covered) > 5:
+            print(f"      ... and {len(covered) - 5} more")
+
+    if result.missing_concepts:
+        print(f"\n   ❌ Missing Concepts - Need to Add ({len(result.missing_concepts)}):")
+        for concept in result.missing_concepts:
+            print(f"      - {concept}")
+
+    if result.shallow_concepts:
+        print(f"\n   ⚠️  Shallow Coverage - Need Deeper Explanation ({len(result.shallow_concepts)}):")
+        for concept in result.shallow_concepts:
+            print(f"      - {concept}")
+
+    # Show intentional omissions
+    if result.intentionally_omitted_concepts:
+        print(f"\n   📋 Intentionally Omitted ({len(result.intentionally_omitted_concepts)}):")
+        for concept, reason in result.intentionally_omitted_concepts:
+            reason_display = reason.replace("_", " ")
+            print(f"      - {concept} ({reason_display})")
+        if result.intentional_omissions_summary:
+            print(f"\n      Summary: {result.intentional_omissions_summary}")
+
+    if result.narrative_gaps:
+        print(f"\n   🔗 Narrative Gaps ({len(result.narrative_gaps)}):")
+        for gap in result.narrative_gaps:
+            severity_icon = "🔴" if gap.severity == "high" else "🟡" if gap.severity == "medium" else "🟢"
+            print(f"      {severity_icon} {gap.from_scene_title} → {gap.to_scene_title}")
+            print(f"         {gap.gap_description}")
+
+    if result.suggested_scenes:
+        print(f"\n   💡 Suggested New Scenes ({len(result.suggested_scenes)}):")
+        for scene in result.suggested_scenes:
+            print(f"      - [{scene.suggested_position}] {scene.title}")
+            print(f"        Reason: {scene.reason}")
+
+    # Show generated patches
+    if result.patches:
+        print(f"\n   🔧 Generated Patches ({len(result.patches)}):")
+        for i, patch in enumerate(result.patches, 1):
+            priority_icon = "🔴" if patch.priority == "critical" else "🟡" if patch.priority == "high" else "🟢"
+            print(f"      {priority_icon} [{i}] {patch.patch_type.value}: {patch.reason[:60]}...")
+
+    if result.analysis_notes:
+        print(f"\n   📝 Notes: {result.analysis_notes}")
+
+    print("\n" + "=" * 60)
 
 
 def _run_script_phase(project: Project, args: argparse.Namespace) -> int:
-    """Run Phase 2: Script refinement."""
+    """Run Phase 2: Script refinement (apply patches)."""
     print("\n📝 Phase 2: Script Refinement")
     print("   " + "=" * 40)
-    print("\n   ⚠️ Phase 2 not yet implemented.")
-    print("   This phase will refine narrations and update script structure.")
-    print("\n   For now, please use the existing 'narration' command to update narrations.")
+
+    verbose = not getattr(args, "quiet", False)
+    batch_approve = getattr(args, "batch_approve", False)
+    refiner = ScriptRefiner(project=project, verbose=verbose)
+
+    # Run analysis to get all patches (Phase 1 patches + storytelling patches)
+    all_patches, narration_result = refiner.refine()
+
+    # Print analysis results
+    _print_narration_analysis(narration_result)
+
+    # Save narration analysis
+    output_path = refiner.save_result(narration_result)
+    print(f"\n   📄 Analysis saved to: {output_path}")
+
+    if not all_patches:
+        print("\n   ✅ No patches to apply. Script is already in good shape!")
+        return 0
+
+    # Print patch summary
+    print(f"\n   🔧 Total Patches to Apply: {len(all_patches)}")
+    _print_patch_summary(all_patches)
+
+    # Apply patches
+    if batch_approve:
+        # Batch approval mode: apply all patches
+        print("\n   --batch-approve specified, applying all patches...")
+        applied = _apply_all_patches(refiner, all_patches)
+        print(f"\n   ✅ Applied {applied}/{len(all_patches)} patches.")
+    else:
+        # Interactive mode: ask for each patch
+        applied = _interactive_patches(refiner, all_patches)
+        print(f"\n   ✅ Applied {applied}/{len(all_patches)} patches.")
+
+    if applied > 0:
+        print("\n   📢 Script and narrations have been updated.")
+        print("   💡 Next steps:")
+        print("      1. Review changes in script/script.json and narration/narrations.json")
+        print("      2. Run 'voiceover' command to regenerate audio")
+        print("      3. Run 'scenes' command to regenerate visual components")
+
     return 0
+
+
+def _print_narration_analysis(result: NarrationRefinementResult) -> None:
+    """Print narration analysis results."""
+    print("\n" + "=" * 60)
+    print("📋 NARRATION ANALYSIS RESULTS")
+    print("=" * 60)
+
+    print(f"\n   Overall Storytelling Score: {result.overall_storytelling_score:.1f}/10")
+    print(f"   Total Issues Found: {result.total_issues_found}")
+    print(f"   Scenes Needing Revision: {len(result.scenes_needing_revision)}")
+
+    for analysis in result.scene_analyses:
+        status = "⚠️" if analysis.needs_revision else "✅"
+        print(f"\n   {status} Scene: {analysis.scene_title}")
+        print(f"      Score: {analysis.scores.overall:.1f}/10")
+        print(f"      Words: {analysis.word_count}/{analysis.expected_word_count} ({analysis.length_ratio:.0%})")
+
+        if analysis.issues:
+            for issue in analysis.issues:
+                severity_icon = "🔴" if issue.severity == "high" else "🟡" if issue.severity == "medium" else "🟢"
+                print(f"      {severity_icon} [{issue.issue_type.value}] {issue.description}")
+
+    if result.high_priority_scenes:
+        print(f"\n   🔴 High Priority Scenes: {', '.join(result.high_priority_scenes)}")
+
+    print("\n" + "=" * 60)
+
+
+def _print_patch_summary(patches: list[ScriptPatch]) -> None:
+    """Print a summary of patches to be applied."""
+    # Group patches by type
+    by_type: dict[str, list[ScriptPatch]] = {}
+    for patch in patches:
+        patch_type = patch.patch_type.value
+        if patch_type not in by_type:
+            by_type[patch_type] = []
+        by_type[patch_type].append(patch)
+
+    for patch_type, type_patches in by_type.items():
+        print(f"\n   {patch_type} ({len(type_patches)}):")
+        for patch in type_patches[:3]:  # Show first 3
+            priority_icon = "🔴" if patch.priority == "critical" else "🟡" if patch.priority == "high" else "🟢"
+            print(f"      {priority_icon} {patch.reason[:50]}...")
+        if len(type_patches) > 3:
+            print(f"      ... and {len(type_patches) - 3} more")
+
+
+def _apply_all_patches(refiner: ScriptRefiner, patches: list[ScriptPatch]) -> int:
+    """Apply all patches (batch mode).
+
+    Args:
+        refiner: The ScriptRefiner instance
+        patches: List of patches to apply
+
+    Returns:
+        Number of patches applied
+    """
+    applied = 0
+    for patch in patches:
+        if refiner.apply_patch(patch):
+            applied += 1
+    return applied
+
+
+def _interactive_patches(refiner: ScriptRefiner, patches: list[ScriptPatch]) -> int:
+    """Interactively approve and apply patches one by one.
+
+    Args:
+        refiner: The ScriptRefiner instance
+        patches: List of patches to apply
+
+    Returns:
+        Number of patches applied
+    """
+    applied = 0
+
+    for i, patch in enumerate(patches, 1):
+        print("\n" + "-" * 60)
+        print(f"   Patch {i}/{len(patches)}")
+        _print_patch_details(patch)
+
+        # Ask for approval
+        try:
+            response = input("\n   Apply this patch? [y/N/q (quit)]: ").strip().lower()
+        except EOFError:
+            # Non-interactive mode - skip
+            print("   (Non-interactive mode, skipping)")
+            continue
+
+        if response == "q":
+            print("   Stopping patch application.")
+            break
+        elif response == "y":
+            if refiner.apply_patch(patch):
+                print("   ✅ Patch applied.")
+                applied += 1
+            else:
+                print("   ❌ Failed to apply patch.")
+        else:
+            print("   Skipped.")
+
+    return applied
+
+
+def _print_patch_details(patch: ScriptPatch) -> None:
+    """Print detailed information about a patch."""
+    priority_icon = "🔴" if patch.priority == "critical" else "🟡" if patch.priority == "high" else "🟢"
+    print(f"   {priority_icon} Type: {patch.patch_type.value}")
+    print(f"   Priority: {patch.priority}")
+    print(f"   Reason: {patch.reason}")
+
+    if isinstance(patch, AddScenePatch):
+        print(f"\n   New Scene: {patch.title}")
+        print(f"   Insert after: {patch.insert_after_scene_id or '(beginning)'}")
+        print(f"   Duration: {patch.duration_seconds}s")
+        narration_preview = patch.narration[:200] + "..." if len(patch.narration) > 200 else patch.narration
+        print(f"\n   Narration:\n   \"{narration_preview}\"")
+
+    elif isinstance(patch, ModifyScenePatch):
+        print(f"\n   Scene: {patch.scene_id}")
+        print(f"   Field: {patch.field_name}")
+        old_preview = patch.old_value[:100] + "..." if len(patch.old_value) > 100 else patch.old_value
+        new_preview = patch.new_value[:100] + "..." if len(patch.new_value) > 100 else patch.new_value
+        print(f"\n   Before:\n   \"{old_preview}\"")
+        print(f"\n   After:\n   \"{new_preview}\"")
+
+    elif isinstance(patch, ExpandScenePatch):
+        print(f"\n   Scene: {patch.scene_id}")
+        print(f"   Concepts to add: {', '.join(patch.concepts_to_add)}")
+        print(f"   Additional duration: +{patch.additional_duration_seconds}s")
+        expanded_preview = patch.expanded_narration[:200] + "..." if len(patch.expanded_narration) > 200 else patch.expanded_narration
+        print(f"\n   Expanded narration:\n   \"{expanded_preview}\"")
+
+    elif isinstance(patch, AddBridgePatch):
+        print(f"\n   Bridge: {patch.from_scene_id} → {patch.to_scene_id}")
+        print(f"   Type: {patch.bridge_type}")
+        print(f"   Modify scene: {patch.modify_scene_id}")
+        new_preview = patch.new_text[:200] + "..." if len(patch.new_text) > 200 else patch.new_text
+        print(f"\n   New text:\n   \"{new_preview}\"")
 
 
 def _run_visual_phase(project: Project, args: argparse.Namespace) -> int:
@@ -313,6 +584,12 @@ Example usage:
         "--live",
         action="store_true",
         help="Stream Claude Code output in real-time (useful for debugging)",
+    )
+
+    refine_parser.add_argument(
+        "--batch-approve",
+        action="store_true",
+        help="Automatically approve all suggested revisions (for --phase script)",
     )
 
     refine_parser.add_argument(

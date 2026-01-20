@@ -229,7 +229,7 @@ class TestIssueType:
     """Tests for IssueType enum."""
 
     def test_all_issue_types_exist(self):
-        """Test that all 10 principle issue types exist."""
+        """Test that all 11 principle issue types exist plus 'other'."""
         expected_types = [
             "show_dont_tell",
             "animation_reveals",
@@ -241,6 +241,7 @@ class TestIssueType:
             "emotional_resonance",
             "professional_polish",
             "sync_with_narration",
+            "screen_space_utilization",
             "other",
         ]
         for type_name in expected_types:

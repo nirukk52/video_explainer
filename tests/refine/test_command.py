@@ -146,6 +146,7 @@ class TestPhaseHandling:
         args.force = False
         args.skip_validation = True
         args.quiet = False
+        args.batch_approve = False
         return args
 
     def test_analyze_phase(self, mock_args, project_with_files):
@@ -155,10 +156,30 @@ class TestPhaseHandling:
         with patch("src.refine.command.load_project") as mock_load:
             mock_load.return_value = project_with_files
 
-            result = cmd_refine(mock_args)
+            with patch("src.refine.command.ScriptAnalyzer") as mock_analyzer_class:
+                # Create mock analyzer instance
+                mock_analyzer = MagicMock()
+                mock_analyzer_class.return_value = mock_analyzer
 
-            # Analyze phase returns 0 (not implemented message)
-            assert result == 0
+                # Mock the analyze() result
+                mock_result = MagicMock()
+                mock_result.has_critical_gaps = False
+                mock_result.source_file = "input.md"
+                mock_result.overall_coverage_score = 80.0
+                mock_result.missing_concepts = []
+                mock_result.shallow_concepts = []
+                mock_result.narrative_gaps = []
+                mock_result.suggested_scenes = []
+                mock_result.patches = []
+                mock_result.analysis_notes = "Good coverage"
+                mock_analyzer.analyze.return_value = mock_result
+                mock_analyzer.save_result.return_value = Path("/tmp/gap_analysis.json")
+
+                result = cmd_refine(mock_args)
+
+                # Analyze phase returns 0 when no critical gaps
+                assert result == 0
+                mock_analyzer.analyze.assert_called_once()
 
     def test_script_phase(self, mock_args, project_with_files):
         """Test script phase execution."""
@@ -167,10 +188,26 @@ class TestPhaseHandling:
         with patch("src.refine.command.load_project") as mock_load:
             mock_load.return_value = project_with_files
 
-            result = cmd_refine(mock_args)
+            with patch("src.refine.command.ScriptRefiner") as mock_refiner_class:
+                # Create mock refiner instance
+                mock_refiner = MagicMock()
+                mock_refiner_class.return_value = mock_refiner
 
-            # Script phase returns 0 (not implemented message)
-            assert result == 0
+                # Mock the refine() result (returns tuple)
+                from src.refine.models import NarrationRefinementResult
+                mock_narration_result = NarrationRefinementResult(
+                    project_id="test-project",
+                    overall_storytelling_score=8.0,
+                    total_issues_found=0,
+                )
+                mock_refiner.refine.return_value = ([], mock_narration_result)
+                mock_refiner.save_result.return_value = Path("/tmp/narration_analysis.json")
+
+                result = cmd_refine(mock_args)
+
+                # Script phase returns 0 when no patches
+                assert result == 0
+                mock_refiner.refine.assert_called_once()
 
 
 class TestVisualPhase:
