@@ -379,10 +379,12 @@ class TestPrinciplesInInspectorPrompt:
         from src.refine.visual.inspector import CLAUDE_CODE_VISUAL_INSPECTION_PROMPT
 
         # Check for navigation section
-        assert "Navigation Tips" in CLAUDE_CODE_VISUAL_INSPECTION_PROMPT
+        assert "Navigation" in CLAUDE_CODE_VISUAL_INSPECTION_PROMPT
         # Check for specific navigation instructions
         assert "frame counter" in CLAUDE_CODE_VISUAL_INSPECTION_PROMPT.lower()
         assert "arrow keys" in CLAUDE_CODE_VISUAL_INSPECTION_PROMPT.lower()
+        # Check that PRESS ENTER is emphasized
+        assert "PRESS ENTER" in CLAUDE_CODE_VISUAL_INSPECTION_PROMPT
 
     def test_inspector_prompt_has_principle_checklist(self):
         """Test that prompt includes explicit principle checklist for each beat."""

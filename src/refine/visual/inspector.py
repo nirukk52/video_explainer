@@ -186,12 +186,16 @@ CLAUDE_CODE_VISUAL_INSPECTION_PROMPT = """Inspect and fix visuals for Scene {sce
 - Total beats to inspect: {num_beats}
 - Frames to check: {beat_frames_list}
 
-## Remotion Studio Navigation Tips
-- **Go to specific frame**: Click the frame counter (shows "00:00.00 / Frame 0"), type the frame number, press Enter
-- **Step frame-by-frame**: Use Left/Right arrow keys
-- **Go to start**: Click the "Skip to start" button (|◀) or press Home
-- **Playback**: Press Space to play/pause, or use J/K/L keys
-- The frame counter shows both timecode AND frame number - use the frame number for precision
+## Remotion Studio Navigation - IMPORTANT
+To go to a specific frame:
+1. Click on the frame counter (shows "Frame XX" in the top toolbar)
+2. Type the frame number (e.g., "397")
+3. **PRESS ENTER** to confirm - this is required!
+
+Without pressing Enter, the frame won't change. If navigation fails, try:
+- Click the frame counter again, clear it, type the number, press Enter
+- Or use Left/Right arrow keys to step frame-by-frame
+- Or click "Skip to start" (|◀) then arrow-key forward
 
 ## CRITICAL: Complete Coverage Required
 - You MUST take a screenshot at EVERY frame listed: {beat_frames_list}
