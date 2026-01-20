@@ -295,10 +295,8 @@ class ClaudeCodeVisualInspector:
         self.live_output = live_output
         self.validator = ProjectValidator(project)
 
-        # Set up beat parser with mock provider (beats are parsed separately)
-        config = LLMConfig(provider="mock")
-        mock_llm = MockLLMProvider(config)
-        self.beat_parser = BeatParser(llm_provider=mock_llm)
+        # Set up beat parser with Claude Code provider for quality beat detection
+        self.beat_parser = BeatParser(working_dir=project.root_dir)
 
     def _log(self, message: str) -> None:
         """Print a message if verbose mode is enabled."""
