@@ -9,6 +9,12 @@ metadata:
 
 Create UI components that feel like physical 3D objects floating above the background.
 
+**IMPORTANT DISTINCTION:**
+- **SCENE BACKGROUND**: The canvas/backdrop of the scene. Can be ANY color - light gradients, dark gradients, patterns, etc. This is specified in the visual_cue's BACKGROUND section.
+- **UI PANELS/CARDS**: The floating components ON TOP of the background. These use "dark glass" styling with dark backgrounds (rgba 18-22 range), multi-layer shadows, bezels, etc.
+
+The styling rules below apply to **UI PANELS/CARDS**, not the scene background!
+
 ### Core Principles
 
 1. **3D depth through shadows, NOT transforms** - Don't use `perspective()` or `rotateX()` to tilt elements
@@ -77,20 +83,23 @@ boxShadow: `
 
 ---
 
-## Dark Glass Background
+## Dark Glass Panel/Card Background (NOT scene background)
 
-Use uniformly dark colors. **NO grey gradients at the top.**
+This is for UI component panels and cards that float on top of the scene background.
+The SCENE background can be any color (light or dark gradients). These rules apply to the floating UI panels only.
+
+Use uniformly dark colors for panels. **NO grey gradients at the top.**
 
 ```tsx
-// GOOD - uniformly dark
+// GOOD - uniformly dark panel
 background: `linear-gradient(180deg,
   rgba(18, 22, 35, 0.98) 0%,
   rgba(12, 15, 28, 0.99) 50%,
   rgba(8, 10, 22, 0.99) 100%)`
 
-// BAD - grey/washed out at top
+// BAD - grey/washed out panel at top
 background: `linear-gradient(180deg,
-  rgba(45, 52, 70, 0.97) 0%,    // Too light!
+  rgba(45, 52, 70, 0.97) 0%,    // Too light for dark glass!
   rgba(20, 25, 40, 0.98) 50%,
   rgba(12, 15, 28, 0.99) 100%)`
 ```
@@ -272,20 +281,23 @@ const GlassCard: React.FC<{
 
 ---
 
-## Anti-Patterns (DON'T DO)
+## Anti-Patterns for Dark Glass Panels (DON'T DO)
+
+These rules apply to dark glass UI panels/cards, NOT the scene background.
+The scene background can be light or dark - these anti-patterns are for the floating UI components.
 
 ```tsx
-// DON'T use perspective transforms for depth
+// DON'T use perspective transforms for depth on panels
 transform: "perspective(1200px) rotateX(2deg)"  // Bad!
 
-// DON'T use grey/light overlays on dark glass
+// DON'T use grey/light overlays on dark glass panels
 background: "linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%)"  // Bad!
 
-// DON'T use single-layer shadows
+// DON'T use single-layer shadows on panels
 boxShadow: "0 4px 20px rgba(0,0,0,0.3)"  // Too flat!
 
-// DON'T use light background colors for dark glass
-background: "rgba(45, 52, 70, 0.95)"  // Too grey!
+// DON'T use light background colors for dark glass panels
+background: "rgba(45, 52, 70, 0.95)"  // Too grey for a dark glass panel!
 ```
 
 ---
