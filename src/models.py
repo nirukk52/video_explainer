@@ -1,9 +1,22 @@
-"""Core data models used across the application."""
+"""
+Core data models used across the application.
+
+Includes models for:
+- Document parsing and content analysis
+- Script generation (both long-form and short-form)
+- Evidence investigation and capture (for Varun Mayya style shorts)
+- Storyboard and animation
+"""
 
 from enum import Enum
-from typing import Any
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+# ============================================================================
+# SOURCE DOCUMENT MODELS
+# ============================================================================
 
 
 class SourceType(str, Enum):
@@ -13,6 +26,144 @@ class SourceType(str, Enum):
     PDF = "pdf"
     URL = "url"
     TEXT = "text"
+
+
+# ============================================================================
+# EVIDENCE MODELS (for short-form video production)
+# ============================================================================
+
+
+class Investigation(BaseModel):
+    """
+    Research results from the Investigator agent.
+
+    Contains the verified primary source URL, fallback alternatives,
+    and credibility assessment. Multiple URLs enable retry on capture failure.
+    """
+
+    status: Literal["found", "not_found", "error", "pending"] = "pending"
+    verified_url: Optional[str] = None
+    fallback_urls: list[str] = Field(default_factory=list)
+    source_title: Optional[str] = None
+    credibility_score: Optional[float] = None
+    error_message: Optional[str] = None
+
+
+class ScreenshotVariant(BaseModel):
+    """Single screenshot variant with path and display title."""
+
+    path: str = Field(description="File path to the screenshot image")
+    title: str = Field(description="Human-readable title for display")
+
+
+class ScreenshotBundle(BaseModel):
+    """
+    Bundle of 5 screenshot variants for a single evidence capture.
+
+    Provides flexibility for video rendering - Editor can choose
+    the most appropriate variant for each scene's visual needs.
+    """
+
+    element_padded: Optional[ScreenshotVariant] = Field(
+        default=None,
+        description="Element with 20px padding - borders visible"
+    )
+    element_tight: Optional[ScreenshotVariant] = Field(
+        default=None,
+        description="Element tight crop - no padding"
+    )
+    context: Optional[ScreenshotVariant] = Field(
+        default=None,
+        description="Parent container with padding"
+    )
+    viewport: Optional[ScreenshotVariant] = Field(
+        default=None,
+        description="Current viewport screenshot"
+    )
+    fullpage: Optional[ScreenshotVariant] = Field(
+        default=None,
+        description="Full page screenshot - ultimate fallback"
+    )
+
+    def get_best_path(self) -> Optional[str]:
+        """Get the best available screenshot path."""
+        if self.element_padded:
+            return self.element_padded.path
+        if self.context:
+            return self.context.path
+        if self.viewport:
+            return self.viewport.path
+        if self.fullpage:
+            return self.fullpage.path
+        return None
+
+    def get_all_with_titles(self) -> list[ScreenshotVariant]:
+        """Return all available screenshots as a list."""
+        variants = []
+        if self.element_padded:
+            variants.append(self.element_padded)
+        if self.element_tight:
+            variants.append(self.element_tight)
+        if self.context:
+            variants.append(self.context)
+        if self.viewport:
+            variants.append(self.viewport)
+        if self.fullpage:
+            variants.append(self.fullpage)
+        return variants
+
+
+class EvidenceCapture(BaseModel):
+    """
+    Visual evidence captured by the Witness agent.
+
+    Contains all metadata needed to use the asset in video rendering:
+    multiple screenshot variants, selectors, dimensions, and capture status.
+    """
+
+    capture_status: Literal["success", "partial", "failed", "pending"] = "pending"
+    asset_type: Literal["screenshot", "recording", "dom_crop"] = "screenshot"
+
+    # Element identification
+    css_selector: Optional[str] = Field(
+        default=None,
+        description="CSS selector used to find the element"
+    )
+    identifying_text: Optional[str] = Field(
+        default=None,
+        description="Anchor text that matched the element"
+    )
+
+    # Screenshot variants
+    screenshots: Optional[ScreenshotBundle] = Field(
+        default=None,
+        description="Bundle of screenshot variants"
+    )
+
+    # Best available screenshot (for backward compatibility)
+    screenshot_url: Optional[str] = Field(
+        default=None,
+        description="Recommended screenshot path"
+    )
+
+    # Recording for scroll animations
+    recording_url: Optional[str] = Field(
+        default=None,
+        description="Video recording URL for scroll_highlight"
+    )
+
+    # Dimensions
+    width: Optional[int] = None
+    height: Optional[int] = None
+
+    # Error handling
+    error_message: Optional[str] = None
+    timing_ms: int = 0
+
+
+# ============================================================================
+# DOCUMENT PARSING MODELS
+# ============================================================================
 
 
 class Section(BaseModel):
@@ -71,12 +222,17 @@ class ScriptScene(BaseModel):
     """A scene in the video script."""
 
     scene_id: str  # Slug-based ID like "the_impossible_leap"
-    scene_type: str  # hook, context, explanation, insight, conclusion
+    scene_type: str  # hook, context, explanation, insight, conclusion (or role for shorts)
     title: str
     voiceover: str
     visual_cue: VisualCue
     duration_seconds: float
     notes: str = ""
+
+    # Evidence fields (for short-form video production)
+    needs_evidence: bool = False
+    investigation: Optional[Investigation] = None
+    evidence_capture: Optional[EvidenceCapture] = None
 
 
 class Script(BaseModel):
@@ -177,3 +333,47 @@ class VideoPlan(BaseModel):
 
     source_document: str
     user_notes: str = ""
+
+
+class ShortsProject(BaseModel):
+    """
+    Project state for short-form video production (Varun Mayya style).
+
+    Tracks the evidence-based video production pipeline:
+    1. Script generation (with evidence requirements)
+    2. URL investigation (Exa.ai search)
+    3. Screenshot capture (Browserbase)
+    4. Asset packaging (Editor)
+    5. Remotion rendering
+    """
+
+    project_id: str
+    topic: str
+    style: str = "varun_mayya"  # varun_mayya, johnny_harris, generic
+    duration_seconds: int = 45
+
+    # Pipeline state
+    status: Literal[
+        "initialized",
+        "scripted",
+        "investigating",
+        "capturing",
+        "editing",
+        "rendering",
+        "complete",
+        "error"
+    ] = "initialized"
+    current_stage: str = "init"
+    error_message: Optional[str] = None
+
+    # Core data
+    script: Optional[Script] = None
+    evidence_urls: list[str] = Field(default_factory=list)
+
+    # Output
+    render_manifest: Optional[dict[str, Any]] = None
+    output_path: Optional[str] = None
+
+    # Metadata
+    resolution: str = "1080x1920"  # 9:16 vertical for shorts
+    tone: str = "investigative_journalist"

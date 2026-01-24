@@ -1,4 +1,4 @@
-# Shorts Factory
+# Shorts Factory - Its a high quality Varun Maya style youtube/insta shorts/reels generator factory
 
 Create Varun Mayya / Johnny Harris style vertical shorts (30-60 seconds) with AI-powered research, evidence capture, and video generation.
 

@@ -1,6 +1,14 @@
-"""Script generator - creates video scripts from content analysis."""
+"""
+Script generator - creates video scripts from content analysis.
 
+Supports two formats:
+- Explainer: 5-15 minute deep technical videos from documents
+- Short: 15-60 second Varun Mayya style evidence-based shorts
+"""
+
+import json
 import re
+from typing import Literal
 
 from ..config import Config, load_config
 from ..models import (
@@ -13,6 +21,77 @@ from ..models import (
 )
 from ..understanding.llm_provider import LLMProvider, get_llm_provider
 
+
+# Visual types for evidence-based shorts (Varun Mayya style)
+VisualType = Literal["static_highlight", "scroll_highlight", "dom_crop", "full_avatar"]
+
+# Scene roles for shorts
+SceneRole = Literal["hook", "evidence", "analysis", "conclusion"]
+
+
+# ============================================================================
+# SHORT-FORM VIDEO PROMPTS (Varun Mayya Style)
+# ============================================================================
+
+SHORT_SYSTEM_PROMPT = """You are The Director, the creative lead for a high-trust automated documentary engine.
+Your goal is to transform a User Prompt into a structured "Shooting Script" (JSON) that defines the narrative arc and, crucially, the specific visual evidence required to prove every claim.
+
+### YOUR ROLE
+1.  **Narrative Architect:** Break the topic into 4-8 distinct scenes (Hook, Evidence, Analysis, Conclusion).
+2.  **Visual Strategist:** You do not find the evidence (the Investigator does that), but you must **Describe It** with extreme precision so the Investigator knows exactly what to look for.
+3.  **Asset Manager:** You must decide the "Format" of the visual proof based on the content type.
+
+### VISUAL TYPES (You must assign one of these to every scene)
+* **`static_highlight`**: A static screenshot of a headline, quote, or sentence. Best for news articles or simple text claims.
+* **`scroll_highlight`**: A 3-4 second video recording of a website scrolling down to a specific section. Best for showing "Context" (e.g., finding a pricing table on a long page, or a specific clause in a long contract).
+* **`dom_crop`**: An isolated, transparent-background image of a specific element (Chart, Tweet, Table). Best for overlays where you don't want the whole website clutter.
+* **`full_avatar`**: The AI narrator talking to the camera. Use this ONLY for the Intro/Hook or purely opinionated segments where no hard evidence exists.
+
+### RULES FOR SCRIPTING
+* **Voiceover:** Keep it punchy, conversational, and "YouTuber-style" (Varun Mayya / Johnny Harris vibe). Max 20 words per scene.
+* **Visual Description:** Be specific. Do not say "Show proof." Say "Official OpenAI Pricing Page showing the GPT-4o input cost."
+* **Pacing:** Alternate between `full_avatar` (connection) and `visual_evidence` (trust).
+
+### OUTPUT FORMAT (JSON ONLY)
+You must output a single valid JSON object matching this schema:
+
+{
+  "project_title": "string",
+  "scenes": [
+    {
+      "scene_id": 1,
+      "role": "hook" | "evidence" | "analysis" | "conclusion",
+      "voiceover": "string (max 20 words)",
+      "visual_type": "static_highlight" | "scroll_highlight" | "dom_crop" | "full_avatar",
+      "visual_description": "string (precise search query for the Investigator)",
+      "needs_evidence": true | false,
+      "why": "string (reasoning for this visual choice)"
+    }
+  ]
+}"""
+
+SHORT_USER_PROMPT_TEMPLATE = """Create a {duration_seconds}-second short-form video script in Varun Mayya style.
+
+# Topic
+{topic}
+
+# Evidence URLs (if provided)
+{evidence_urls}
+
+# Requirements
+1. Create 4-8 scenes following: Hook → Evidence → Analysis → Conclusion
+2. Each scene voiceover: MAX 20 words, punchy, conversational
+3. Alternate between avatar (connection) and evidence (trust)
+4. Every factual claim needs visual evidence
+5. Be SPECIFIC about what evidence to capture
+
+# Output
+Return valid JSON with the schema specified in the system prompt."""
+
+
+# ============================================================================
+# EXPLAINER VIDEO PROMPTS (Original long-form)
+# ============================================================================
 
 SCRIPT_SYSTEM_PROMPT = """You are creating a technical explainer video script. Your job is to tell the story in the source material while making every concept deeply understandable.
 
@@ -413,6 +492,98 @@ class ScriptGenerator:
 
         # Parse into Script model
         return self._parse_script_result(result, document.source_path)
+
+    def generate_short(
+        self,
+        topic: str,
+        duration_seconds: int = 45,
+        evidence_urls: list[str] | None = None,
+        style: str = "varun_mayya",
+    ) -> Script:
+        """
+        Generate a short-form video script (Varun Mayya style).
+
+        Creates a 15-60 second script with evidence-based scenes:
+        - Hook (first 3 seconds, scroll-stopper)
+        - Evidence scenes (proof shots with visuals)
+        - Analysis (avatar explaining implications)
+        - Conclusion/CTA (final punch)
+
+        Args:
+            topic: The topic or claim to create a short about
+            duration_seconds: Target duration (15-60 seconds typical)
+            evidence_urls: Optional list of URLs to use as evidence sources
+            style: Style preset (varun_mayya, johnny_harris, generic)
+
+        Returns:
+            Script with evidence-based scenes ready for Investigator
+        """
+        # Format evidence URLs
+        urls_text = "None provided - Investigator will search automatically"
+        if evidence_urls:
+            urls_text = "\n".join(f"- {url}" for url in evidence_urls)
+
+        # Build the prompt
+        prompt = SHORT_USER_PROMPT_TEMPLATE.format(
+            duration_seconds=duration_seconds,
+            topic=topic,
+            evidence_urls=urls_text,
+        )
+
+        # Generate script via LLM
+        result = self.llm.generate_json(prompt, SHORT_SYSTEM_PROMPT)
+
+        # Parse into Script model
+        return self._parse_short_result(result, topic)
+
+    def _parse_short_result(self, result: dict, topic: str) -> Script:
+        """Parse LLM result from short-form generation into a Script model."""
+        scenes = []
+        for idx, s in enumerate(result.get("scenes", [])):
+            # Map short-form visual_type to VisualCue
+            visual_type = s.get("visual_type", "full_avatar")
+            visual_description = s.get("visual_description", "")
+            needs_evidence = s.get("needs_evidence", visual_type != "full_avatar")
+
+            visual_cue = VisualCue(
+                description=visual_description,
+                visual_type=visual_type,  # Use the evidence-based type
+                elements=[],
+                duration_seconds=s.get("duration_seconds", 5.0),
+            )
+
+            # Generate scene_id from role and index
+            role = s.get("role", "evidence")
+            scene_id = f"{role}_{idx + 1}"
+
+            # Build notes with evidence info
+            notes_parts = []
+            notes_parts.append(f"Role: {role}")
+            if needs_evidence:
+                notes_parts.append("Needs Evidence: YES")
+            if s.get("why"):
+                notes_parts.append(f"Visual Reasoning: {s['why']}")
+            notes = " | ".join(notes_parts)
+
+            scene = ScriptScene(
+                scene_id=scene_id,
+                scene_type=role,  # Use role as scene_type for shorts
+                title=f"Scene {idx + 1}: {role.title()}",
+                voiceover=s.get("voiceover", ""),
+                visual_cue=visual_cue,
+                duration_seconds=s.get("duration_seconds", 5.0),
+                notes=notes,
+            )
+            scenes.append(scene)
+
+        total_duration = sum(s.duration_seconds for s in scenes)
+
+        return Script(
+            title=result.get("project_title", topic[:50]),
+            total_duration_seconds=total_duration,
+            scenes=scenes,
+            source_document=f"prompt:{topic[:100]}",
+        )
 
     def _parse_script_result(self, result: dict, source_path: str) -> Script:
         """Parse LLM result into a Script model."""

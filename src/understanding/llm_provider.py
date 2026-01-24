@@ -80,13 +80,22 @@ class MockLLMProvider(LLMProvider):
         """Generate mock JSON responses for known prompt patterns.
 
         Pattern matching order is important:
-        1. Plan refinement (most specific - contains "refine" + "plan")
-        2. Plan generation (contains "video plan" or "create a video plan")
-        3. Storyboard (most specific - contains "storyboard" keyword)
-        4. Script (contains "script" + "create/generate", but NOT "storyboard")
-        5. Content analysis (contains "analyze" + "content/document")
+        1. Short-form video (contains "short" or "varun" style keywords)
+        2. Plan refinement (most specific - contains "refine" + "plan")
+        3. Plan generation (contains "video plan" or "create a video plan")
+        4. Storyboard (most specific - contains "storyboard" keyword)
+        5. Script (contains "script" + "create/generate", but NOT "storyboard")
+        6. Content analysis (contains "analyze" + "content/document")
         """
         prompt_lower = prompt.lower()
+        system_lower = (system_prompt or "").lower()
+
+        # Short-form video request (Varun Mayya style)
+        if any(kw in prompt_lower or kw in system_lower for kw in [
+            "short-form", "shorts", "varun mayya", "scroll-stopper",
+            "evidence-based short", "15-60 second"
+        ]):
+            return self._mock_short_script_generation(prompt)
 
         # Plan refinement request (check first - most specific)
         if "refine" in prompt_lower and "plan" in prompt_lower:
@@ -119,6 +128,87 @@ class MockLLMProvider(LLMProvider):
 
         # Default empty response
         return {}
+
+    def _mock_short_script_generation(self, prompt: str) -> dict[str, Any]:
+        """Return mock short-form script for Varun Mayya style testing.
+        
+        Designed for the Shorts Factory pipeline with evidence-based scenes.
+        Uses the DeepSeek pricing example as the default mock content.
+        """
+        # Extract topic from prompt if possible
+        topic = "DeepSeek's pricing is crashing the AI market"
+        if "deepseek" in prompt.lower():
+            topic = "DeepSeek's pricing is crashing the AI market"
+        elif "nvidia" in prompt.lower():
+            topic = "NVIDIA just changed everything"
+        elif "ai" in prompt.lower():
+            topic = "AI is disrupting this industry"
+        
+        return {
+            "project_title": topic,
+            "total_duration_seconds": 45,
+            "style": "varun_mayya",
+            "scenes": [
+                {
+                    "scene_id": 1,
+                    "role": "hook",
+                    "voiceover": "This is going to blow your mind. DeepSeek just dropped API pricing that's 95% cheaper than OpenAI.",
+                    "visual_type": "full_avatar",
+                    "visual_description": "Avatar with bold text overlay: '95% CHEAPER'",
+                    "needs_evidence": False,
+                    "duration_seconds": 5,
+                },
+                {
+                    "scene_id": 2,
+                    "role": "evidence",
+                    "voiceover": "Look at this. Their API costs just 14 cents per million tokens. OpenAI charges 3 dollars.",
+                    "visual_type": "static_highlight",
+                    "visual_description": "DeepSeek pricing page with $0.14 highlighted",
+                    "evidence_keywords": ["DeepSeek API pricing", "cost per token"],
+                    "anchor_text": "$0.14 per million tokens",
+                    "needs_evidence": True,
+                    "duration_seconds": 7,
+                },
+                {
+                    "scene_id": 3,
+                    "role": "evidence",
+                    "voiceover": "And the benchmarks? They're matching GPT-4 on most tasks.",
+                    "visual_type": "static_highlight",
+                    "visual_description": "Benchmark comparison chart",
+                    "evidence_keywords": ["DeepSeek benchmark", "GPT-4 comparison"],
+                    "anchor_text": "benchmark results",
+                    "needs_evidence": True,
+                    "duration_seconds": 6,
+                },
+                {
+                    "scene_id": 4,
+                    "role": "analysis",
+                    "voiceover": "This means startups can now build AI products for a fraction of the cost. The barrier to entry just collapsed.",
+                    "visual_type": "full_avatar",
+                    "visual_description": "Avatar explaining implications",
+                    "needs_evidence": False,
+                    "duration_seconds": 8,
+                },
+                {
+                    "scene_id": 5,
+                    "role": "consequence",
+                    "voiceover": "OpenAI and Anthropic are going to have to respond. Expect a price war.",
+                    "visual_type": "split_avatar",
+                    "visual_description": "Avatar with company logos",
+                    "needs_evidence": False,
+                    "duration_seconds": 6,
+                },
+                {
+                    "scene_id": 6,
+                    "role": "cta",
+                    "voiceover": "Follow for more AI market updates. Link in bio.",
+                    "visual_type": "full_avatar",
+                    "visual_description": "Avatar with CTA overlay",
+                    "needs_evidence": False,
+                    "duration_seconds": 4,
+                },
+            ],
+        }
 
     def _mock_content_analysis(self, prompt: str) -> dict[str, Any]:
         """Return mock content analysis based on document content."""

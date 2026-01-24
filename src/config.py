@@ -48,7 +48,7 @@ class PathsConfig(BaseModel):
     """Path configuration."""
 
     output_dir: str = "output"
-    templates_dir: str = "templates"
+    templates_dir: str = "remotion-templates"
     animations_dir: str = "animations"
 
 
