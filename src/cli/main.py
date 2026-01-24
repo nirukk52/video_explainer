@@ -2131,6 +2131,491 @@ def cmd_evidence(args: argparse.Namespace) -> int:
         return 1
 
 
+def cmd_director(args: argparse.Namespace) -> int:
+    """
+    Director CLI - Orchestrate Varun Mayya style shorts production.
+    
+    Subcommands:
+        draft  - Generate initial script with asset requirements
+        status - Show current production phase and asset status
+        review - Review captured assets
+        finalize - Create render-ready script from approved assets
+    """
+    import json
+    import openai
+    from pathlib import Path
+    from ..factory.director_state import DirectorState, DirectorPhase, AssetStatus
+    from ..prompts.director_short import SHORT_SYSTEM_PROMPT, SHORT_USER_PROMPT_TEMPLATE
+    
+    project_dir = Path(args.projects_dir) / args.project
+    
+    # Create project directory structure if it doesn't exist
+    if not project_dir.exists():
+        if args.director_command == "draft":
+            print(f"Creating new project: {args.project}")
+            project_dir.mkdir(parents=True)
+            (project_dir / "input").mkdir()
+            (project_dir / "evidence").mkdir()
+            (project_dir / "script").mkdir()
+            (project_dir / "audio").mkdir()
+            (project_dir / "avatar").mkdir()
+            (project_dir / "backgrounds").mkdir()
+            (project_dir / "output").mkdir()
+            
+            # Create minimal config.json
+            config = {
+                "id": args.project,
+                "title": args.project.replace("-", " ").title(),
+                "type": "short",
+                "video": {
+                    "width": 1080,
+                    "height": 1920,
+                    "fps": 30,
+                    "duration_seconds": args.duration
+                },
+                "tts": {"provider": "elevenlabs"},
+                "avatar": {"provider": "heygen"}
+            }
+            with open(project_dir / "config.json", "w") as f:
+                json.dump(config, f, indent=2)
+        else:
+            print(f"Error: Project not found: {project_dir}", file=sys.stderr)
+            return 1
+    
+    # Load or create Director state
+    try:
+        state = DirectorState.load(project_dir)
+        print(f"Loaded existing Director state (phase: {state.phase.value})")
+    except FileNotFoundError:
+        state = DirectorState.create(
+            project_id=args.project,
+            project_dir=project_dir,
+            topic=getattr(args, 'topic', '') or '',
+            duration_seconds=getattr(args, 'duration', 6)
+        )
+    
+    # Handle subcommands
+    if not args.director_command:
+        print("Usage: python -m src.cli director <project> <command>")
+        print("\nCommands:")
+        print("  draft    - Generate initial script with LLM")
+        print("  status   - Show current production phase")
+        print("  review   - Review captured assets")
+        print("  finalize - Create render-ready script")
+        return 1
+    
+    if args.director_command == "draft":
+        return _director_draft(args, state)
+    
+    elif args.director_command == "status":
+        return _director_status(args, state)
+    
+    elif args.director_command == "review":
+        return _director_review(args, state)
+    
+    elif args.director_command == "finalize":
+        return _director_finalize(args, state)
+    
+    else:
+        print(f"Unknown director command: {args.director_command}")
+        return 1
+
+
+def _director_draft(args, state) -> int:
+    """Generate initial script with LLM."""
+    import json
+    import openai
+    from ..prompts.director_short import SHORT_SYSTEM_PROMPT, SHORT_USER_PROMPT_TEMPLATE, SHORT_WITH_AUDIO_TEMPLATE
+    from ..factory.director_state import DirectorPhase, AssetStatus
+    
+    # Get topic and audio script from args
+    topic = getattr(args, 'topic', None)
+    audio_script = getattr(args, 'audio_script', None)
+    
+    # If audio_script provided, use it as topic if no topic given
+    if audio_script and not topic:
+        topic = audio_script
+    
+    if not topic and not audio_script:
+        topic = input("Enter video topic (or exact audio script): ").strip()
+        if not topic:
+            print("Error: Topic is required", file=sys.stderr)
+            return 1
+    
+    duration = getattr(args, 'duration', 6)
+    num_scenes = max(2, duration // 2)  # ~2 seconds per scene
+    
+    state.topic = topic
+    state.duration_seconds = duration
+    state.transition_to(DirectorPhase.DRAFTING, f"Topic: {topic}")
+    
+    print(f"\n{'='*60}")
+    print(f"DIRECTOR - Phase 1: Drafting Script")
+    print(f"{'='*60}")
+    print(f"Project: {state.project_id}")
+    if audio_script:
+        print(f"Audio Script: \"{audio_script}\"")
+        print(f"Topic Context: {topic}")
+    else:
+        print(f"Topic: {topic}")
+    print(f"Duration: {duration}s")
+    print(f"Target scenes: {num_scenes}")
+    print()
+    
+    # Check for mock mode
+    if getattr(args, 'mock', False):
+        print("[MOCK MODE] Using mock script...")
+        draft_script = _get_mock_draft_script(topic, duration)
+    else:
+        # Call LLM
+        print("Calling LLM to generate script...")
+        
+        # Use audio-specific template if audio script provided
+        if audio_script:
+            user_prompt = SHORT_WITH_AUDIO_TEMPLATE.format(
+                duration_seconds=duration,
+                audio_script=audio_script,
+                topic=topic,
+                num_scenes=num_scenes
+            )
+        else:
+            user_prompt = SHORT_USER_PROMPT_TEMPLATE.format(
+                duration_seconds=duration,
+                topic=topic,
+                evidence_urls=getattr(args, 'urls', '') or '',
+                num_scenes=num_scenes
+            )
+        
+        try:
+            client = openai.OpenAI()
+            response = client.chat.completions.create(
+                model=getattr(args, 'model', 'gpt-4o-mini'),
+                messages=[
+                    {"role": "system", "content": SHORT_SYSTEM_PROMPT},
+                    {"role": "user", "content": user_prompt}
+                ],
+                response_format={"type": "json_object"}
+            )
+            draft_script = json.loads(response.choices[0].message.content)
+        except Exception as e:
+            print(f"Error calling LLM: {e}", file=sys.stderr)
+            state.set_error(str(e))
+            state.save()
+            return 1
+    
+    # Save draft script
+    state.draft_script = draft_script
+    script_path = state.project_dir / "script" / "script.json"
+    with open(script_path, "w") as f:
+        json.dump(draft_script, f, indent=2)
+    
+    print(f"\nDraft script saved to: {script_path}")
+    
+    # Extract assets needed
+    if "assets_needed" in draft_script:
+        assets = draft_script["assets_needed"]
+        
+        for bg in assets.get("backgrounds", []):
+            state.assets.append(AssetStatus(
+                id=bg["id"],
+                asset_type="background",
+                status="pending",
+                metadata={"source": bg.get("source"), "description": bg.get("description")}
+            ))
+        
+        for ev in assets.get("evidence", []):
+            state.assets.append(AssetStatus(
+                id=ev["id"],
+                asset_type="evidence",
+                status="pending",
+                metadata={"source": ev.get("source"), "url_hint": ev.get("url_hint")}
+            ))
+        
+        for av in assets.get("avatar", []):
+            state.assets.append(AssetStatus(
+                id=av["id"],
+                asset_type="avatar",
+                status="pending",
+                metadata={"source": av.get("source"), "text": av.get("text")}
+            ))
+    
+    # Update state
+    state.transition_to(DirectorPhase.AWAITING_CAPTURE, "Script drafted, awaiting asset capture")
+    state.save()
+    
+    # Display summary
+    print(f"\n{'='*60}")
+    print("SCRIPT SUMMARY")
+    print(f"{'='*60}")
+    print(f"Title: {draft_script.get('title', 'Untitled')}")
+    print(f"Duration: {draft_script.get('duration_seconds', '?')}s")
+    print(f"Scenes: {len(draft_script.get('scenes', []))}")
+    print()
+    
+    for scene in draft_script.get("scenes", []):
+        print(f"  [{scene.get('id')}] {scene.get('template')}")
+        print(f"    \"{scene.get('audio', {}).get('text', '')}\"")
+        print()
+    
+    if state.assets:
+        print(f"{'='*60}")
+        print("ASSETS NEEDED")
+        print(f"{'='*60}")
+        for asset in state.assets:
+            print(f"  [{asset.asset_type}] {asset.id} - {asset.status}")
+    
+    print(f"\n{'='*60}")
+    print("NEXT STEPS")
+    print(f"{'='*60}")
+    print("1. Capture evidence screenshots:")
+    print(f"   python -m src.cli evidence {state.project_id} capture")
+    print()
+    print("2. Generate background videos (AI or stock)")
+    print()
+    print("3. Review captured assets:")
+    print(f"   python -m src.cli director {state.project_id} review")
+    print()
+    
+    return 0
+
+
+def _director_status(args, state) -> int:
+    """Show current production status."""
+    import json
+    from ..factory.director_state import DirectorPhase
+    
+    print(f"\n{'='*60}")
+    print(f"DIRECTOR STATUS: {state.project_id}")
+    print(f"{'='*60}")
+    print(f"Phase: {state.phase.value}")
+    print(f"Topic: {state.topic or '(not set)'}")
+    print(f"Duration: {state.duration_seconds}s")
+    print()
+    
+    # Asset status
+    if state.assets:
+        print("ASSETS:")
+        for asset in state.assets:
+            status_icon = {
+                "pending": "⏳",
+                "capturing": "🔄",
+                "captured": "📷",
+                "approved": "✅",
+                "rejected": "❌",
+                "failed": "💥"
+            }.get(asset.status, "?")
+            print(f"  {status_icon} [{asset.asset_type}] {asset.id} - {asset.status}")
+            if asset.file_path:
+                print(f"      File: {asset.file_path}")
+            if asset.error:
+                print(f"      Error: {asset.error}")
+        print()
+    
+    # Script status
+    if state.draft_script:
+        print(f"Draft script: ✅ ({len(state.draft_script.get('scenes', []))} scenes)")
+    else:
+        print("Draft script: ❌ Not generated")
+    
+    if state.final_script:
+        print(f"Final script: ✅")
+    else:
+        print("Final script: ❌ Not finalized")
+    
+    # Audio status
+    if state.audio_file:
+        print(f"Audio: ✅ {state.audio_file}")
+    else:
+        print("Audio: ❌ Not generated")
+    
+    # Render ready check
+    ready, missing = state.is_ready_for_render()
+    if ready:
+        print("\n✅ READY FOR RENDER")
+    else:
+        print(f"\n❌ Not ready for render. Missing: {', '.join(missing)}")
+    
+    # Phase history
+    if state.history:
+        print(f"\n{'='*60}")
+        print("PHASE HISTORY")
+        print(f"{'='*60}")
+        for entry in state.history[-5:]:  # Last 5 transitions
+            print(f"  {entry['from']} → {entry['to']}: {entry.get('reason', '')}")
+    
+    return 0
+
+
+def _director_review(args, state) -> int:
+    """Review captured assets and approve/reject."""
+    from ..factory.director_state import DirectorPhase
+    
+    print(f"\n{'='*60}")
+    print(f"DIRECTOR REVIEW: {state.project_id}")
+    print(f"{'='*60}")
+    
+    if state.phase != DirectorPhase.AWAITING_CAPTURE:
+        print(f"Warning: Current phase is {state.phase.value}, not AWAITING_CAPTURE")
+    
+    captured = state.get_captured_assets()
+    pending = state.get_pending_assets()
+    
+    if not captured and not pending:
+        print("No assets to review.")
+        return 0
+    
+    if pending:
+        print(f"\n{len(pending)} assets still pending capture:")
+        for asset in pending:
+            print(f"  - [{asset.asset_type}] {asset.id}")
+    
+    if captured:
+        print(f"\n{len(captured)} assets ready for review:")
+        for asset in captured:
+            print(f"  - [{asset.asset_type}] {asset.id}")
+            if asset.file_path:
+                print(f"    File: {asset.file_path}")
+    
+    # Auto-approve if --approve flag
+    if getattr(args, 'approve_all', False):
+        for asset in captured:
+            asset.status = "approved"
+        state.transition_to(DirectorPhase.REVIEWING, "Auto-approved all assets")
+        state.save()
+        print("\n✅ All captured assets approved")
+    else:
+        print("\nTo approve all assets, run:")
+        print(f"  python -m src.cli director {state.project_id} review --approve-all")
+    
+    return 0
+
+
+def _director_finalize(args, state) -> int:
+    """Create render-ready script from approved assets."""
+    import json
+    from ..factory.director_state import DirectorPhase
+    
+    print(f"\n{'='*60}")
+    print(f"DIRECTOR FINALIZE: {state.project_id}")
+    print(f"{'='*60}")
+    
+    if not state.draft_script:
+        print("Error: No draft script found. Run 'director draft' first.", file=sys.stderr)
+        return 1
+    
+    # Copy draft to final
+    final_script = json.loads(json.dumps(state.draft_script))  # Deep copy
+    
+    # Remove assets_needed section (assets are now captured)
+    if "assets_needed" in final_script:
+        del final_script["assets_needed"]
+    
+    # Update paths based on captured assets
+    approved = {a.id: a for a in state.get_approved_assets()}
+    
+    for scene in final_script.get("scenes", []):
+        # Update background paths
+        bg = scene.get("background", {})
+        bg_src = bg.get("src", "")
+        if bg_src:
+            filename = bg_src.split("/")[-1]
+            if filename in approved:
+                asset = approved[filename]
+                if asset.file_path:
+                    bg["src"] = asset.file_path
+        
+        # Update avatar paths
+        avatar = scene.get("avatar", {})
+        if avatar.get("visible"):
+            avatar_src = avatar.get("src", "")
+            if avatar_src:
+                filename = avatar_src.split("/")[-1]
+                if filename in approved:
+                    asset = approved[filename]
+                    if asset.file_path:
+                        avatar["src"] = asset.file_path
+    
+    # Save final script
+    state.final_script = final_script
+    script_path = state.project_dir / "script" / "script.json"
+    with open(script_path, "w") as f:
+        json.dump(final_script, f, indent=2)
+    
+    state.transition_to(DirectorPhase.AWAITING_AUDIO, "Script finalized")
+    state.save()
+    
+    print(f"Final script saved to: {script_path}")
+    print()
+    print("NEXT STEPS:")
+    print(f"1. Generate voiceover:")
+    print(f"   python -m src.cli voiceover {state.project_id}")
+    print()
+    print(f"2. Preview in Remotion:")
+    print(f"   cd remotion && PROJECT={state.project_id} npm run dev")
+    print()
+    
+    return 0
+
+
+def _get_mock_draft_script(topic: str, duration: int) -> dict:
+    """Return a mock draft script for testing without API calls."""
+    return {
+        "id": topic.lower().replace(" ", "-")[:30],
+        "title": topic,
+        "duration_seconds": duration,
+        "scenes": [
+            {
+                "id": "scene_001",
+                "template": "SplitVideo",
+                "start_seconds": 0,
+                "end_seconds": duration * 0.25,
+                "description": "Hook scene",
+                "audio": {"text": f"This is about {topic}"},
+                "background": {"type": "video", "src": "backgrounds/hook.mp4"},
+                "avatar": {"visible": True, "position": "bottom"},
+                "text": {"headline": topic[:20], "position": "top"}
+            },
+            {
+                "id": "scene_002",
+                "template": "TextOverProof",
+                "start_seconds": duration * 0.25,
+                "end_seconds": duration * 0.5,
+                "description": "Evidence scene",
+                "audio": {"text": "Here's the proof."},
+                "background": {"type": "screenshot", "src": "evidence/proof.png"},
+                "avatar": {"visible": False},
+                "text": {"headline": "The Proof", "position": "top"}
+            },
+            {
+                "id": "scene_003",
+                "template": "TextCard",
+                "start_seconds": duration * 0.5,
+                "end_seconds": duration,
+                "description": "Conclusion",
+                "audio": {"text": "And that's why it matters."},
+                "background": {"type": "gradient", "colors": ["#0a0a0f", "#1a1a2e"]},
+                "avatar": {"visible": False},
+                "text": {"headline": "Why It Matters", "position": "center"}
+            }
+        ],
+        "audio": {
+            "full_text": f"This is about {topic}. Here's the proof. And that's why it matters.",
+            "provider": "elevenlabs"
+        },
+        "assets_needed": {
+            "backgrounds": [
+                {"id": "hook.mp4", "description": "Hook video", "source": "ai_generated"}
+            ],
+            "evidence": [
+                {"id": "proof.png", "description": "Evidence screenshot", "source": "witness_capture"}
+            ],
+            "avatar": [
+                {"id": "scene_001.mp4", "description": "Avatar intro", "source": "heygen", "text": f"This is about {topic}"}
+            ]
+        }
+    }
+
+
 def cmd_factcheck(args: argparse.Namespace) -> int:
     """Run fact checking on a project's script and narration."""
     from ..project import load_project
@@ -4207,6 +4692,94 @@ Commands:
     )
 
     evidence_parser.set_defaults(func=cmd_evidence)
+
+    # director command (Varun Mayya style shorts orchestration)
+    director_parser = subparsers.add_parser(
+        "director",
+        help="Orchestrate Varun Mayya style shorts production",
+        description="""
+Director - The brain/orchestrator for Varun Mayya style shorts.
+
+Commands:
+  draft    - Generate initial script with LLM (creates assets_needed)
+  status   - Show current production phase and asset status
+  review   - Review captured assets (approve/reject)
+  finalize - Create render-ready script from approved assets
+
+Workflow:
+  1. python -m src.cli director my-short draft --topic "Your topic here"
+  2. Capture evidence with Witness agent
+  3. python -m src.cli director my-short review --approve-all
+  4. python -m src.cli director my-short finalize
+  5. Generate audio, then render
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    director_parser.add_argument("project", help="Project ID")
+    
+    director_subparsers = director_parser.add_subparsers(
+        dest="director_command",
+        help="Director commands",
+    )
+    
+    # director draft
+    director_draft_parser = director_subparsers.add_parser(
+        "draft",
+        help="Generate initial script with LLM",
+    )
+    director_draft_parser.add_argument(
+        "--topic", "-t",
+        help="Video topic (will prompt if not provided)",
+    )
+    director_draft_parser.add_argument(
+        "--audio-script", "-a",
+        help="Exact audio script to use (Director will structure scenes around this)",
+    )
+    director_draft_parser.add_argument(
+        "--duration", "-d",
+        type=int,
+        default=6,
+        help="Target duration in seconds (default: 6)",
+    )
+    director_draft_parser.add_argument(
+        "--urls", "-u",
+        help="Evidence URLs (comma-separated)",
+    )
+    director_draft_parser.add_argument(
+        "--model", "-m",
+        default="gpt-4o-mini",
+        help="LLM model to use (default: gpt-4o-mini)",
+    )
+    director_draft_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock LLM (for testing without API)",
+    )
+    
+    # director status
+    director_status_parser = director_subparsers.add_parser(
+        "status",
+        help="Show current production phase and asset status",
+    )
+    
+    # director review
+    director_review_parser = director_subparsers.add_parser(
+        "review",
+        help="Review captured assets",
+    )
+    director_review_parser.add_argument(
+        "--approve-all",
+        action="store_true",
+        help="Auto-approve all captured assets",
+    )
+    
+    # director finalize
+    director_finalize_parser = director_subparsers.add_parser(
+        "finalize",
+        help="Create render-ready script from approved assets",
+    )
+    
+    director_parser.set_defaults(func=cmd_director)
 
     args = parser.parse_args()
 

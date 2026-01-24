@@ -45,6 +45,120 @@ Why? So agents can:
 }
 ```
 
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CURRENT STATE: first-draft                                │
+│                    Phase: awaiting_capture (stale - voiceover done)          │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+                           DEPENDENCY CHAIN
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│   ┌────────────────┐                                                         │
+│   │ config.json    │  Project settings (dimensions, fps, providers)          │
+│   └───────┬────────┘                                                         │
+│           │                                                                  │
+│           ▼                                                                  │
+│   ┌────────────────┐      ┌──────────────────┐                              │
+│   │ User Topic     │ ──▶  │ .director_state  │  State machine tracking       │
+│   │ "China drone   │      │    .json         │  phase transitions            │
+│   │  swarm tech"   │      └────────┬─────────┘                              │
+│   └────────────────┘               │                                         │
+│                                    ▼                                         │
+│                    ┌───────────────────────────────┐                         │
+│                    │        narration.json         │ ◄── LLM generates       │
+│                    │  • title                      │     scene breakdown      │
+│                    │  • scenes[].narration text    │                         │
+│                    │  • scenes[].duration estimate │                         │
+│                    └───────────────┬───────────────┘                         │
+│                                    │                                         │
+│           ┌────────────────────────┼────────────────────────┐               │
+│           │                        │                        │               │
+│           ▼                        ▼                        ▼               │
+│   ┌───────────────┐   ┌────────────────────┐   ┌─────────────────┐          │
+│   │ backgrounds/  │   │ voiceover/         │   │ avatar/ (TODO)  │          │
+│   │ drone_swarm   │   │ manifest.json      │   │ scene_001.mp4   │          │
+│   │   .mp4 ✓      │   │ scene_001.mp3 ✓    │   │ scene_002.mp4   │          │
+│   │ (manual)      │   │ scene_002.mp3 ✓    │   │ (HeyGen)        │          │
+│   └───────┬───────┘   └─────────┬──────────┘   └────────┬────────┘          │
+│           │                     │                       │                    │
+│           │                     │ word_timestamps       │                    │
+│           │                     │ duration_seconds      │                    │
+│           │                     ▼                       │                    │
+│           │         ┌────────────────────────────────┐  │                    │
+│           └────────▶│     script/script.json         │◄─┘                    │
+│                     │  • scenes[].audio.file         │                       │
+│                     │  • scenes[].audio.word_timestamps                      │
+│                     │  • scenes[].background.src     │                       │
+│                     │  • scenes[].avatar.src (TODO)  │                       │
+│                     │  • scenes[].start/end_seconds  │                       │
+│                     └───────────────┬────────────────┘                       │
+│                                     │                                        │
+│                                     ▼                                        │
+│                     ┌────────────────────────────────┐                       │
+│                     │     REMOTION RENDER            │                       │
+│                     │  VarunPlayer reads script.json │                       │
+│                     │  + resolves all asset paths    │                       │
+│                     └───────────────┬────────────────┘                       │
+│                                     │                                        │
+│                                     ▼                                        │
+│                     ┌────────────────────────────────┐                       │
+│                     │     output/short.mp4           │                       │
+│                     │     (final video)              │                       │
+│                     └────────────────────────────────┘                       │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+                           CURRENT ASSET STATUS
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│   ASSET                  STATUS        SOURCE           NEXT STEP            │
+│   ─────────────────────────────────────────────────────────────────────────  │
+│   backgrounds/           ✅ READY      Manual upload    -                    │
+│     drone_swarm.mp4                                                          │
+│                                                                              │
+│   voiceover/             ✅ READY      ElevenLabs       -                    │
+│     scene_001.mp3                      TTS API                               │
+│     scene_002.mp3                                                            │
+│     manifest.json                                                            │
+│                                                                              │
+│   avatar/                ❌ MISSING    HeyGen API       Generate clips       │
+│     scene_001.mp4                                       with lip-sync        │
+│     scene_002.mp4                                                            │
+│                                                                              │
+│   script/script.json     ✅ READY      Generated        Has all timing       │
+│                          (partial)                      but avatar.src       │
+│                                                         paths missing        │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+                           PIPELINE FLOW
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  STAGE 1        STAGE 2         STAGE 3         STAGE 4         STAGE 5     │
+│  ────────       ────────        ────────        ────────        ────────    │
+│                                                                              │
+│  ┌─────────┐   ┌───────────┐   ┌───────────┐   ┌───────────┐   ┌─────────┐ │
+│  │ Topic   │──▶│ Narration │──▶│ Voiceover │──▶│  Avatar   │──▶│ Render  │ │
+│  │ + Config│   │ Generator │   │ Generator │   │ Generator │   │ Remotion│ │
+│  └─────────┘   └───────────┘   └───────────┘   └───────────┘   └─────────┘ │
+│       │              │               │               │               │       │
+│       ▼              ▼               ▼               ▼               ▼       │
+│  config.json   narration.json  voiceover/       avatar/         output/     │
+│                                manifest.json    scene_*.mp4     short.mp4   │
+│                                scene_*.mp3                                   │
+│                                      │                                       │
+│                                      ▼                                       │
+│                               script/script.json ◄─────────────────────────  │
+│                               (updated with timing)                          │
+│                                                                              │
+│  ──────────────────────────────────────────────────────────────────────────  │
+│  YOU ARE HERE:           ✅ ✅ ✅             ───▶  ❌              ❌       │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
 ### Stage 2: Evidence → Script
 
 **Input:** Evidence manifest + prompt

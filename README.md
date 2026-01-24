@@ -83,6 +83,35 @@ projects/
         └── ratings.json         # Per-scene 1-10 ratings
 ```
 
+IDLE
+  │
+  ▼ (user provides topic)
+DRAFTING ←────── Director + LLM
+  │
+  ▼ (draft script with assets_needed)
+AWAITING_CAPTURE ←── Witness Agent
+  │
+  ▼ (evidence manifest)
+REVIEWING ←───── Director reviews
+  │
+  ▼ (approved assets)
+FINALIZING ←──── Director maps paths
+  │
+  ▼ (final script.json)
+AWAITING_AUDIO ←── ElevenLabs TTS
+  │
+  ▼ (voiceover + timestamps)
+AWAITING_AVATAR ←── HeyGen
+  │
+  ▼ (avatar clips)
+READY_FOR_RENDER
+  │
+  ▼ (human approval)
+RENDERING ←────── Remotion
+  │
+  ▼
+COMPLETE
+
 ## Templates
 
 5 JSON-driven templates for any Varun Mayya style scene:
