@@ -114,6 +114,7 @@ cd remotion && npm install && cd ..
 python -m src.cli create my-video
 
 # 2. Add source documents to projects/my-video/input/
+#    Supported: Markdown (.md, .markdown), PDF (.pdf)
 
 # 3. Run the full pipeline
 python -m src.cli generate my-video
