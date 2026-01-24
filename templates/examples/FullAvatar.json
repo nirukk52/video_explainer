@@ -1,0 +1,33 @@
+{
+  "_description": "Avatar fills the screen, optional text overlay",
+  "_use_when": "Opinion segments, transitions, no evidence needed",
+  "_screenshot": "templates/screenshots/FullAvatar.png",
+  
+  "id": "scene_003",
+  "template": "FullAvatar",
+  "start_seconds": 7.0,
+  "end_seconds": 10.5,
+  
+  "audio": {
+    "text": "These peptides are taking over the tech industry",
+    "file": "audio/voiceover.mp3",
+    "start_seconds": 7.0
+  },
+  
+  "background": {
+    "type": "gradient",
+    "colors": ["#0a0a0f", "#1a1a2e"]
+  },
+  
+  "avatar": {
+    "visible": true,
+    "position": "full",
+    "src": "avatar/scene_003.mp4"
+  },
+  
+  "text": {
+    "headline": "are taking over",
+    "position": "top",
+    "caption_style": "word_by_word"
+  }
+}

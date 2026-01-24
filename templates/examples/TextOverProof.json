@@ -1,0 +1,37 @@
+{
+  "_description": "Bold headline text over cropped evidence image",
+  "_use_when": "Key quote or headline that needs emphasis, avatar not needed",
+  "_screenshot": "templates/screenshots/TextOverProof.png",
+  
+  "id": "scene_002",
+  "template": "TextOverProof",
+  "start_seconds": 4.5,
+  "end_seconds": 7.0,
+  
+  "audio": {
+    "text": "A motion sensing glove that controls drones",
+    "file": "audio/voiceover.mp3",
+    "start_seconds": 4.5
+  },
+  
+  "background": {
+    "type": "screenshot",
+    "src": "evidence/glove_001.png",
+    "crop": {
+      "x": 0,
+      "y": 100,
+      "width": 1080,
+      "height": 1000
+    }
+  },
+  
+  "avatar": {
+    "visible": false
+  },
+  
+  "text": {
+    "headline": "motion sensing glove",
+    "position": "top",
+    "highlight_words": ["glove"]
+  }
+}

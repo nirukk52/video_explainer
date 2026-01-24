@@ -1,0 +1,35 @@
+{
+  "_description": "Screenshot fills entire frame with highlight and caption",
+  "_use_when": "Document, tweet, or article that speaks for itself",
+  "_screenshot": "templates/screenshots/ProofOnly.png",
+  
+  "id": "scene_004",
+  "template": "ProofOnly",
+  "start_seconds": 10.5,
+  "end_seconds": 14.0,
+  
+  "audio": {
+    "text": "One OpenAI researcher publicly called it Ozempic for autism",
+    "file": "audio/voiceover.mp3",
+    "start_seconds": 10.5
+  },
+  
+  "background": {
+    "type": "screenshot",
+    "src": "evidence/techspot_article.png"
+  },
+  
+  "avatar": {
+    "visible": false
+  },
+  
+  "text": {
+    "caption_style": "word_by_word",
+    "highlight_box": {
+      "x": 30,
+      "y": 280,
+      "width": 700,
+      "height": 120
+    }
+  }
+}

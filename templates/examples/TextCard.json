@@ -1,0 +1,31 @@
+{
+  "_description": "Bold statement text on gradient background, no image",
+  "_use_when": "Dramatic pause, key statement, no visual evidence needed",
+  "_screenshot": "templates/screenshots/TextCard.png",
+  
+  "id": "scene_005",
+  "template": "TextCard",
+  "start_seconds": 14.0,
+  "end_seconds": 16.5,
+  
+  "audio": {
+    "text": "about tech workers",
+    "file": "audio/voiceover.mp3",
+    "start_seconds": 14.0
+  },
+  
+  "background": {
+    "type": "gradient",
+    "colors": ["#1a1a2e", "#0a0a0f"]
+  },
+  
+  "avatar": {
+    "visible": false
+  },
+  
+  "text": {
+    "headline": "about tech workers",
+    "position": "center",
+    "style": "dramatic"
+  }
+}

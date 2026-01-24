@@ -1,86 +1,230 @@
-# Video Explainer System
+# Shorts Factory
 
-A system for generating high-quality explainer videos from technical documents. Transform research papers, articles, and documentation into engaging video content with automated narration and programmatic animations.
+Create Varun Mayya / Johnny Harris style vertical shorts (30-60 seconds) with AI-powered research, evidence capture, and video generation.
 
-## Example Videos
+## Philosophy
 
-- [How AI Learned to Reason: DeepSeek and o1 Explained](https://youtu.be/uUTTeGVB6z8)
-- [How LLMs Actually Understand Images](https://youtu.be/PuodF4pq79g?si=4T0CV555qr89DSvY)
-- [What Actually Happens When You Prompt AI?](https://youtu.be/nmBqcRl2tmM?si=FhCf4G5lKY3_rZ5I)
-- [What Happens in 300ms Before AI Responds (Short)](https://youtube.com/shorts/Ctlvk5ALxxI)
-- [The Trick That Let AI See (Short)](https://www.youtube.com/shorts/vwI_gD4OG4I)
+**Evidence-First Production:** Gather proof screenshots BEFORE writing the script. The script references real evidence, not hallucinated claims.
 
-## Features
+**JSON-Driven Templates:** Everything is JSON. Templates, scenes, timing - all defined in JSON so agents can read, understand, and generate.
 
-### Content Pipeline
-- **Multi-Format Input** - Parse Markdown, PDF documents, and web URLs
-- **Script Generation** - Generate video scripts with visual cues and voiceover text
-- **Text-to-Speech** - Integration with ElevenLabs and Edge TTS
-- **Manual Voiceover** - Import your own recordings with Whisper transcription
+**Human-in-the-Loop:** Approve at each stage. Perfect Scene 1 before Scene 2. Each iteration improves the templates and vibe.
 
-### Visual Generation
-- **Remotion Animations** - React-based programmatic video generation
-- **AI Scene Generation** - Claude-powered scene component creation
-- **Visual Refinement** - 4-phase quality improvement system
-
-### Sound Design
-- **Automated SFX** - Intelligent sound effect planning and generation
-- **AI Background Music** - Generate ambient music using MusicGen
-- **Audio Mixing** - Combine voiceover, SFX, and music
-
-### Shorts & Distribution
-- **Vertical Shorts** - 1080x1920 for YouTube Shorts, Reels, TikTok
-- **TikTok-Style Captions** - Single-word captions with glow effects
-- **Multiple Variants** - Generate different versions from same project
-
-### Quality Assurance
-- **Fact Checking** - Verify accuracy against source material
-- **Feedback Processing** - Natural language feedback to file updates
-
-## Architecture
+## Pipeline
 
 ```
-Document → Parse → Analyze → Script → TTS → Storyboard → Animation → Video
-                                       │         ↑
-                                       │    (JSON schema)
-                                       └─────────┘
-                                    (word timestamps)
+┌─────────────────────────────────────────────────────────────────┐
+│                        SHORTS FACTORY                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. RESEARCH        2. EVIDENCE         3. SCRIPT               │
+│  ┌──────────┐      ┌──────────┐       ┌──────────┐             │
+│  │ URLs     │ ──▶  │ Witness  │ ──▶   │ Director │             │
+│  │ Articles │      │ Agent    │       │ Agent    │             │
+│  │ Prompts  │      │          │       │          │             │
+│  └──────────┘      └──────────┘       └──────────┘             │
+│       │                 │                   │                   │
+│       ▼                 ▼                   ▼                   │
+│  input/            evidence/           script.json              │
+│                                                                  │
+│  4. AUDIO           5. AVATAR          6. RENDER                │
+│  ┌──────────┐      ┌──────────┐       ┌──────────┐             │
+│  │ Eleven   │ ──▶  │ HeyGen   │ ──▶   │ Remotion │             │
+│  │ Labs     │      │ Lip-sync │       │          │             │
+│  └──────────┘      └──────────┘       └──────────┘             │
+│       │                 │                   │                   │
+│       ▼                 ▼                   ▼                   │
+│  audio/            avatar/             output/                  │
+│                                                                  │
+│  ✓ Human Review     ✓ Human Review     ✓ Human Review          │
+│    after each         after each         final render          │
+│    stage              stage                                     │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-**Key Insight:** TTS generation happens BEFORE storyboard creation because we need audio timing (word-level timestamps) to sync visuals precisely to narration.
+## Project Structure
 
-### Project Structure
+Each project is self-contained with all inputs, intermediates, and outputs:
 
 ```
-video_explainer/
-├── projects/                    # Self-contained video projects
-│   └── <project>/               # Each project contains:
-│       ├── config.json          # Project configuration
-│       ├── input/               # Source documents (MD, PDF)
-│       ├── script/              # Generated scripts
-│       ├── narration/           # Scene narrations
-│       ├── scenes/              # Remotion components (*.tsx)
-│       ├── voiceover/           # Audio files (*.mp3)
-│       ├── storyboard/          # Storyboard JSON
-│       ├── music/               # Background music
-│       ├── short/               # Shorts variants
-│       └── output/              # Final videos
-│
-├── src/                         # Core pipeline code
-│   ├── cli/                     # CLI commands
-│   ├── ingestion/               # Document parsing
-│   ├── script/                  # Script generation
-│   ├── scenes/                  # Scene component generation
-│   ├── audio/                   # TTS providers
-│   ├── sound/                   # SFX system
-│   ├── music/                   # MusicGen integration
-│   ├── refine/                  # Refinement system
-│   └── short/                   # Shorts generation
-│
-└── remotion/                    # Remotion project (React)
-    ├── src/components/          # Reusable components
-    ├── src/scenes/              # Scene compositions
-    └── scripts/render.mjs       # Headless rendering
+projects/
+└── my-short/
+    ├── config.json              # Project settings
+    │
+    ├── input/                   # Research materials
+    │   ├── prompt.md            # Topic + angle
+    │   ├── urls.json            # Source URLs to capture
+    │   └── research/            # PDFs, screenshots, docs
+    │
+    ├── evidence/                # Captured proof (Witness Agent)
+    │   ├── manifest.json        # Evidence index
+    │   ├── techspot_001.png     # Screenshot captures
+    │   ├── twitter_002.png
+    │   └── ...
+    │
+    ├── script/
+    │   └── script.json          # Scene-by-scene script
+    │
+    ├── audio/
+    │   ├── voiceover.mp3        # ElevenLabs audio
+    │   └── timestamps.json      # Word-level timing
+    │
+    ├── avatar/
+    │   ├── scene_001.mp4        # HeyGen lip-sync clips
+    │   ├── scene_002.mp4
+    │   └── ...
+    │
+    ├── backgrounds/             # AI-generated or stock
+    │   ├── scene_001.mp4        # Veo 3 / stock footage
+    │   └── ...
+    │
+    └── output/
+        ├── short.mp4            # Final render
+        └── ratings.json         # Per-scene 1-10 ratings
+```
+
+## Templates
+
+5 JSON-driven templates for any Varun Mayya style scene:
+
+### 1. TextOverProof
+Bold headline text over a cropped evidence screenshot.
+
+```json
+{
+  "template": "TextOverProof",
+  "background": {
+    "type": "screenshot",
+    "src": "evidence/techspot_001.png",
+    "crop": { "x": 0, "y": 100, "width": 1080, "height": 800 }
+  },
+  "avatar": { "visible": false },
+  "text": {
+    "headline": "motion sensing glove",
+    "position": "top",
+    "highlight_words": ["glove"]
+  }
+}
+```
+
+### 2. SplitProof
+Evidence on top, avatar talking on bottom.
+
+```json
+{
+  "template": "SplitProof",
+  "background": {
+    "type": "screenshot",
+    "src": "evidence/article_002.png",
+    "highlight_box": { "x": 50, "y": 200, "width": 400, "height": 80 }
+  },
+  "avatar": {
+    "visible": true,
+    "position": "bottom",
+    "src": "avatar/scene_002.mp4"
+  },
+  "text": {
+    "caption": "blocks of protein"
+  }
+}
+```
+
+### 3. FullAvatar
+Avatar fills the screen, text overlay optional.
+
+```json
+{
+  "template": "FullAvatar",
+  "background": {
+    "type": "gradient",
+    "colors": ["#0a0a0f", "#1a1a2e"]
+  },
+  "avatar": {
+    "visible": true,
+    "position": "full",
+    "src": "avatar/scene_003.mp4"
+  },
+  "text": {
+    "headline": "are taking over",
+    "position": "top"
+  }
+}
+```
+
+### 4. ProofOnly
+Screenshot fills the entire frame with highlight and caption.
+
+```json
+{
+  "template": "ProofOnly",
+  "background": {
+    "type": "screenshot",
+    "src": "evidence/twitter_004.png"
+  },
+  "avatar": { "visible": false },
+  "text": {
+    "caption": "Ozempic for autism",
+    "highlight_box": { "x": 100, "y": 300, "width": 600, "height": 100 }
+  }
+}
+```
+
+### 5. TextCard
+Bold statement on gradient background, no image.
+
+```json
+{
+  "template": "TextCard",
+  "background": {
+    "type": "gradient",
+    "colors": ["#1a1a2e", "#0a0a0f"]
+  },
+  "avatar": { "visible": false },
+  "text": {
+    "headline": "about tech workers",
+    "style": "dramatic"
+  }
+}
+```
+
+## Script Schema
+
+The script.json defines the entire video:
+
+```json
+{
+  "id": "peptides-short",
+  "title": "Chinese Peptides Taking Over Silicon Valley",
+  "duration_seconds": 45,
+  "scenes": [
+    {
+      "id": "scene_001",
+      "template": "SplitProof",
+      "start_seconds": 0,
+      "end_seconds": 4.5,
+      "audio": {
+        "text": "Chinese peptides are taking over Silicon Valley",
+        "file": "audio/voiceover.mp3",
+        "word_timestamps": [
+          { "word": "Chinese", "start": 0.0, "end": 0.4 },
+          { "word": "peptides", "start": 0.4, "end": 0.9 }
+        ]
+      },
+      "background": {
+        "type": "screenshot",
+        "src": "evidence/techspot_001.png"
+      },
+      "avatar": {
+        "visible": true,
+        "position": "bottom",
+        "src": "avatar/scene_001.mp4"
+      },
+      "text": {
+        "caption_style": "word_by_word"
+      }
+    }
+  ]
+}
 ```
 
 ## Quick Start
@@ -90,272 +234,141 @@ video_explainer/
 - Python 3.10+
 - Node.js 20+
 - FFmpeg
+- API Keys: ElevenLabs, HeyGen, Browserbase (for evidence capture)
 
 ### Installation
 
 ```bash
-# Clone and setup
-git clone <repository-url>
 cd video_explainer
 
 # Python environment
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 pip install -e .
 
 # Remotion dependencies
 cd remotion && npm install && cd ..
 ```
 
-### Basic Workflow
+### Create a Short (Manual First)
 
 ```bash
-# 1. Create a new project
-python -m src.cli create my-video
+# 1. Create project
+python -m src.cli create my-short --type short
 
-# 2. Add source documents to projects/my-video/input/
-#    Supported: Markdown (.md, .markdown), PDF (.pdf)
+# 2. Add research to projects/my-short/input/
+#    - prompt.md: Your topic and angle
+#    - urls.json: Sources to capture
 
-# 3. Run the full pipeline
-python -m src.cli generate my-video
+# 3. Capture evidence
+python -m src.cli evidence my-short
 
-# 4. Preview in Remotion Studio
+# 4. Generate script (references evidence)
+python -m src.cli script my-short
+
+# 5. Generate audio
+python -m src.cli audio my-short
+
+# 6. Generate avatar clips
+python -m src.cli avatar my-short
+
+# 7. Preview in Remotion
 cd remotion && npm run dev
 
-# 5. Render final video
-python -m src.cli render my-video
+# 8. Render
+python -m src.cli render my-short
 ```
-
-### Step-by-Step Pipeline
-
-```bash
-python -m src.cli script my-video        # Generate script from input docs
-python -m src.cli narration my-video     # Generate scene narrations
-python -m src.cli scenes my-video        # Generate Remotion components
-python -m src.cli voiceover my-video     # Generate TTS audio
-python -m src.cli storyboard my-video    # Create storyboard
-python -m src.cli render my-video        # Render final video
-```
-
-## CLI Reference
-
-### Project Management
-
-```bash
-python -m src.cli list                    # List all projects
-python -m src.cli info <project>          # Show project details
-python -m src.cli create <project_id>     # Create new project
-```
-
-### Generation Pipeline
-
-```bash
-# Full pipeline
-python -m src.cli generate <project>              # Run all steps
-python -m src.cli generate <project> --force      # Regenerate everything
-python -m src.cli generate <project> --mock       # Use mock LLM/TTS
-
-# Partial runs
-python -m src.cli generate <project> --from scenes    # Start from step
-python -m src.cli generate <project> --to voiceover   # Stop at step
-```
-
-### Individual Steps
-
-```bash
-python -m src.cli script <project>        # Generate script
-python -m src.cli narration <project>     # Generate narrations
-python -m src.cli scenes <project>        # Generate scene components
-python -m src.cli voiceover <project>     # Generate audio
-python -m src.cli storyboard <project>    # Create storyboard
-python -m src.cli render <project>        # Render video
-```
-
-### Sound Design
-
-```bash
-python -m src.cli sound <project> analyze     # Preview detected moments
-python -m src.cli sound <project> generate    # Generate SFX cues
-python -m src.cli music <project> generate    # Generate background music
-```
-
-See [docs/SOUND.md](docs/SOUND.md) for detailed sound design documentation.
-
-### Refinement
-
-```bash
-python -m src.cli refine <project> --phase analyze     # Gap analysis
-python -m src.cli refine <project> --phase script      # Script refinement
-python -m src.cli refine <project> --phase visual-cue  # Visual spec refinement
-python -m src.cli refine <project> --phase visual      # AI visual inspection
-```
-
-See [docs/REFINEMENT.md](docs/REFINEMENT.md) for the 4-phase refinement process.
-
-### Shorts Generation
-
-```bash
-python -m src.cli short generate <project>    # Full shorts pipeline
-python -m src.cli render <project> --short    # Render the short
-```
-
-See [docs/SHORTS.md](docs/SHORTS.md) for shorts workflow and timing sync.
-
-### Quality Assurance
-
-```bash
-python -m src.cli factcheck <project>                          # Verify accuracy
-python -m src.cli feedback <project> add "Make text larger"    # Process feedback
-```
-
-### Rendering Options
-
-| Preset | Resolution | Use Case |
-|--------|------------|----------|
-| 4k     | 3840x2160  | YouTube/Final |
-| 1440p  | 2560x1440  | High quality |
-| 1080p  | 1920x1080  | Default |
-| 720p   | 1280x720   | Development |
-| 480p   | 854x480    | Quick preview |
-
-```bash
-python -m src.cli render <project> -r 4k          # 4K render
-python -m src.cli render <project> --fast         # Faster encoding
-python -m src.cli render <project> --preview      # Quick preview
-python -m src.cli render <project> --concurrency 8  # Thread count
-```
-
-See [docs/CLI.md](docs/CLI.md) for complete CLI reference with all options.
 
 ## Configuration
 
-### Project Configuration (projects/*/config.json)
+### Project Config (projects/*/config.json)
 
 ```json
 {
-  "id": "my-video",
-  "title": "My Explainer Video",
+  "id": "my-short",
+  "type": "short",
   "video": {
-    "resolution": { "width": 1920, "height": 1080 },
+    "width": 1080,
+    "height": 1920,
     "fps": 30,
-    "target_duration_seconds": 180
+    "duration_seconds": 45
   },
   "tts": {
     "provider": "elevenlabs",
     "voice_id": "your-voice-id"
   },
+  "avatar": {
+    "provider": "heygen",
+    "avatar_id": "your-avatar-id"
+  },
   "style": {
-    "background_color": "#0f0f1a",
-    "primary_color": "#00d9ff"
+    "background": "#0a0a0f",
+    "text_color": "#ffffff",
+    "accent_color": "#00d9ff"
   }
 }
 ```
 
-### Global Configuration (config.yaml)
-
-```yaml
-llm:
-  provider: claude-code  # claude-code | mock | anthropic | openai
-  model: claude-sonnet-4-20250514
-
-tts:
-  provider: mock  # mock | elevenlabs | edge
-  voice_id: null
-
-video:
-  width: 1920
-  height: 1080
-  fps: 30
-```
-
 ### Environment Variables
 
-- `ANTHROPIC_API_KEY` - For Claude LLM provider
-- `OPENAI_API_KEY` - For OpenAI LLM provider
-- `ELEVENLABS_API_KEY` - For ElevenLabs TTS
-
-## Development
-
-### Remotion Studio
-
 ```bash
-cd remotion
-npm run dev
+ELEVENLABS_API_KEY=xxx      # Text-to-speech
+HEYGEN_API_KEY=xxx          # Avatar generation
+BROWSERBASE_API_KEY=xxx     # Evidence capture
+EXA_API_KEY=xxx             # URL research
+OPENAI_API_KEY=xxx          # LLM for script
 ```
 
-Opens at `http://localhost:3000` for previewing compositions.
+## Self-Improvement
 
-### Creating Animation Components
+After each video, rate scenes 1-10 in `output/ratings.json`:
 
-```tsx
-import React from "react";
-import { interpolate, useCurrentFrame } from "remotion";
-
-export const MyComponent: React.FC<{ title: string }> = ({ title }) => {
-  const frame = useCurrentFrame();
-  const opacity = interpolate(frame, [0, 30], [0, 1], {
-    extrapolateRight: "clamp",
-  });
-  return <div style={{ opacity }}>{title}</div>;
-};
+```json
+{
+  "overall": 7,
+  "scenes": [
+    { "id": "scene_001", "rating": 8, "notes": "Good hook" },
+    { "id": "scene_002", "rating": 5, "notes": "Text too small" }
+  ]
+}
 ```
 
-### Testing
+Patterns emerge over time:
+- Which templates score highest?
+- What pacing works best?
+- Which evidence types are most compelling?
 
-```bash
-# Python tests (1192 tests)
-pytest tests/ -v
-pytest tests/ -v -m "not slow"  # Skip network tests
+## Architecture
 
-# JavaScript tests (203 tests)
-cd remotion && npm test
+```
+src/
+├── agents/                  # AI agents
+│   ├── witness.py           # Evidence capture (Browserbase)
+│   ├── investigator.py      # URL discovery (Exa)
+│   ├── director.py          # Script generation
+│   └── editor.py            # Render manifest
+│
+├── audio/                   # ElevenLabs TTS
+├── avatar/                  # HeyGen integration
+│
+└── cli/                     # Command interface
+
+remotion/
+├── src/
+│   ├── templates/           # 5 JSON-driven templates
+│   │   ├── TextOverProof.tsx
+│   │   ├── SplitProof.tsx
+│   │   ├── FullAvatar.tsx
+│   │   ├── ProofOnly.tsx
+│   │   └── TextCard.tsx
+│   │
+│   └── ShortsPlayer.tsx     # Main composition
 ```
 
-### Visual Style
+## Reference
 
-Default theme for technical content:
-
-| Element | Color | Hex |
-|---------|-------|-----|
-| Background | Dark Slate | `#0f0f1a` |
-| Compute/Data | Cyan | `#00d9ff` |
-| Memory | Orange | `#ff6b35` |
-| Optimization | Green | `#00ff88` |
-| Problems | Red | `#ff4757` |
-
-Typography: Inter/SF Pro for text, JetBrains Mono for code
-
-## Documentation
-
-- [CLI Reference](docs/CLI.md) - Complete command reference with all options
-- [Refinement System](docs/REFINEMENT.md) - 4-phase quality improvement process
-- [Shorts Generation](docs/SHORTS.md) - Vertical video workflow and timing sync
-- [Sound Design](docs/SOUND.md) - SFX system and AI music generation
-
-## Dependencies
-
-### Python
-- pydantic, rich, pyyaml - Core utilities
-- edge-tts - Microsoft Edge TTS
-- pymupdf - PDF parsing
-- transformers, torch - MusicGen AI music
-
-### Node.js
-- remotion, @remotion/renderer - Video rendering
-- react - UI components
-- vitest - Testing
-
-### System
-- FFmpeg - Video processing
-- Node.js 20+ - Remotion runtime
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Acknowledgments
-
-- [Remotion](https://remotion.dev/) - React-based video generation
-- [ElevenLabs](https://elevenlabs.io/) - Text-to-Speech
-- [MusicGen](https://github.com/facebookresearch/audiocraft) - AI music generation
-- [FFmpeg](https://ffmpeg.org/) - Video processing
+- Style: Varun Mayya, Johnny Harris, Fever
+- Format: 9:16 vertical (1080x1920)
+- Length: 30-60 seconds
+- Scene duration: 1-10 seconds each
+- Platforms: YouTube Shorts, Instagram Reels, TikTok

@@ -1,0 +1,48 @@
+{
+  "_description": "Styled text on top, rounded video card in center, black background",
+  "_use_when": "Dramatic reveal with video evidence, text builds anticipation",
+  "_screenshot": "templates/screenshots/VideoCard.png",
+  
+  "id": "scene_002",
+  "template": "VideoCard",
+  "start_seconds": 1.5,
+  "end_seconds": 4.0,
+  
+  "audio": {
+    "text": "looks like something straight out of a sci-fi movie except it's real",
+    "word_timestamps": [
+      { "word": "looks", "start": 1.5, "end": 1.7 },
+      { "word": "like", "start": 1.7, "end": 1.85 },
+      { "word": "something", "start": 1.85, "end": 2.2 }
+    ]
+  },
+  
+  "background": {
+    "type": "solid",
+    "color": "#000000"
+  },
+  
+  "video_inset": {
+    "src": "backgrounds/footage.mp4",
+    "position": "center",
+    "width_percent": 85,
+    "border_radius": 16,
+    "border_color": "#333333"
+  },
+  
+  "avatar": {
+    "visible": false
+  },
+  
+  "text": {
+    "headline": {
+      "lines": [
+        { "text": "looks like", "style": "normal" },
+        { "text": "something", "style": "italic" },
+        { "text": "straight out of a", "style": "normal" }
+      ]
+    },
+    "position": "top",
+    "animate": "word_by_word"
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Shorts Script Schema",
+  "description": "JSON schema for Varun Mayya style shorts",
+  "type": "object",
+  "required": ["id", "scenes"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique project identifier"
+    },
+    "title": {
+      "type": "string",
+      "description": "Video title"
+    },
+    "duration_seconds": {
+      "type": "number",
+      "minimum": 30,
+      "maximum": 60
+    },
+    "scenes": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/scene" }
+    }
+  },
+  "definitions": {
+    "scene": {
+      "type": "object",
+      "required": ["id", "template", "start_seconds", "end_seconds"],
+      "properties": {
+        "id": { "type": "string" },
+        "template": {
+          "type": "string",
+          "enum": ["TextOverProof", "SplitProof", "FullAvatar", "ProofOnly", "TextCard"]
+        },
+        "start_seconds": { "type": "number" },
+        "end_seconds": { "type": "number" },
+        "audio": { "$ref": "#/definitions/audio" },
+        "background": { "$ref": "#/definitions/background" },
+        "avatar": { "$ref": "#/definitions/avatar" },
+        "text": { "$ref": "#/definitions/text" }
+      }
+    },
+    "audio": {
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "file": { "type": "string" },
+        "start_seconds": { "type": "number" },
+        "word_timestamps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "word": { "type": "string" },
+              "start": { "type": "number" },
+              "end": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "background": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["screenshot", "ai_video", "gradient", "stock"]
+        },
+        "src": { "type": "string" },
+        "colors": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "crop": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "width": { "type": "number" },
+            "height": { "type": "number" }
+          }
+        },
+        "highlight_box": {
+          "type": "object",
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "width": { "type": "number" },
+            "height": { "type": "number" }
+          }
+        }
+      }
+    },
+    "avatar": {
+      "type": "object",
+      "required": ["visible"],
+      "properties": {
+        "visible": { "type": "boolean" },
+        "position": {
+          "type": "string",
+          "enum": ["full", "bottom", "pip_corner", "off"]
+        },
+        "src": { "type": "string" }
+      }
+    },
+    "text": {
+      "type": "object",
+      "properties": {
+        "headline": { "type": "string" },
+        "caption_style": {
+          "type": "string",
+          "enum": ["word_by_word", "sentence"]
+        },
+        "position": {
+          "type": "string",
+          "enum": ["top", "center", "bottom"]
+        },
+        "highlight_words": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  }
+}

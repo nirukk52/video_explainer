@@ -1,0 +1,37 @@
+{
+  "_description": "Evidence on top (60%), avatar talking on bottom (40%)",
+  "_use_when": "Showing proof while avatar explains the significance",
+  "_screenshot": "templates/screenshots/SplitProof.png",
+  
+  "id": "scene_001",
+  "template": "SplitProof",
+  "start_seconds": 0,
+  "end_seconds": 4.5,
+  
+  "audio": {
+    "text": "Chinese peptides are taking over Silicon Valley",
+    "file": "audio/voiceover.mp3",
+    "start_seconds": 0
+  },
+  
+  "background": {
+    "type": "screenshot",
+    "src": "evidence/techspot_001.png",
+    "highlight_box": {
+      "x": 50,
+      "y": 120,
+      "width": 500,
+      "height": 60
+    }
+  },
+  
+  "avatar": {
+    "visible": true,
+    "position": "bottom",
+    "src": "avatar/scene_001.mp4"
+  },
+  
+  "text": {
+    "caption_style": "word_by_word"
+  }
+}

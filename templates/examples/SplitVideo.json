@@ -1,0 +1,37 @@
+{
+  "_description": "Video on top, avatar on bottom - classic split layout",
+  "_use_when": "Showing video footage while avatar comments on it",
+  "_screenshot": "templates/screenshots/SplitVideo.png",
+  
+  "id": "scene_001",
+  "template": "SplitVideo",
+  "start_seconds": 0,
+  "end_seconds": 1.5,
+  
+  "audio": {
+    "text": "This video",
+    "word_timestamps": [
+      { "word": "This", "start": 0.0, "end": 0.3 },
+      { "word": "video", "start": 0.3, "end": 0.7 }
+    ]
+  },
+  
+  "background": {
+    "type": "video",
+    "src": "backgrounds/footage.mp4",
+    "position": "top",
+    "height_percent": 60
+  },
+  
+  "avatar": {
+    "visible": true,
+    "position": "bottom",
+    "src": "avatar/scene_001.mp4",
+    "height_percent": 40
+  },
+  
+  "text": {
+    "caption_style": "word_by_word",
+    "position": "video_overlay_bottom"
+  }
+}

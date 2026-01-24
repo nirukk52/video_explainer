@@ -1,15 +1,18 @@
 import { Composition } from "remotion";
 import { loadFont as loadOutfit } from "@remotion/google-fonts/Outfit";
 import { loadFont as loadInter } from "@remotion/google-fonts/Inter";
+import { loadFont as loadPlayfair } from "@remotion/google-fonts/PlayfairDisplay";
 import { ExplainerVideo } from "./scenes/ExplainerVideo";
 import { StoryboardPlayer } from "./scenes/StoryboardPlayer";
 import { ThreeDemo } from "./ThreeDemo";
 import { ShortsPlayer } from "./shorts/ShortsPlayer";
 import type { ShortsStoryboard } from "./shorts/ShortsPlayer";
+import { VarunPlayer, Script } from "./templates";
 
 // Load fonts globally
 loadOutfit(); // Modern geometric sans-serif for tech content
 loadInter();  // Clean sans-serif for shorts captions
+loadPlayfair(); // Serif font for Varun Mayya style headlines
 import {
   SceneStoryboardPlayer,
   DynamicStoryboardPlayer,
@@ -259,6 +262,72 @@ export const RemotionRoot: React.FC = () => {
           }
           const storyboard = props.storyboard as ShortsStoryboard | undefined;
           const duration = storyboard?.total_duration_seconds || 60;
+          return {
+            durationInFrames: Math.ceil(duration * 30),
+          };
+        }}
+      />
+
+      {/* ===== Varun Mayya Style Shorts ===== */}
+      
+      {/* VarunPlayer - JSON-driven template system for Varun Mayya style */}
+      {/* Templates: SplitVideo, VideoCard, TextOverProof, FullAvatar, etc. */}
+      <Composition
+        id="VarunPlayer"
+        component={VarunPlayer}
+        durationInFrames={30 * 60} // 1 min max
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{
+          script: {
+            id: "preview",
+            title: "Varun Style Preview",
+            duration_seconds: 4,
+            scenes: [
+              {
+                id: "scene_001",
+                template: "VideoCard",
+                start_seconds: 0,
+                end_seconds: 4,
+                background: { type: "solid", color: "#000000" },
+                video_inset: {
+                  src: "backgrounds/placeholder.mp4",
+                  position: "center",
+                  width_percent: 85,
+                  border_radius: 16,
+                },
+                avatar: { visible: false },
+                text: {
+                  headline: {
+                    lines: [
+                      { text: "looks like", style: "normal" },
+                      { text: "something", style: "italic" },
+                      { text: "straight out of a", style: "normal" },
+                    ],
+                  },
+                  position: "top",
+                },
+              },
+            ],
+          } as Script,
+        }}
+        calculateMetadata={async ({ props }) => {
+          // Try to use injected script from PROJECT env
+          try {
+            const injected = process.env.__VARUN_SCRIPT_JSON__;
+            if (injected && typeof injected === "object") {
+              const script = injected as unknown as Script;
+              return {
+                durationInFrames: Math.ceil(script.duration_seconds * 30),
+                props: { ...props, script },
+              };
+            }
+          } catch {
+            // Fallback to props
+          }
+          const script = props.script as Script | undefined;
+          const duration = script?.duration_seconds || 60;
           return {
             durationInFrames: Math.ceil(duration * 30),
           };
