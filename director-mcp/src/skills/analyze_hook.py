@@ -13,8 +13,34 @@ from typing import Optional
 from openai import AsyncOpenAI
 
 # Import from centralized prompts (single source of truth)
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-from src.prompts import HOOK_ANALYSIS_PROMPT
+# Add parent directory to path for imports from main src/
+_parent_dir = Path(__file__).parent.parent.parent.parent
+if str(_parent_dir) not in sys.path:
+    sys.path.insert(0, str(_parent_dir))
+
+try:
+    from src.prompts import HOOK_ANALYSIS_PROMPT
+except ImportError:
+    # Fallback prompt if main src is not available
+    HOOK_ANALYSIS_PROMPT = """You are an expert short-form video hook analyst.
+Your job is to evaluate the first 3 seconds of a video script and score its "scroll-stopping" potential.
+
+WHAT MAKES A GREAT HOOK:
+1. Pattern Interrupt: Something visually/aurally unexpected that breaks the scroll
+2. Specificity: Numbers, names, outcomes ("$0.14" not "cheap")
+3. Stakes: Why should I care RIGHT NOW?
+4. Open Loop: Creates curiosity that demands resolution
+5. Visual Match: The first frame supports the hook energy
+
+OUTPUT JSON:
+{
+  "hook_score": 1-10,
+  "pattern_interrupt": "weak" | "moderate" | "strong",
+  "scroll_stop_potential": "description",
+  "suggestions": ["list", "of", "improvements"],
+  "improved_hook": "rewritten hook text if score < 8",
+  "visual_match": true/false
+}"""
 
 from ..models import AnalyzeHookInput, HookAnalysis
 

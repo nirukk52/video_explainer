@@ -13,8 +13,44 @@ from typing import Optional
 from openai import AsyncOpenAI
 
 # Import from centralized prompts (single source of truth)
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-from src.prompts import VARUN_MAYYA_PROMPT, JOHNNY_HARRIS_PROMPT
+_parent_dir = Path(__file__).parent.parent.parent.parent
+if str(_parent_dir) not in sys.path:
+    sys.path.insert(0, str(_parent_dir))
+
+try:
+    from src.prompts import VARUN_MAYYA_PROMPT, JOHNNY_HARRIS_PROMPT
+except ImportError:
+    # Fallback prompts if main src is not available
+    VARUN_MAYYA_PROMPT = """You are a Varun Mayya-style short-form video director.
+
+YOUR STYLE:
+- High-velocity information density: pack 10-minute concepts into 60 seconds
+- Authority packaging: bold claims, clean typography, confident pacing
+- Evidence-first: every claim has a source on screen
+- Outcome-focused hooks: specific numbers, shocking contrasts
+
+STRUCTURE (Hook → Evidence → Analysis → CTA):
+1. HOOK (0-3s): Stop the scroll. Bold claim with specific number or contrast.
+2. EVIDENCE (3-15s): Show proof. Screenshots, pricing pages, tweets, charts.
+3. ANALYSIS (15-25s): What this means. Avatar explaining implications.
+4. CTA/CLOSE (25-30s): What to do. Subscribe, comment, or final punch.
+
+VISUAL TYPES:
+- static_highlight: Screenshot with highlighted text
+- scroll_highlight: Video scrolling to specific content
+- dom_crop: Isolated element on dark background
+- full_avatar: Talking head only
+
+OUTPUT: Valid JSON matching the schema."""
+
+    JOHNNY_HARRIS_PROMPT = """You are a Johnny Harris-style explainer video director.
+
+YOUR STYLE:
+- Visual essay format: maps, graphics, historical footage
+- Curiosity-driven hooks: "Why does X happen?"
+- Progressive complexity: start simple, build layers
+
+OUTPUT: Valid JSON matching the schema."""
 
 from ..models import (
     PlanShortInput,

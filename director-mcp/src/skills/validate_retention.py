@@ -13,8 +13,34 @@ from typing import Optional
 from openai import AsyncOpenAI
 
 # Import from centralized prompts (single source of truth)
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-from src.prompts import RETENTION_PROMPT
+_parent_dir = Path(__file__).parent.parent.parent.parent
+if str(_parent_dir) not in sys.path:
+    sys.path.insert(0, str(_parent_dir))
+
+try:
+    from src.prompts import RETENTION_PROMPT
+except ImportError:
+    # Fallback prompt if main src is not available
+    RETENTION_PROMPT = """You are a YouTube Shorts retention analyst.
+
+Your job is to predict Average View Percentage and flag drop-off risks.
+
+RETENTION KILLERS (flag these):
+1. No visual change for >4 seconds
+2. Filler words or "dead air"
+3. Stakes plateau (no new information)
+4. Weak CTA (viewer leaves before end)
+
+OUTPUT JSON:
+{
+  "retention_score": 0-10,
+  "predicted_avg_view_pct": 0-100,
+  "drop_off_risks": [{"time_seconds": 12, "reason": "No visual change", "severity": "high"}],
+  "recommendations": ["Add pattern interrupt at 12s"],
+  "visual_change_frequency": 3.5,
+  "stakes_escalation_valid": true/false,
+  "benchmark_comparison": "Top 25% for tech/AI shorts"
+}"""
 
 from ..models import DropOffRisk, DropOffSeverity, RetentionValidation, ValidateRetentionInput
 

@@ -43,8 +43,18 @@ from .models import (
 )
 from .skills import analyze_hook, generate_beat_sheet, plan_short, validate_retention
 
-# Initialize the MCP server
-mcp = FastMCP("director_mcp")
+
+def _parse_port() -> int:
+    """Parse port from command line args."""
+    for i, arg in enumerate(sys.argv):
+        if arg == "--port" and i + 1 < len(sys.argv):
+            return int(sys.argv[i + 1])
+    return 8001  # default port
+
+
+# Initialize the MCP server with port config for HTTP mode
+_port = _parse_port() if "--http" in sys.argv else 8000
+mcp = FastMCP("director_mcp", host="0.0.0.0", port=_port)
 
 # Global project storage (in-memory for now, persisted to disk)
 _active_projects: dict = {}
@@ -645,16 +655,131 @@ async def factory_get_render_manifest(params: GetStatusInput) -> str:
         return json.dumps({"error": str(e)})
 
 
+# ============================================================================
+# EVAL/SCORING TOOLS
+# ============================================================================
+
+
+class ScoreTemplateInput(BaseModel):
+    """Input for scoring a completed template."""
+    
+    project_id: str = Field(..., description="Project ID to score")
+
+
+class GetWinnersInput(BaseModel):
+    """Input for getting similar winning templates."""
+    
+    topic: str = Field(..., description="Topic to search for similar winners")
+    limit: int = Field(default=3, description="Max number of winners to return", ge=1, le=10)
+
+
+@mcp.tool(
+    name="eval_score_template",
+    annotations={
+        "title": "Score Completed Template",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def eval_score_template(params: ScoreTemplateInput) -> str:
+    """
+    Score a completed template to determine if it's a winner.
+    
+    Scoring dimensions:
+    - Hook Score (25%): Scroll-stopping potential
+    - Retention Score (25%): Predicted avg view percentage
+    - Pacing Score (20%): Stakes escalation and beat timing
+    - Evidence Score (15%): Screenshot quality and relevance
+    - User Rating (15%): Upvote/downvote history
+    
+    Templates scoring >= 7.0 become winners and are added to the library.
+    
+    Args:
+        params: ScoreTemplateInput with project_id
+    
+    Returns:
+        JSON with overall score, breakdown, and winner status
+    """
+    try:
+        project = _get_or_create_project(params.project_id)
+        if not project:
+            return json.dumps({"error": f"Project {params.project_id} not found"})
+        
+        # Import eval service
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+        from src.eval.scorer import TemplateScorer
+        from src.eval.winner_library import WinnerLibrary
+        
+        scorer = TemplateScorer(project.store)
+        score = await scorer.score_template(params.project_id)
+        
+        # If winner, add to library
+        if score.is_winner:
+            library = WinnerLibrary()
+            script = project.get_script()
+            if script:
+                await library.add_winner(
+                    project_id=params.project_id,
+                    topic=score.topic or project.topic,
+                    script_json=script,
+                    score=score.overall_score,
+                )
+        
+        return json.dumps(score.to_dict(), indent=2)
+        
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+@mcp.tool(
+    name="eval_get_similar_winners",
+    annotations={
+        "title": "Get Similar Winners",
+        "readOnlyHint": True,
+        "destructiveHint": False,
+        "idempotentHint": True,
+        "openWorldHint": False,
+    },
+)
+async def eval_get_similar_winners(params: GetWinnersInput) -> str:
+    """
+    Get similar winning templates for a topic.
+    
+    Uses embedding similarity search to find templates with similar topics.
+    Useful for few-shot prompting in script generation.
+    
+    Args:
+        params: GetWinnersInput with topic and limit
+    
+    Returns:
+        JSON array of similar winning templates
+    """
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+        from src.eval.winner_library import WinnerLibrary
+        
+        library = WinnerLibrary()
+        winners = await library.get_similar_winners(params.topic, params.limit)
+        
+        return json.dumps({
+            "winners": [w.to_dict() for w in winners],
+            "count": len(winners),
+        }, indent=2)
+        
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
 def main():
     """Run the Director MCP server."""
     # Check for HTTP transport flag
     if "--http" in sys.argv:
-        port = 8001
-        for i, arg in enumerate(sys.argv):
-            if arg == "--port" and i + 1 < len(sys.argv):
-                port = int(sys.argv[i + 1])
-        print(f"Starting Director MCP on HTTP port {port}...")
-        mcp.run(transport="streamable_http", port=port)
+        print(f"Starting Director MCP on HTTP port {_port}...")
+        mcp.run(transport="streamable-http")
     else:
         # Default: stdio transport
         mcp.run()

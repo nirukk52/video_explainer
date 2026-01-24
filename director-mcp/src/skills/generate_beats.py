@@ -13,8 +13,34 @@ from typing import Optional
 from openai import AsyncOpenAI
 
 # Import from centralized prompts (single source of truth)
-sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
-from src.prompts import BEAT_SHEET_PROMPT
+_parent_dir = Path(__file__).parent.parent.parent.parent
+if str(_parent_dir) not in sys.path:
+    sys.path.insert(0, str(_parent_dir))
+
+try:
+    from src.prompts import BEAT_SHEET_PROMPT
+except ImportError:
+    # Fallback prompt if main src is not available
+    BEAT_SHEET_PROMPT = """You are a Varun Mayya-style video editor planning beats.
+
+A BEAT is a 5-7 second unit of content where something changes.
+
+BEAT TYPES:
+1. hook: First impression, scroll-stopper
+2. setup: Context needed to understand the claim
+3. proof: Evidence shot (screenshot, data, quote)
+4. escalation: Raises stakes
+5. implication: What this means for the viewer
+6. cta: Call to action, final punch
+
+OUTPUT JSON:
+{
+  "total_duration_seconds": number,
+  "num_beats": number,
+  "beats": [{"time_range": "0-5s", "beat_type": "hook", "stakes": "attention", "visual": "avatar_bold_claim", "scene_id": 1}],
+  "stakes_curve": "ascending" | "flat" | "descending",
+  "pacing_score": 1-10
+}"""
 
 from ..models import Beat, BeatSheet, GenerateBeatSheetInput
 
