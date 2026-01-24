@@ -42,6 +42,16 @@ if (fs.existsSync(shortsStoryboardPath)) {
   console.warn(`[remotion.config] Warning: shorts_storyboard.json not found at ${shortsStoryboardPath}`);
 }
 
+// Load Varun-style script.json at build time
+const varunScriptPath = path.resolve(projectDir, "script/script.json");
+let varunScriptJson = "null";
+if (fs.existsSync(varunScriptPath)) {
+  varunScriptJson = fs.readFileSync(varunScriptPath, "utf-8");
+  console.log(`[remotion.config] Loaded script.json for VarunPlayer`);
+} else {
+  console.warn(`[remotion.config] Warning: script.json not found at ${varunScriptPath}`);
+}
+
 // Set public directory to project directory for assets (voiceover, music, sfx)
 Config.setPublicDir(projectDir);
 
@@ -70,6 +80,7 @@ Config.overrideWebpackConfig((config) => {
       new webpack.DefinePlugin({
         "process.env.__STORYBOARD_JSON__": storyboardJson,
         "process.env.__SHORTS_STORYBOARD_JSON__": shortsStoryboardJson,
+        "process.env.__VARUN_SCRIPT_JSON__": varunScriptJson,
       }),
     ],
   };

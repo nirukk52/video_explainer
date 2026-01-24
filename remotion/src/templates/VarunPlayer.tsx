@@ -11,6 +11,8 @@ import { AbsoluteFill, Audio, useCurrentFrame, useVideoConfig, staticFile } from
 import { Script, Scene, LAYOUT, COLORS } from './types';
 import { SplitVideo } from './SplitVideo';
 import { VideoCard } from './VideoCard';
+import { TextOverProof } from './TextOverProof';
+import { TextCard } from './TextCard';
 
 interface VarunPlayerProps {
   script: Script;
@@ -66,12 +68,16 @@ const SceneRenderer: React.FC<{ scene: Scene; currentTime: number }> = ({ scene,
     case 'VideoCard':
       return <VideoCard scene={scene} currentTime={currentTime} />;
     
+    case 'TextOverProof':
+      return <TextOverProof scene={scene} currentTime={currentTime} />;
+    
+    case 'TextCard':
+      return <TextCard scene={scene} currentTime={currentTime} />;
+    
     // TODO: Implement other templates
     case 'SplitProof':
-    case 'TextOverProof':
     case 'FullAvatar':
     case 'ProofOnly':
-    case 'TextCard':
     default:
       return (
         <AbsoluteFill style={{ 

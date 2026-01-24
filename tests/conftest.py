@@ -15,6 +15,12 @@ def pytest_addoption(parser):
         default=False,
         help="Run LLM integration tests (expensive, makes real API calls)",
     )
+    parser.addoption(
+        "--keep-artifacts",
+        action="store_true",
+        default=False,
+        help="Keep temp dirs / artifacts from evidence pipeline tests for inspection",
+    )
 
 
 def pytest_configure(config):

@@ -13,6 +13,8 @@ export { VarunPlayer } from './VarunPlayer';
 // Individual templates
 export { SplitVideo } from './SplitVideo';
 export { VideoCard } from './VideoCard';
+export { TextOverProof } from './TextOverProof';
+export { TextCard } from './TextCard';
 
 // Shared components
 export { WordByWordCaption } from './WordByWordCaption';

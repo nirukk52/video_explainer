@@ -2043,6 +2043,94 @@ def _cmd_sound_clear(project, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_evidence(args: argparse.Namespace) -> int:
+    """Review and curate evidence screenshots."""
+    from ..evidence import curate_evidence, review_evidence
+
+    project_dir = Path(args.projects_dir) / args.project
+
+    if not project_dir.exists():
+        print(f"Error: Project not found: {project_dir}", file=sys.stderr)
+        return 1
+
+    evidence_dir = project_dir / "evidence"
+    if not evidence_dir.exists():
+        print(f"Error: Evidence directory not found: {evidence_dir}", file=sys.stderr)
+        print("Run the Witness agent first to capture evidence screenshots.")
+        return 1
+
+    use_mock = getattr(args, "mock", False)
+    verbose = not getattr(args, "quiet", False)
+    force = getattr(args, "force", False)
+
+    if not args.evidence_command:
+        print("Usage: python -m src.cli evidence <project> <command>")
+        print("\nCommands:")
+        print("  review   - Review screenshots with Vision LLM, filter out bad ones")
+        print("  curate   - Crop and process reviewed screenshots")
+        print("  process  - Run both review and curate in sequence")
+        return 1
+
+    try:
+        if args.evidence_command == "review":
+            manifest = review_evidence(
+                project_dir=project_dir,
+                mock=use_mock,
+                verbose=verbose,
+            )
+            print(f"\nManifest updated: {evidence_dir / 'manifest.json'}")
+            return 0
+
+        elif args.evidence_command == "curate":
+            manifest = curate_evidence(
+                project_dir=project_dir,
+                mock=use_mock,
+                verbose=verbose,
+                force=force,
+            )
+            print(f"\nCurated images saved to: {evidence_dir / 'curated'}")
+            return 0
+
+        elif args.evidence_command == "process":
+            # Run both in sequence
+            print("[Step 1/2] Reviewing evidence...")
+            manifest = review_evidence(
+                project_dir=project_dir,
+                mock=use_mock,
+                verbose=verbose,
+            )
+
+            print("\n[Step 2/2] Curating evidence...")
+            manifest = curate_evidence(
+                project_dir=project_dir,
+                mock=use_mock,
+                verbose=verbose,
+                force=force,
+            )
+
+            print(f"\nEvidence processing complete!")
+            print(f"  Manifest: {evidence_dir / 'manifest.json'}")
+            print(f"  Curated: {evidence_dir / 'curated'}")
+            return 0
+
+        else:
+            print(f"Unknown evidence command: {args.evidence_command}")
+            return 1
+
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        return 1
+
+
 def cmd_factcheck(args: argparse.Namespace) -> int:
     """Run fact checking on a project's script and narration."""
     from ..project import load_project
@@ -4033,6 +4121,92 @@ For manual voiceover recording:
     )
 
     sound_parser.set_defaults(func=cmd_sound)
+
+    # evidence command (review and curate screenshots)
+    evidence_parser = subparsers.add_parser(
+        "evidence",
+        help="Review and curate evidence screenshots",
+        description="""
+Evidence curation pipeline for reviewing and processing Witness screenshots.
+
+Commands:
+  review  - Review screenshots with Vision LLM, filter out bad ones
+  curate  - Crop and process reviewed screenshots
+  process - Run both review and curate in sequence
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    evidence_parser.add_argument("project", help="Project ID")
+
+    evidence_subparsers = evidence_parser.add_subparsers(
+        dest="evidence_command",
+        help="Evidence commands",
+    )
+
+    # evidence review
+    evidence_review_parser = evidence_subparsers.add_parser(
+        "review",
+        help="Review screenshots with Vision LLM to filter bad ones",
+    )
+    evidence_review_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock Vision LLM (for testing without API)",
+    )
+    evidence_review_parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress progress output",
+    )
+
+    # evidence curate
+    evidence_curate_parser = evidence_subparsers.add_parser(
+        "curate",
+        help="Crop and process reviewed screenshots",
+    )
+    evidence_curate_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock Vision LLM (for testing without API)",
+    )
+    evidence_curate_parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Re-process even if already curated",
+    )
+    evidence_curate_parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress progress output",
+    )
+
+    # evidence process (review + curate)
+    evidence_process_parser = evidence_subparsers.add_parser(
+        "process",
+        help="Run both review and curate in sequence",
+    )
+    evidence_process_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock Vision LLM (for testing without API)",
+    )
+    evidence_process_parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Re-process even if already curated",
+    )
+    evidence_process_parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress progress output",
+    )
+
+    evidence_parser.set_defaults(func=cmd_evidence)
 
     args = parser.parse_args()
 

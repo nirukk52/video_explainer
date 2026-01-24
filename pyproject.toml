@@ -22,6 +22,8 @@ dependencies = [
     "numpy>=1.21.0",
     "pymupdf>=1.23.0",
     "beautifulsoup4>=4.12.0",
+    "anthropic>=0.40.0",
+    "pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]
