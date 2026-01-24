@@ -81,6 +81,8 @@ def cmd_refine(args: argparse.Namespace) -> int:
         return _run_visual_phase(project, args)
     elif phase == "visual-cue":
         return _run_visual_cue_phase(project, args)
+    elif phase == "sync":
+        return _run_sync_phase(project, args)
     else:
         print(f"Error: Unknown phase '{phase}'", file=sys.stderr)
         return 1
@@ -553,6 +555,83 @@ def _print_visual_cue_analysis(result) -> None:
     print("\n" + "=" * 60)
 
 
+def _run_sync_phase(project: Project, args: argparse.Namespace) -> int:
+    """Run sync phase: visual-voiceover synchronization."""
+    print("\n🔄 Phase: Visual-Voiceover Sync")
+    print("   " + "=" * 40)
+
+    from ..sync import SyncOrchestrator
+
+    verbose = not getattr(args, "quiet", False)
+    dry_run = getattr(args, "dry_run", False)
+    force = getattr(args, "force", False)
+    full = getattr(args, "full", False)
+    generate_map = getattr(args, "generate_map", False)
+    generate_timing = getattr(args, "generate_timing", False)
+    migrate_scenes = getattr(args, "migrate_scenes", False)
+    scene_index = getattr(args, "scene", None)
+
+    orchestrator = SyncOrchestrator(project=project, verbose=verbose)
+
+    # Determine what to run
+    if full or (not generate_map and not generate_timing and not migrate_scenes):
+        # Full sync (default when no specific step is requested)
+        scene_id = None
+        if scene_index is not None:
+            # Get scene_id from storyboard
+            storyboard = project.load_storyboard()
+            scenes = storyboard.get("scenes", [])
+            if 0 < scene_index <= len(scenes):
+                scene_id = scenes[scene_index - 1].get("id")
+
+        result = orchestrator.run_full_sync(
+            dry_run=dry_run,
+            force=force,
+            scene_id=scene_id,
+        )
+        return 0 if result.success else 1
+
+    # Individual steps
+    if generate_map:
+        try:
+            sync_map = orchestrator.generate_sync_map(force=force)
+            print(f"\n   ✅ Sync map generated with {len(sync_map.scenes)} scenes")
+            total_points = sum(len(s.sync_points) for s in sync_map.scenes)
+            print(f"   Total sync points: {total_points}")
+        except Exception as e:
+            print(f"\n   ❌ Error: {e}")
+            return 1
+
+    if generate_timing:
+        try:
+            timing_path = orchestrator.generate_timing_file(force=force)
+            print(f"\n   ✅ Timing file generated: {timing_path}")
+        except Exception as e:
+            print(f"\n   ❌ Error: {e}")
+            return 1
+
+    if migrate_scenes:
+        try:
+            scene_id = None
+            if scene_index is not None:
+                storyboard = project.load_storyboard()
+                scenes = storyboard.get("scenes", [])
+                if 0 < scene_index <= len(scenes):
+                    scene_id = scenes[scene_index - 1].get("id")
+
+            results = orchestrator.migrate_scenes(
+                dry_run=dry_run,
+                scene_id=scene_id,
+            )
+            success_count = sum(1 for p in results.values() if p.success)
+            print(f"\n   ✅ Migrated {success_count}/{len(results)} scenes")
+        except Exception as e:
+            print(f"\n   ❌ Error: {e}")
+            return 1
+
+    return 0
+
+
 def _print_refinement_summary(results: list) -> None:
     """Print a summary of refinement results."""
     print("\n" + "=" * 60)
@@ -603,6 +682,7 @@ Phase 1 (analyze): Compare source material against script to identify gaps
 Phase 2 (script): Refine narrations and update script structure
 Phase 3 (visual): Inspect and refine scene visuals (default)
 Phase 4 (visual-cue): Analyze and improve visual_cue specifications in script.json
+Phase 5 (sync): Synchronize visual animations with voiceover timing
 
 The visual phase uses AI to:
 1. Parse narration into visual "beats"
@@ -614,6 +694,11 @@ The visual phase uses AI to:
 The visual-cue phase analyzes script.json visual specifications and generates
 patches to improve them (dark glass patterns, 3D depth, specific elements).
 
+The sync phase automatically:
+1. Analyzes scene code to identify sync points with voiceover
+2. Generates centralized timing.ts with frame-accurate constants
+3. Migrates scene code to use timing imports
+
 Example usage:
   python -m src.cli.main refine my-project                        # Refine all scenes (visual)
   python -m src.cli.main refine my-project --scene 1              # Refine specific scene
@@ -621,6 +706,8 @@ Example usage:
   python -m src.cli.main refine my-project --phase script         # Refine narrations
   python -m src.cli.main refine my-project --phase visual-cue     # Analyze visual_cues
   python -m src.cli.main refine my-project --phase visual-cue --apply  # Apply visual_cue patches
+  python -m src.cli.main refine my-project --phase sync --full    # Full sync workflow
+  python -m src.cli.main refine my-project --phase sync --generate-map  # Generate sync map only
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -632,9 +719,9 @@ Example usage:
 
     refine_parser.add_argument(
         "--phase",
-        choices=["analyze", "script", "visual", "visual-cue"],
+        choices=["analyze", "script", "visual", "visual-cue", "sync"],
         default="visual",
-        help="Refinement phase to run: analyze, script, visual (default), or visual-cue",
+        help="Refinement phase to run: analyze, script, visual (default), visual-cue, or sync",
     )
 
     refine_parser.add_argument(
@@ -684,6 +771,37 @@ Example usage:
         "--apply",
         action="store_true",
         help="Apply patches to script.json (for --phase visual-cue)",
+    )
+
+    # Sync phase arguments
+    refine_parser.add_argument(
+        "--full",
+        action="store_true",
+        help="Run full sync workflow (for --phase sync)",
+    )
+
+    refine_parser.add_argument(
+        "--generate-map",
+        action="store_true",
+        help="Generate sync map only (for --phase sync)",
+    )
+
+    refine_parser.add_argument(
+        "--generate-timing",
+        action="store_true",
+        help="Generate timing.ts only (for --phase sync)",
+    )
+
+    refine_parser.add_argument(
+        "--migrate-scenes",
+        action="store_true",
+        help="Migrate scenes to use timing imports (for --phase sync)",
+    )
+
+    refine_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview changes without modifying files (for --phase sync)",
     )
 
     refine_parser.add_argument(

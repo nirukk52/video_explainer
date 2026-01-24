@@ -1,6 +1,6 @@
 # Refinement System
 
-The refinement system helps elevate video quality to professional standards through a 4-phase process.
+The refinement system helps elevate video quality to professional standards through a 5-phase process.
 
 ## Overview
 
@@ -10,6 +10,7 @@ The refinement system helps elevate video quality to professional standards thro
 | 2 | Script | Applies patches + storytelling refinements to script |
 | 3 | Visual-Cue | Improves visual specifications in script.json |
 | 4 | Visual | AI-powered visual inspection and code fixes |
+| 5 | Sync | Synchronize visual animations with voiceover timing |
 
 **Key Design:** Phases 1 and 2 are connected. Phase 1 outputs patches that Phase 2 consumes and applies.
 
@@ -21,9 +22,13 @@ python -m src.cli refine <project> --phase analyze
 python -m src.cli refine <project> --phase script --batch-approve
 python -m src.cli refine <project> --phase visual-cue --apply
 python -m src.cli refine <project> --phase visual
+python -m src.cli refine <project> --phase sync --full
 
 # Or just run visual refinement (default)
 python -m src.cli refine <project>
+
+# Or just run sync to align animations with voiceover
+python -m src.cli refine <project> --phase sync --full
 ```
 
 ## Phase 1: Gap Analysis
@@ -186,13 +191,181 @@ Uses `SingleScenePlayer` Remotion composition that loads individual scenes start
 
 ---
 
+## Phase 5: Visual-Voiceover Sync
+
+Automatically synchronizes visual animations with voiceover timing by generating frame-accurate timing constants.
+
+**Prerequisites:**
+- Voiceover manifest with word timestamps (`voiceover/manifest.json`)
+- Scene components with timing variables (`scenes/*.tsx`)
+
+```bash
+# Full sync workflow (recommended)
+python -m src.cli refine <project> --phase sync --full
+
+# Individual steps
+python -m src.cli refine <project> --phase sync --generate-map
+python -m src.cli refine <project> --phase sync --generate-timing
+python -m src.cli refine <project> --phase sync --migrate-scenes
+
+# Preview without changes
+python -m src.cli refine <project> --phase sync --full --dry-run
+
+# Process specific scene
+python -m src.cli refine <project> --phase sync --full --scene 1
+```
+
+### How it works
+
+The sync phase runs in three steps:
+
+#### Step 1: Generate Sync Map (`--generate-map`)
+
+Uses LLM to analyze each scene's code and identify sync points - moments where visual animations should align with specific words in the narration.
+
+**Input:** Scene code + word timestamps from manifest
+
+**Output:** `sync/sync_map.json` containing:
+```json
+{
+  "scenes": [{
+    "scene_id": "the_impossible_leap",
+    "sync_points": [{
+      "id": "numbersAppear",
+      "sync_type": "element_appear",
+      "trigger_phrase": "Eighty-three point three percent",
+      "trigger_word": "Eighty-three",
+      "offset_frames": -3,
+      "visual_element": "BigNumber component"
+    }]
+  }]
+}
+```
+
+#### Step 2: Generate Timing File (`--generate-timing`)
+
+Converts sync points to frame numbers using word timestamps from the voiceover manifest.
+
+**Output:** `scenes/timing.ts`
+```typescript
+export const TIMING = {
+  the_impossible_leap: {
+    duration: 1112,
+    numbersAppear: 129,
+    vsAppear: 176,
+    windowsEntrance: 356,
+  },
+  // ... more scenes
+} as const;
+```
+
+#### Step 3: Migrate Scenes (`--migrate-scenes`)
+
+Uses LLM to transform scene code to import and use the centralized timing constants.
+
+**Before:**
+```typescript
+const entrance = spring({
+  frame: Math.max(0, f - 220),
+  fps,
+});
+```
+
+**After:**
+```typescript
+import { TIMING } from './timing';
+
+const entrance = spring({
+  frame: Math.max(0, f - TIMING.the_impossible_leap.windowsEntrance),
+  fps,
+});
+```
+
+### Sync Point Types
+
+| Type | Description |
+|------|-------------|
+| `element_appear` | Visual element enters the scene |
+| `element_exit` | Visual element leaves the scene |
+| `phase_transition` | Major visual phase change |
+| `text_reveal` | Text or label appears |
+| `animation_start` | Animation sequence begins |
+| `data_update` | Data visualization updates |
+| `highlight` | Element gets highlighted |
+| `camera_move` | Camera/viewport changes |
+
+### Timing Calculation
+
+Frame numbers are calculated from word timestamps:
+
+```
+frame = (word_start_seconds × fps) + offset_frames
+```
+
+- **offset_frames**: Default -3 frames (anticipate by ~100ms at 30fps)
+- **use_word_start**: Use word start (default) or end time
+- Frames are clamped to valid range (0 to scene duration)
+
+### Backup & Recovery
+
+Scene migrations create automatic backups:
+- Backups stored in `scenes/.backups/`
+- Named: `SceneName.YYYYMMDD_HHMMSS.bak`
+- Restored automatically if validation fails
+
+### Validation
+
+After migration, scenes are validated for:
+- Balanced braces, parentheses, and brackets
+- Required import and export statements
+- TIMING import present when TIMING is used
+
+For full TypeScript validation, run:
+```bash
+cd remotion && npx tsc --noEmit
+```
+
+**Output:**
+- `sync/sync_map.json` - Sync point definitions
+- `sync/sync_result.json` - Execution summary
+- `scenes/timing.ts` - Centralized timing constants
+- `scenes/*.tsx` - Migrated scene components
+
+---
+
 ## CLI Options
 
 | Option | Description |
 |--------|-------------|
-| `--phase` | Phase to run: `analyze`, `script`, `visual-cue`, or `visual` (default: visual) |
-| `--scene N` | Refine only scene N (0-indexed for visual-cue, 1-indexed for visual) |
-| `--apply` | Apply generated patches to script.json (visual-cue phase) |
-| `--batch-approve` | Auto-approve all suggested changes (script phase) |
+| `--phase` | Phase to run: `analyze`, `script`, `visual-cue`, `visual`, or `sync` (default: visual) |
+| `--scene N` | Refine only scene N (1-indexed) |
+| `--force` | Continue even if project files are out of sync |
+| `--skip-validation` | Skip project sync validation |
+| `-q, --quiet` | Suppress progress messages |
+
+### Phase-specific options
+
+**Script phase:**
+| Option | Description |
+|--------|-------------|
+| `--batch-approve` | Auto-approve all suggested changes |
+
+**Visual-cue phase:**
+| Option | Description |
+|--------|-------------|
+| `--apply` | Apply generated patches to script.json |
+
+**Visual phase:**
+| Option | Description |
+|--------|-------------|
+| `--legacy` | Use Playwright-based screenshot capture instead of Claude Code |
 | `--live` | Stream Claude Code output in real-time |
-| `-v, --verbose` | Show detailed progress |
+
+**Sync phase:**
+| Option | Description |
+|--------|-------------|
+| `--full` | Run complete sync workflow (default if no step specified) |
+| `--generate-map` | Generate sync map only |
+| `--generate-timing` | Generate timing.ts only |
+| `--migrate-scenes` | Migrate scenes to use timing imports |
+| `--dry-run` | Preview changes without modifying files |
