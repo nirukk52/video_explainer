@@ -267,11 +267,12 @@ class VoiceoverGenerator:
         output_dir.mkdir(parents=True, exist_ok=True)
         audio_path = output_dir / filename
 
-        # Combine all narrations with natural pauses
-        # Use period + space for natural TTS pausing between scenes
+        # Build full narration from ShortScript.condensed_narration + CTA
         narration_parts = []
-        for scene in short_script.scenes:
-            narration_parts.append(scene.condensed_narration.strip())
+
+        # Use the condensed narration from the script level
+        if short_script.condensed_narration:
+            narration_parts.append(short_script.condensed_narration.strip())
 
         # Add CTA narration at the end
         if short_script.cta_narration:
@@ -404,11 +405,11 @@ class VoiceoverGenerator:
             "",
         ]
 
-        # Combine narrations
-        for i, scene in enumerate(short_script.scenes, 1):
+        # Add main narration from script level
+        if short_script.condensed_narration:
             if with_tags:
-                lines.append(f"[Scene {i} - {scene.source_scene_id}]")
-            lines.append(scene.condensed_narration.strip())
+                lines.append("[Main Narration]")
+            lines.append(short_script.condensed_narration.strip())
             lines.append("")
 
         # Add CTA

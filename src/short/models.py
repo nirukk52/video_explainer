@@ -6,6 +6,13 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class ShortMode(str, Enum):
+    """Mode for generating shorts."""
+
+    HOOK = "hook"  # Select compelling scenes, deep dive with cliffhanger
+    SUMMARY = "summary"  # Cover all scenes, rapid-fire teaser sweep
+
+
 class VisualType(str, Enum):
     """Types of visuals that can be shown in shorts."""
 
@@ -145,10 +152,14 @@ class ShortConfig(BaseModel):
 
 
 class ShortScene(BaseModel):
-    """A scene selected for the short."""
+    """A scene selected for the short.
+
+    Note: The condensed_narration field is deprecated at the scene level.
+    Use ShortScript.condensed_narration instead for the full narration.
+    """
 
     source_scene_id: str
-    condensed_narration: str
+    condensed_narration: str = ""  # Deprecated: use ShortScript.condensed_narration
     duration_seconds: float
 
 
@@ -157,11 +168,13 @@ class ShortScript(BaseModel):
 
     source_project: str
     title: str
-    hook_question: str  # The cliffhanger question
+    condensed_narration: str = ""  # The full condensed narration for the short
+    hook_question: str  # The cliffhanger question (or intrigue_close for summary mode)
     scenes: list[ShortScene]
     cta_text: str
     cta_narration: str  # Voiceover for CTA
     total_duration_seconds: float
+    mode: ShortMode = ShortMode.HOOK  # Generation mode used
 
 
 class HookAnalysis(BaseModel):
@@ -170,6 +183,26 @@ class HookAnalysis(BaseModel):
     selected_scene_ids: list[str]
     hook_question: str
     reasoning: str
+
+
+class SceneHighlight(BaseModel):
+    """A highlight/teaser from a single scene for summary mode."""
+
+    scene_id: str
+    scene_title: str
+    teaser_phrase: str  # 2-5 word hook for this layer
+    key_number: str = ""  # Optional specific number to feature
+    visual_hint: str = ""  # Hint for visual type (e.g., "grid", "flow", "number")
+
+
+class SummaryAnalysis(BaseModel):
+    """Result of analyzing script for summary mode."""
+
+    scene_highlights: list[SceneHighlight]
+    narrative_arc: str  # e.g., "descent", "journey", "transformation"
+    hook_opening: str  # Opening line, e.g., "You press a key..."
+    intrigue_close: str  # Closing hook before CTA
+    total_scenes: int  # Number of scenes being summarized
 
 
 class CondensedNarration(BaseModel):

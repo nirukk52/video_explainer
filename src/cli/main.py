@@ -2114,29 +2114,45 @@ def cmd_short(args: argparse.Namespace) -> int:
         print(f"  Warning: Could not load script ({type(e).__name__}: {e})")
         print("  Will use generic visual components instead.")
 
+    # Get mode and duration
+    mode = getattr(args, "mode", "hook")
+    duration = args.duration
+
+    # Set default duration based on mode if not specified
+    if duration is None:
+        duration = 60 if mode == "summary" else 45
+
     print(f"Generating YouTube Short for: {project.id}")
     print(f"  Variant: {args.variant}")
-    print(f"  Duration: {args.duration}s")
+    print(f"  Mode: {mode}")
+    print(f"  Duration: {duration}s")
     print(f"  Custom scenes: {not args.skip_custom_scenes}")
     print()
 
-    # Parse scene override if provided
+    # Parse scene override if provided (only for hook mode)
     scene_ids = None
     if args.scenes:
-        scene_ids = [s.strip() for s in args.scenes.split(",")]
-        print(f"  Using specified scenes: {scene_ids}")
+        if mode == "summary":
+            print("  Warning: --scenes is ignored in summary mode (uses all scenes)")
+        else:
+            scene_ids = [s.strip() for s in args.scenes.split(",")]
+            print(f"  Using specified scenes: {scene_ids}")
 
     # Initialize generators
     generator = ShortGenerator()
     scene_generator = ShortSceneGenerator()
 
     # Generate short script
-    print("Analyzing script for best hook...")
+    if mode == "summary":
+        print("Analyzing script for summary sweep...")
+    else:
+        print("Analyzing script for best hook...")
     result = generator.generate_short(
         project,
         variant=args.variant,
-        duration=args.duration,
+        duration=duration,
         scene_ids=scene_ids,
+        mode=mode,
         force=args.force,
         mock=args.mock,
     )
@@ -2289,25 +2305,41 @@ def cmd_short_script(args: argparse.Namespace) -> int:
         print("Error: Script not found. Run 'script' command first.", file=sys.stderr)
         return 1
 
+    # Get mode and duration
+    mode = getattr(args, "mode", "hook")
+    duration = args.duration
+
+    # Set default duration based on mode if not specified
+    if duration is None:
+        duration = 60 if mode == "summary" else 45
+
     print(f"Generating short script for: {project.id}")
     print(f"  Variant: {args.variant}")
-    print(f"  Duration: {args.duration}s")
+    print(f"  Mode: {mode}")
+    print(f"  Duration: {duration}s")
     print()
 
-    # Parse scene override if provided
+    # Parse scene override if provided (only for hook mode)
     scene_ids = None
     if args.scenes:
-        scene_ids = [s.strip() for s in args.scenes.split(",")]
-        print(f"  Using specified scenes: {scene_ids}")
+        if mode == "summary":
+            print("  Warning: --scenes is ignored in summary mode (uses all scenes)")
+        else:
+            scene_ids = [s.strip() for s in args.scenes.split(",")]
+            print(f"  Using specified scenes: {scene_ids}")
 
     generator = ShortGenerator()
 
-    print("Analyzing script for best hook...")
+    if mode == "summary":
+        print("Analyzing script for summary sweep...")
+    else:
+        print("Analyzing script for best hook...")
     result = generator.generate_short(
         project,
         variant=args.variant,
-        duration=args.duration,
+        duration=duration,
         scene_ids=scene_ids,
+        mode=mode,
         force=args.force,
         mock=args.mock,
     )
@@ -3261,10 +3293,16 @@ For manual voiceover recording:
     )
     short_generate_parser.add_argument("project", help="Project ID")
     short_generate_parser.add_argument(
+        "--mode", "-m",
+        choices=["hook", "summary"],
+        default="hook",
+        help="Generation mode: 'hook' (deep dive into selected scenes) or 'summary' (rapid sweep of all scenes)",
+    )
+    short_generate_parser.add_argument(
         "--duration", "-d",
         type=int,
-        default=45,
-        help="Target duration in seconds (default: 45, range: 30-60)",
+        default=None,
+        help="Target duration in seconds (default: 45 for hook, 60 for summary, max: 60)",
     )
     short_generate_parser.add_argument(
         "--variant",
@@ -3273,7 +3311,7 @@ For manual voiceover recording:
     )
     short_generate_parser.add_argument(
         "--scenes",
-        help="Override scene selection (comma-separated scene IDs)",
+        help="Override scene selection (comma-separated scene IDs, hook mode only)",
     )
     short_generate_parser.add_argument(
         "--force", "-f",
@@ -3304,10 +3342,16 @@ For manual voiceover recording:
     )
     short_script_parser.add_argument("project", help="Project ID")
     short_script_parser.add_argument(
+        "--mode", "-m",
+        choices=["hook", "summary"],
+        default="hook",
+        help="Generation mode: 'hook' (deep dive into selected scenes) or 'summary' (rapid sweep of all scenes)",
+    )
+    short_script_parser.add_argument(
         "--duration", "-d",
         type=int,
-        default=45,
-        help="Target duration in seconds (default: 45, range: 30-60)",
+        default=None,
+        help="Target duration in seconds (default: 45 for hook, 60 for summary, max: 60)",
     )
     short_script_parser.add_argument(
         "--variant",
@@ -3316,7 +3360,7 @@ For manual voiceover recording:
     )
     short_script_parser.add_argument(
         "--scenes",
-        help="Override scene selection (comma-separated scene IDs)",
+        help="Override scene selection (comma-separated scene IDs, hook mode only)",
     )
     short_script_parser.add_argument(
         "--force", "-f",

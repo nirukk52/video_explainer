@@ -37,24 +37,34 @@ class TestShortModels:
         assert config.target_duration_seconds == 30
 
     def test_short_scene(self):
+        """Test ShortScene without condensed_narration (now at script level)."""
         scene = ShortScene(
             source_scene_id="scene1_hook",
-            condensed_narration="This is the condensed version.",
             duration_seconds=20.0,
         )
         assert scene.source_scene_id == "scene1_hook"
-        assert scene.condensed_narration == "This is the condensed version."
+        assert scene.condensed_narration == ""  # Default empty
         assert scene.duration_seconds == 20.0
 
+    def test_short_scene_with_deprecated_narration(self):
+        """Test ShortScene with deprecated condensed_narration for backwards compatibility."""
+        scene = ShortScene(
+            source_scene_id="scene1_hook",
+            condensed_narration="Legacy narration",
+            duration_seconds=20.0,
+        )
+        assert scene.condensed_narration == "Legacy narration"
+
     def test_short_script(self):
+        """Test ShortScript with condensed_narration at script level."""
         script = ShortScript(
             source_project="test-project",
             title="Test Short",
+            condensed_narration="This is the full condensed narration for the short.",
             hook_question="How did they solve this?",
             scenes=[
                 ShortScene(
                     source_scene_id="scene1",
-                    condensed_narration="Test narration",
                     duration_seconds=20.0,
                 )
             ],
@@ -64,7 +74,9 @@ class TestShortModels:
         )
         assert script.source_project == "test-project"
         assert script.title == "Test Short"
+        assert script.condensed_narration == "This is the full condensed narration for the short."
         assert len(script.scenes) == 1
+        assert script.scenes[0].condensed_narration == ""  # Not in scene
         assert script.total_duration_seconds == 45.0
 
     def test_hook_analysis(self):
@@ -251,11 +263,11 @@ class TestShortSceneGenerator:
         return ShortScript(
             source_project="test-project",
             title="Test Short Video",
+            condensed_narration="Punchy content here.",  # At script level
             hook_question="How did they solve this impossible problem?",
             scenes=[
                 ShortScene(
                     source_scene_id="scene1_hook",
-                    condensed_narration="Punchy content here.",
                     duration_seconds=20.0,
                 )
             ],
@@ -686,11 +698,11 @@ class TestCTABeatTiming:
         return ShortScript(
             source_project="test-project",
             title="Test Short",
+            condensed_narration="Test narration content here.",  # At script level
             hook_question="How did they solve this?",
             scenes=[
                 ShortScene(
                     source_scene_id="scene1",
-                    condensed_narration="Test narration content here.",
                     duration_seconds=20.0,
                 )
             ],

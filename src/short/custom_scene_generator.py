@@ -23,158 +23,87 @@ from ..understanding.llm_provider import ClaudeCodeLLMProvider
 from .models import ShortsStoryboard, ShortsBeat
 
 
-# Constraint-focused system prompt - no examples, just rules
-SHORTS_SCENE_SYSTEM_PROMPT = """You are an expert React/Remotion developer creating animated scene components for YouTube Shorts.
+# =============================================================================
+# SHORTS-SPECIFIC CONSTRAINTS
+# =============================================================================
+# These are the ONLY shorts-specific requirements that aren't in the Remotion skill.
+# General Remotion knowledge (interpolate, spring, etc.) comes from the skill files.
 
-## CRITICAL CONSTRAINTS (MUST FOLLOW)
+SHORTS_CONSTRAINTS = """
+## YouTube Shorts Constraints
+
+These constraints are specific to vertical YouTube Shorts format.
 
 ### Canvas & Layout
 - Canvas: 1080x1920 (vertical, mobile-first)
-- Visual area: Top 70% only (0-1344px) - bottom 30% is for captions
+- Visual area: Top 70% only (0-1344px) - bottom 30% reserved for captions
 - All content must fit within this visual area
-- Use `const visualHeight = height * 0.7;` to get the visual area height
+- Use `const visualHeight = height * 0.7;` to calculate visual area height
 
-### Dark Theme (MANDATORY)
-- Background: Use `COLORS.backgroundGradient` for the AbsoluteFill background
-- Text: White (`COLORS.text`) for primary, dim gray (`COLORS.textDim`) for secondary
-- Accents: Vibrant colors that pop on dark backgrounds (cyan, orange, green, purple)
+### Dark Theme (MANDATORY for Shorts)
+- Background: Always use `COLORS.backgroundGradient` from "./styles"
+- Text: White (`COLORS.text`) for primary, gray (`COLORS.textDim`) for secondary
+- Accents: Vibrant colors (cyan, orange, green, purple) that pop on dark backgrounds
+- NEVER use light/white backgrounds
 
-### Animation Speed (FAST & PUNCHY)
-- Entry animations: 10-15 frames (NOT 30+)
-- Spring config: { damping: 12, stiffness: 120 }
+### Animation Speed (FAST & PUNCHY for Shorts)
+- Entry animations: 10-15 frames (NOT 30+ like full videos)
+- Spring config: `{ damping: 12, stiffness: 120 }`
 - Stagger delays: 5-8 frames between elements
 - Start animations 5-10 frames BEFORE the word is spoken
 
-### Typography (LARGE FOR MOBILE)
-- Main text: 72-96px scaled
-- Secondary text: 48-64px scaled
-- Labels: 36-48px scaled
+### Typography (LARGE for Mobile)
+- Main text: 72-96px (scaled)
+- Secondary text: 48-64px (scaled)
+- Labels: 36-48px (scaled)
 - Everything must be readable on a phone screen
 
-### Imports (MANDATORY)
+### Required Imports
 ```typescript
 import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame, useVideoConfig, spring } from "remotion";
 import { COLORS, FONTS } from "./styles";
 ```
 
-### Component Structure with PHASE-BASED ANIMATION (MANDATORY)
+### Component Interface
 ```typescript
 interface BeatNSceneProps {
   startFrame?: number;
 }
-
-export const BeatNScene: React.FC<BeatNSceneProps> = ({ startFrame = 0 }) => {
-  const frame = useCurrentFrame();
-  const { fps, width, height } = useVideoConfig();
-  const localFrame = frame - startFrame;
-  const scale = Math.min(width / 1080, height / 1920);
-
-  // Visual area - top 70% only
-  const visualHeight = height * 0.7;
-
-  // Phase timing synced with voiceover (CALCULATED FROM WORD TIMESTAMPS):
-  // Phase 1: [words 1-N] (Xs-Ys) → frames 0-A
-  // Phase 2: [words N-M] (Ys-Zs) → frames A-B
-  // Phase 3: [words M-end] (Zs-end) → frames B-total
-  const phase1End = XXX;  // Calculate from word timestamps
-  const phase2End = YYY;  // Calculate from word timestamps
-  const phase3End = ZZZ;  // Total frames
-
-  // IMPORTANT: Use adaptive fade times to prevent "inputRange must be monotonically increasing" errors
-  // When phases are short (<30 frames), hardcoded fade times can cause [0, 15, 12, 27] which fails
-  const getFadeTime = (duration: number) => Math.min(10, Math.floor(duration / 3));
-  const fade1 = getFadeTime(phase1End);
-  const fade2 = getFadeTime(phase2End - phase1End);
-  const fade3 = getFadeTime(phase3End - phase2End);
-
-  // Phase transitions (smooth crossfades with adaptive timing)
-  const phase1Opacity = interpolate(localFrame, [0, fade1, phase1End - fade1, phase1End], [0, 1, 1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const phase2Opacity = interpolate(localFrame, [phase1End - fade2, phase1End + fade2, phase2End - fade2, phase2End], [0, 1, 1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const phase3Opacity = interpolate(localFrame, [phase2End - fade3, phase2End + fade3], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  return (
-    <AbsoluteFill style={{ background: COLORS.backgroundGradient, fontFamily: FONTS.primary }}>
-      {/* Phase 1 content */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: visualHeight, opacity: phase1Opacity }}>
-        {/* Phase 1 visualization */}
-      </div>
-
-      {/* Phase 2 content */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: visualHeight, opacity: phase2Opacity }}>
-        {/* Phase 2 visualization */}
-      </div>
-
-      {/* Phase 3 content */}
-      <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: visualHeight, opacity: phase3Opacity }}>
-        {/* Phase 3 visualization */}
-      </div>
-    </AbsoluteFill>
-  );
-};
 ```
 
-### Color Palette (DARK THEME - from ./styles)
-- COLORS.background: "#0a0a0f" (dark)
+### Phase-Based Animation (CRITICAL for Shorts)
+Each shorts scene MUST have 2-3 phases synced with the voiceover:
+1. Each phase shows a DIFFERENT visual matching what's being said
+2. Phase boundaries are calculated from word timestamps (seconds * 30 = frames)
+3. Phases crossfade smoothly using interpolate with adaptive fade times
+4. Use `getFadeTime = (duration) => Math.min(10, Math.floor(duration / 3))` to prevent monotonic errors
+
+### Color Palette (from ./styles)
+- COLORS.background: "#0a0a0f"
 - COLORS.backgroundGradient: "linear-gradient(180deg, #0a0a0f 0%, #1a1a2e 100%)"
-- COLORS.text: "#ffffff" (white)
-- COLORS.textDim: "#b0b0b0" (gray)
+- COLORS.text: "#ffffff"
+- COLORS.textDim: "#b0b0b0"
 - COLORS.primary: "#00d4ff" (cyan)
 - COLORS.secondary: "#ff6b35" (orange)
 - COLORS.success: "#22c55e" (green)
-- COLORS.error: "#ef4444" (red)
-- COLORS.purple: "#a855f7" (purple)
+- COLORS.purple: "#a855f7"
 
-## PHASE-BASED VISUAL SYNC (CRITICAL)
-
-Each scene MUST have 2-3 phases that match the voiceover progression:
-1. Analyze the word timestamps to identify natural phrase breaks
-2. Calculate phase boundaries: phase1End = (first_phrase_end_seconds) * 30
-3. Each phase shows a DIFFERENT visual that matches what's being said
-4. Phases crossfade smoothly (15-frame overlap)
-
-Example: If caption is "Text tokens are simple. But images have millions of pixels."
-- Phase 1 (frames 0-90): Show text tokens visual
-- Phase 2 (frames 90-180): Show image/pixels visual
-- The visual CHANGES when the narration changes topic
-
-## YOUR JOB
-
-1. Study the word timestamps - identify 2-3 natural phrase breaks
-2. Calculate phase timing (convert seconds to frames: seconds * 30)
-3. Design a different visual for each phase that matches the voiceover
-4. Create STUNNING visuals that SHOW the concept, don't just display text
-5. Use the dark theme consistently - all backgrounds use backgroundGradient
-
-## WHAT MAKES GOOD VISUALS
-
-- Show MECHANISMS, not just icons (if explaining attention, show the actual computation)
-- Use MOTION to tell the story (data flowing, elements transforming)
-- Make elements LARGE and BOLD (this is mobile-first)
-- Use CONTRAST and GLOW for emphasis on dark backgrounds
-- Phase transitions match when the voiceover changes topic
-- Visual content matches what's being said at that moment
-
-## WHAT TO AVOID
-
-- Generic placeholder text like "[VISUAL]" or "Image here"
-- Tiny elements with lots of whitespace
-- Static visuals with no animation
-- Slow, boring transitions
-- Positioning elements in the bottom 30% (that's for captions)
-- Light/white backgrounds (use dark theme only)
-- Showing the same visual for the entire beat (use phases!)
-- Phase timing that doesn't match when words are spoken
+### What to Avoid
+- Positioning elements in bottom 30% (reserved for captions)
+- Light/white backgrounds (dark theme only)
+- Static visuals without animation
+- Same visual for entire beat (use phases!)
+- Slow transitions (keep it punchy)
 """
+
+# Default Remotion rules to load from the skill
+DEFAULT_REMOTION_RULES = [
+    "animations.md",
+    "timing.md",
+    "visual-styling.md",
+    "text-animations.md",
+]
 
 
 SHORTS_SCENE_GENERATION_PROMPT = """Generate a custom React/Remotion scene for this YouTube Shorts beat.
@@ -260,6 +189,7 @@ class ShortsCustomSceneGenerator:
         config: Config | None = None,
         working_dir: Path | None = None,
         timeout: int = 180,
+        remotion_skill_path: Path | None = None,
     ):
         """Initialize the generator.
 
@@ -267,10 +197,100 @@ class ShortsCustomSceneGenerator:
             config: Configuration object.
             working_dir: Working directory for Claude Code.
             timeout: Timeout for LLM calls in seconds.
+            remotion_skill_path: Path to Remotion skill rules directory.
+                Defaults to .claude/skills/remotion/rules/ in working directory.
         """
         self.config = config or load_config()
         self.working_dir = working_dir or Path.cwd()
         self.timeout = timeout
+
+        # Find Remotion skill rules directory
+        if remotion_skill_path:
+            self.remotion_skill_path = remotion_skill_path
+        else:
+            # Look for skill in working directory or project root
+            candidates = [
+                self.working_dir / ".claude" / "skills" / "remotion" / "rules",
+                Path(__file__).parent.parent.parent / ".claude" / "skills" / "remotion" / "rules",
+            ]
+            self.remotion_skill_path = next(
+                (p for p in candidates if p.exists()),
+                None
+            )
+
+        # Cache for loaded rules
+        self._remotion_rules_cache: dict[str, str] = {}
+
+    def _load_remotion_rules(
+        self,
+        rule_files: list[str] | None = None,
+    ) -> str:
+        """Load Remotion skill rules from the skill directory.
+
+        Args:
+            rule_files: List of rule file names to load (e.g., ["animations.md", "timing.md"]).
+                If None, uses DEFAULT_REMOTION_RULES.
+
+        Returns:
+            Combined content of all loaded rules.
+        """
+        if rule_files is None:
+            rule_files = DEFAULT_REMOTION_RULES
+
+        if not self.remotion_skill_path or not self.remotion_skill_path.exists():
+            return "<!-- Remotion skill rules not found. Using shorts constraints only. -->"
+
+        loaded_rules = []
+        for rule_file in rule_files:
+            # Check cache first
+            if rule_file in self._remotion_rules_cache:
+                loaded_rules.append(self._remotion_rules_cache[rule_file])
+                continue
+
+            rule_path = self.remotion_skill_path / rule_file
+            if rule_path.exists():
+                content = rule_path.read_text()
+                # Cache the content
+                self._remotion_rules_cache[rule_file] = content
+                loaded_rules.append(f"### {rule_file}\n\n{content}")
+
+        return "\n\n---\n\n".join(loaded_rules) if loaded_rules else "<!-- No Remotion rules loaded. -->"
+
+    def _build_system_prompt(
+        self,
+        rule_files: list[str] | None = None,
+    ) -> str:
+        """Build the system prompt by combining Remotion rules with shorts constraints.
+
+        Args:
+            rule_files: List of Remotion rule files to load.
+
+        Returns:
+            Complete system prompt for scene generation.
+        """
+        remotion_rules = self._load_remotion_rules(rule_files)
+
+        return f"""You are an expert React/Remotion developer creating animated scene components for YouTube Shorts.
+
+## Remotion Best Practices
+
+The following are Remotion best practices for animations, timing, and visual styling:
+
+{remotion_rules}
+
+---
+
+{SHORTS_CONSTRAINTS}
+
+## Your Task
+
+Create visually stunning scenes that:
+1. SHOW the concept (don't just display text)
+2. Use MOTION to tell the story
+3. Make elements LARGE and BOLD (mobile-first)
+4. Use the dark theme with vibrant accent colors
+5. Sync phase transitions with the voiceover timing
+"""
 
     def generate_all_scenes(
         self,
@@ -466,7 +486,10 @@ class ShortsCustomSceneGenerator:
             timeout=self.timeout,
         )
 
-        full_prompt = f"""{SHORTS_SCENE_SYSTEM_PROMPT}
+        # Build system prompt dynamically from Remotion skill + shorts constraints
+        system_prompt = self._build_system_prompt()
+
+        full_prompt = f"""{system_prompt}
 
 {prompt}
 

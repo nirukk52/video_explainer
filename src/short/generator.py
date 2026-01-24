@@ -10,11 +10,14 @@ from ..project.loader import Project
 from ..understanding.llm_provider import LLMProvider, get_llm_provider
 from .models import (
     ShortConfig,
+    ShortMode,
     ShortScene,
     ShortScript,
     ShortResult,
     HookAnalysis,
     CondensedNarration,
+    SummaryAnalysis,
+    SceneHighlight,
     VisualType,
     ShortsVisual,
     ShortsBeat,
@@ -226,6 +229,127 @@ IMPORTANT:
 - The condensed_narration should be tighter and punchier than the original
 - End with tension, not resolution
 - The CTA should feel natural and create urgency"""
+
+
+# =============================================================================
+# SUMMARY MODE PROMPTS
+# =============================================================================
+
+SUMMARY_ANALYSIS_SYSTEM_PROMPT = """You are an expert at creating viral YouTube Shorts that tease full-length videos.
+
+Your job is to analyze an ENTIRE video script and extract the most compelling teaser elements from EVERY scene. The goal is to create a rapid-fire montage that showcases the breadth and depth of the full video.
+
+For each scene, identify:
+- A 2-5 word "teaser phrase" that captures the essence
+- Any specific numbers that would hook viewers
+- The visual concept that best represents this layer
+
+The summary should create intrigue through ACCUMULATION - viewers should be overwhelmed by how much content exists and feel compelled to watch the full breakdown."""
+
+
+SUMMARY_ANALYSIS_USER_PROMPT_TEMPLATE = """Analyze this ENTIRE video script and extract teaser elements from EVERY scene.
+
+Script title: {title}
+Total scenes: {total_scenes}
+
+Script:
+{script_json}
+
+Current narrations for each scene:
+{narrations_json}
+
+For EACH scene, provide:
+1. A teaser_phrase (2-5 words that capture the essence)
+2. A key_number (specific stat if available, empty string if none)
+3. A visual_hint (what visual concept represents this: "grid", "flow", "number", "code", "diagram")
+
+Also determine:
+- narrative_arc: The overall story structure ("journey", "descent", "transformation", "discovery")
+- hook_opening: A compelling 1-2 sentence opening (e.g., "You press a key. 300 milliseconds later, an AI responds.")
+- intrigue_close: A closing line before CTA that emphasizes the breadth (e.g., "19 layers. From quantum physics to global networks.")
+
+Return JSON:
+{{
+  "scene_highlights": [
+    {{
+      "scene_id": "the_browser",
+      "scene_title": "The Browser",
+      "teaser_phrase": "60 frames per second",
+      "key_number": "16ms",
+      "visual_hint": "flow"
+    }},
+    ...
+  ],
+  "narrative_arc": "descent",
+  "hook_opening": "You press a key. 300 milliseconds later, an AI responds. In that blink of an eye—nineteen layers of technology.",
+  "intrigue_close": "Nineteen layers. From quantum physics to global networks.",
+  "total_scenes": {total_scenes}
+}}
+
+IMPORTANT:
+- Include ALL scenes - this is a summary, not a selection
+- Teaser phrases should be punchy and memorable
+- Extract specific numbers whenever possible (they hook viewers)
+- The hook_opening should create immediate curiosity
+- The intrigue_close should emphasize the SCALE of what's covered"""
+
+
+SUMMARY_NARRATION_SYSTEM_PROMPT = """You are an expert at creating rapid-fire, montage-style YouTube Short narrations.
+
+Your job is to create a SUMMARY narration that sweeps through an entire video's content in 60 seconds or less. Unlike hook-style shorts that deep-dive into one moment, summary shorts create intrigue through BREADTH.
+
+Style:
+- Rapid-fire, punchy phrases (2-5 words per concept)
+- Build momentum through accumulation
+- Use specific numbers to add credibility
+- Create a sense of overwhelming depth
+- End with scale/scope emphasis, not a question
+
+The viewer should think: "Wow, there's so much here - I need to see the full breakdown!"
+
+Structure:
+1. Hook opening (establish the premise)
+2. Rapid sweep through all layers (brief mention of each)
+3. Closing that emphasizes scale
+4. CTA driving to full video"""
+
+
+SUMMARY_NARRATION_USER_PROMPT_TEMPLATE = """Create a {duration}s summary narration that sweeps through ALL scenes of this video.
+
+Video title: {title}
+Total scenes: {total_scenes}
+
+Scene highlights to weave together:
+{scene_highlights_json}
+
+Narrative arc: {narrative_arc}
+Hook opening: {hook_opening}
+Intrigue close: {intrigue_close}
+
+Requirements:
+- Target word count: ~{word_count} words (2.5 words per second)
+- Touch on EVERY scene briefly (2-5 words each during the sweep)
+- Use specific numbers where available
+- Build momentum through the sweep
+- End with the intrigue_close, NOT a question
+
+CTA voiceover to generate (8-10 seconds, ~20-25 words):
+Should emphasize the depth available and drive to full video.
+Example: "Nineteen layers of technology. Each one a feat of engineering. See the complete journey—full breakdown in the description."
+
+Return JSON:
+{{
+  "condensed_narration": "The rapid-fire sweep narration covering all scenes...",
+  "cta_narration": "Nineteen layers of technology. Each one a feat of engineering. See the complete journey—full breakdown in the description.",
+  "intrigue_close": "Nineteen layers. From quantum physics to global networks."
+}}
+
+IMPORTANT:
+- This is a SUMMARY, not a deep dive - touch everything briefly
+- Use the teaser_phrases as inspiration but create flowing prose
+- Numbers hook viewers - include as many as fit naturally
+- Build a sense of overwhelming scale and depth
+- The narration should feel like a breathless sweep through layers"""
 
 
 VISUAL_EXTRACTION_SYSTEM_PROMPT = """You are an expert at creating VISUALLY COMPELLING content for viral YouTube Shorts.
@@ -440,12 +564,118 @@ class ShortGenerator:
             hook_question=result.get("hook_question", "But how did they solve this?"),
         )
 
+    def analyze_for_summary(
+        self,
+        script: Script,
+        narrations: list[dict[str, Any]],
+    ) -> SummaryAnalysis:
+        """Analyze script to extract teaser elements from ALL scenes for summary mode.
+
+        Unlike analyze_for_hook which selects scenes, this extracts highlights
+        from every scene to create a rapid-fire summary.
+
+        Args:
+            script: The full video script.
+            narrations: List of scene narrations.
+
+        Returns:
+            SummaryAnalysis with highlights from all scenes.
+        """
+        script_data = script.model_dump()
+        total_scenes = len(script_data.get("scenes", []))
+
+        prompt = SUMMARY_ANALYSIS_USER_PROMPT_TEMPLATE.format(
+            title=script.title,
+            total_scenes=total_scenes,
+            script_json=json.dumps(script_data, indent=2),
+            narrations_json=json.dumps(narrations, indent=2),
+        )
+
+        result = self.llm.generate_json(prompt, SUMMARY_ANALYSIS_SYSTEM_PROMPT)
+
+        # Parse scene highlights
+        scene_highlights = []
+        for h in result.get("scene_highlights", []):
+            scene_highlights.append(
+                SceneHighlight(
+                    scene_id=h.get("scene_id", ""),
+                    scene_title=h.get("scene_title", ""),
+                    teaser_phrase=h.get("teaser_phrase", ""),
+                    key_number=h.get("key_number", ""),
+                    visual_hint=h.get("visual_hint", ""),
+                )
+            )
+
+        return SummaryAnalysis(
+            scene_highlights=scene_highlights,
+            narrative_arc=result.get("narrative_arc", "journey"),
+            hook_opening=result.get("hook_opening", ""),
+            intrigue_close=result.get("intrigue_close", ""),
+            total_scenes=total_scenes,
+        )
+
+    def generate_summary_narration(
+        self,
+        script: Script,
+        narrations: list[dict[str, Any]],
+        summary_analysis: SummaryAnalysis,
+        target_duration: int = 60,
+    ) -> CondensedNarration:
+        """Generate summary narration that sweeps through ALL scenes.
+
+        Unlike generate_condensed_narration which deep-dives into selected scenes,
+        this creates a rapid-fire overview of the entire video content.
+
+        Args:
+            script: The full video script.
+            narrations: List of all scene narrations.
+            summary_analysis: Analysis with highlights from all scenes.
+            target_duration: Target duration in seconds (max 60).
+
+        Returns:
+            CondensedNarration with summary narration and CTA.
+        """
+        # Cap at 60 seconds for shorts
+        target_duration = min(target_duration, 60)
+
+        # Calculate target word count (2.5 words per second)
+        word_count = int(target_duration * 2.5)
+
+        # Convert scene highlights to JSON for the prompt
+        highlights_data = [h.model_dump() for h in summary_analysis.scene_highlights]
+
+        prompt = SUMMARY_NARRATION_USER_PROMPT_TEMPLATE.format(
+            duration=target_duration,
+            title=script.title,
+            total_scenes=summary_analysis.total_scenes,
+            scene_highlights_json=json.dumps(highlights_data, indent=2),
+            narrative_arc=summary_analysis.narrative_arc,
+            hook_opening=summary_analysis.hook_opening,
+            intrigue_close=summary_analysis.intrigue_close,
+            word_count=word_count,
+        )
+
+        result = self.llm.generate_json(prompt, SUMMARY_NARRATION_SYSTEM_PROMPT)
+
+        return CondensedNarration(
+            condensed_narration=result.get("condensed_narration", ""),
+            cta_narration=result.get(
+                "cta_narration",
+                "See the complete journey. Full breakdown in the description.",
+            ),
+            hook_question=result.get(
+                "intrigue_close",
+                summary_analysis.intrigue_close or "The full journey awaits.",
+            ),
+        )
+
     def generate_short(
         self,
         project: Project,
         variant: str = "default",
-        duration: int = 45,
+        duration: int | None = None,
         scene_ids: list[str] | None = None,
+        mode: str = "hook",
         force: bool = False,
         mock: bool = False,
     ) -> ShortResult:
@@ -454,14 +684,32 @@ class ShortGenerator:
         Args:
             project: The source project.
             variant: Variant name for multiple shorts from same project.
-            duration: Target duration in seconds (30-60).
-            scene_ids: Optional override for scene selection.
+            duration: Target duration in seconds. Defaults to 45 for hook mode, 60 for summary mode.
+            scene_ids: Optional override for scene selection (only for hook mode).
+            mode: Generation mode - "hook" (deep dive into selected scenes) or "summary" (sweep all scenes).
             force: Force regeneration even if files exist.
             mock: Use mock data for testing.
 
         Returns:
             ShortResult with paths to generated files.
         """
+        # Validate and normalize mode
+        try:
+            short_mode = ShortMode(mode)
+        except ValueError:
+            return ShortResult(
+                success=False,
+                variant=variant,
+                error=f"Invalid mode: {mode}. Must be 'hook' or 'summary'.",
+            )
+
+        # Set default duration based on mode
+        if duration is None:
+            duration = 60 if short_mode == ShortMode.SUMMARY else 45
+
+        # Cap summary mode at 60 seconds
+        if short_mode == ShortMode.SUMMARY and duration > 60:
+            duration = 60
         # Setup directories
         variant_dir = project.root_dir / "short" / variant
         variant_dir.mkdir(parents=True, exist_ok=True)
@@ -503,56 +751,81 @@ class ShortGenerator:
                 narrations_data = json.load(f)
             narrations = narrations_data.get("scenes", [])
 
-            # 2. Analyze for best hook (or use override)
-            if scene_ids:
-                # User provided scene IDs - validate them
-                valid_scene_ids = {n.get("scene_id") for n in narrations}
-                invalid_ids = set(scene_ids) - valid_scene_ids
-                if invalid_ids:
-                    return ShortResult(
-                        success=False,
-                        variant=variant,
-                        error=f"Invalid scene IDs: {invalid_ids}. Valid IDs: {valid_scene_ids}",
-                    )
-                selected_scene_ids = scene_ids
-                hook_question = "But how did they solve this?"  # Default
-            else:
-                # LLM selects best hook
+            # 2. Analyze and generate narration based on mode
+            if short_mode == ShortMode.SUMMARY:
+                # Summary mode: sweep through ALL scenes
+                all_scene_ids = [n.get("scene_id") for n in narrations]
+
                 if mock:
-                    # Use first 2 scenes for mock
-                    selected_scene_ids = [n.get("scene_id") for n in narrations[:2]]
-                    hook_question = "But how did they actually solve this impossible problem?"
+                    condensed_narration = CondensedNarration(
+                        condensed_narration="This is a mock summary narration for testing. It would normally contain a rapid-fire sweep through all scenes.",
+                        cta_narration="See the complete journey. Full breakdown in the description.",
+                        hook_question="The full journey awaits.",
+                    )
                 else:
-                    hook_analysis = self.analyze_for_hook(script, narrations)
-                    selected_scene_ids = hook_analysis.selected_scene_ids
-                    hook_question = hook_analysis.hook_question
+                    summary_analysis = self.analyze_for_summary(script, narrations)
+                    condensed_narration = self.generate_summary_narration(
+                        script,
+                        narrations,
+                        summary_analysis,
+                        target_duration=duration,
+                    )
 
-            # 3. Generate condensed narration
-            if mock:
-                condensed_narration = CondensedNarration(
-                    condensed_narration="This is a mock condensed narration for testing. It would normally contain punchy, dense content from the selected scenes.",
-                    cta_narration="Want to know how they solved this? Full breakdown in the description.",
-                    hook_question=hook_question,
-                )
+                selected_scene_ids = all_scene_ids
+                cta_text = "See the complete journey"
+
             else:
-                condensed_narration = self.generate_condensed_narration(
-                    script,
-                    narrations,
-                    selected_scene_ids,
-                    target_duration=duration,
-                )
+                # Hook mode: select compelling scenes for deep dive
+                if scene_ids:
+                    # User provided scene IDs - validate them
+                    valid_scene_ids = {n.get("scene_id") for n in narrations}
+                    invalid_ids = set(scene_ids) - valid_scene_ids
+                    if invalid_ids:
+                        return ShortResult(
+                            success=False,
+                            variant=variant,
+                            error=f"Invalid scene IDs: {invalid_ids}. Valid IDs: {valid_scene_ids}",
+                        )
+                    selected_scene_ids = scene_ids
+                    hook_question = "But how did they solve this?"  # Default
+                else:
+                    # LLM selects best hook
+                    if mock:
+                        # Use first 2 scenes for mock
+                        selected_scene_ids = [n.get("scene_id") for n in narrations[:2]]
+                        hook_question = "But how did they actually solve this impossible problem?"
+                    else:
+                        hook_analysis = self.analyze_for_hook(script, narrations)
+                        selected_scene_ids = hook_analysis.selected_scene_ids
+                        hook_question = hook_analysis.hook_question
 
-            # 4. Build short script
+                # Generate condensed narration for hook mode
+                if mock:
+                    condensed_narration = CondensedNarration(
+                        condensed_narration="This is a mock condensed narration for testing. It would normally contain punchy, dense content from the selected scenes.",
+                        cta_narration="Want to know how they solved this? Full breakdown in the description.",
+                        hook_question=hook_question,
+                    )
+                else:
+                    condensed_narration = self.generate_condensed_narration(
+                        script,
+                        narrations,
+                        selected_scene_ids,
+                        target_duration=duration,
+                    )
+
+                cta_text = "Full breakdown in description"
+
+            # 3. Build short script
             short_scenes = []
-            scene_duration = (duration - 5) / len(
-                selected_scene_ids
-            )  # Reserve 5s for CTA
+            # Reserve 8s for CTA in summary mode (longer CTA), 5s for hook mode
+            cta_duration = 8 if short_mode == ShortMode.SUMMARY else 5
+            scene_duration = (duration - cta_duration) / len(selected_scene_ids)
 
             for scene_id in selected_scene_ids:
                 short_scenes.append(
                     ShortScene(
                         source_scene_id=scene_id,
-                        condensed_narration=condensed_narration.condensed_narration,
                         duration_seconds=scene_duration,
                     )
                 )
@@ -560,16 +833,18 @@ class ShortGenerator:
             short_script = ShortScript(
                 source_project=project.id,
                 title=f"{script.title} - Short",
+                condensed_narration=condensed_narration.condensed_narration,
                 hook_question=condensed_narration.hook_question,
                 scenes=short_scenes,
-                cta_text="Full breakdown in description",
+                cta_text=cta_text,
                 cta_narration=condensed_narration.cta_narration,
                 total_duration_seconds=duration,
+                mode=short_mode,
             )
 
-            # 5. Save short script
-            with open(short_script_path, "w") as f:
-                json.dump(short_script.model_dump(), f, indent=2)
+            # 4. Save short script
+            with open(short_script_path, "w", encoding="utf-8") as f:
+                json.dump(short_script.model_dump(), f, indent=2, ensure_ascii=False)
 
             return ShortResult(
                 success=True,
@@ -607,16 +882,15 @@ class ShortGenerator:
         return ShortScript(
             source_project=project_id,
             title=f"{topic} - Short",
+            condensed_narration=f"Here's something that will blow your mind about {topic}. The numbers are staggering—and the solution? Completely unexpected. Traditional approaches failed completely. But one team found a way that nobody expected.",
             hook_question=f"But how did they actually solve the {topic} problem?",
             scenes=[
                 ShortScene(
                     source_scene_id="scene1_hook",
-                    condensed_narration=f"Here's something that will blow your mind about {topic}. The numbers are staggering - and the solution? Completely unexpected.",
                     duration_seconds=(duration - 5) / 2,
                 ),
                 ShortScene(
                     source_scene_id="scene2_insight",
-                    condensed_narration=f"Traditional approaches failed completely. But one team found a way that nobody expected.",
                     duration_seconds=(duration - 5) / 2,
                 ),
             ],
@@ -633,8 +907,8 @@ class ShortGenerator:
             path: Path to save the script.
         """
         path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "w") as f:
-            json.dump(short_script.model_dump(), f, indent=2)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(short_script.model_dump(), f, indent=2, ensure_ascii=False)
 
     @staticmethod
     def load_short_script(path: Path) -> ShortScript:
@@ -706,10 +980,8 @@ class ShortGenerator:
         Returns:
             ShortsStoryboard with visual beats.
         """
-        # Combine all narrations
-        full_narration = " ".join(
-            scene.condensed_narration for scene in short_script.scenes
-        )
+        # Get the condensed narration from the script
+        full_narration = short_script.condensed_narration
 
         # Calculate timing
         content_duration = short_script.total_duration_seconds - 5  # Reserve 5s for CTA
@@ -915,8 +1187,8 @@ class ShortGenerator:
             "voiceover_path": storyboard.voiceover_path,
         }
 
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
 
     @staticmethod
     def load_shorts_storyboard(path: Path) -> ShortsStoryboard:

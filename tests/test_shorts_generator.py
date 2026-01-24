@@ -6,7 +6,11 @@ from unittest.mock import patch, MagicMock
 import tempfile
 import json
 
-from src.short.custom_scene_generator import ShortsCustomSceneGenerator
+from src.short.custom_scene_generator import (
+    ShortsCustomSceneGenerator,
+    SHORTS_CONSTRAINTS,
+    DEFAULT_REMOTION_RULES,
+)
 from src.short.models import ShortsStoryboard, ShortsBeat, ShortsVisual, VisualType
 
 
@@ -92,6 +96,196 @@ def sample_storyboard(sample_visual):
             ),
         ],
     )
+
+
+# ============================================================================
+# Remotion Skill Loading Tests
+# ============================================================================
+
+
+class TestLoadRemotionRules:
+    """Tests for _load_remotion_rules method."""
+
+    def test_loads_rules_from_skill_directory(self):
+        """Test loading rules from a valid skill directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create mock skill directory structure
+            skill_dir = Path(tmpdir) / ".claude" / "skills" / "remotion" / "rules"
+            skill_dir.mkdir(parents=True)
+
+            # Create mock rule files
+            (skill_dir / "animations.md").write_text("# Animations\nUse interpolate for smooth animations.")
+            (skill_dir / "timing.md").write_text("# Timing\nUse spring for natural motion.")
+
+            generator = ShortsCustomSceneGenerator(
+                remotion_skill_path=skill_dir,
+            )
+
+            rules = generator._load_remotion_rules(["animations.md", "timing.md"])
+
+            assert "Animations" in rules
+            assert "interpolate" in rules
+            assert "Timing" in rules
+            assert "spring" in rules
+
+    def test_returns_fallback_when_skill_not_found(self):
+        """Test fallback when skill directory doesn't exist."""
+        generator = ShortsCustomSceneGenerator(
+            remotion_skill_path=Path("/nonexistent/path"),
+        )
+
+        rules = generator._load_remotion_rules(["animations.md"])
+
+        assert "not found" in rules.lower()
+
+    def test_caches_loaded_rules(self):
+        """Test that loaded rules are cached."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "rules"
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "animations.md").write_text("# Animations content")
+
+            generator = ShortsCustomSceneGenerator(
+                remotion_skill_path=skill_dir,
+            )
+
+            # Load twice
+            generator._load_remotion_rules(["animations.md"])
+            generator._load_remotion_rules(["animations.md"])
+
+            # Should be cached
+            assert "animations.md" in generator._remotion_rules_cache
+            assert generator._remotion_rules_cache["animations.md"] == "# Animations content"
+
+    def test_uses_default_rules_when_none_specified(self):
+        """Test that DEFAULT_REMOTION_RULES is used when no rules specified."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "rules"
+            skill_dir.mkdir(parents=True)
+
+            # Create all default rule files
+            for rule_file in DEFAULT_REMOTION_RULES:
+                (skill_dir / rule_file).write_text(f"# {rule_file} content")
+
+            generator = ShortsCustomSceneGenerator(
+                remotion_skill_path=skill_dir,
+            )
+
+            rules = generator._load_remotion_rules()  # No args = use defaults
+
+            for rule_file in DEFAULT_REMOTION_RULES:
+                assert rule_file in rules
+
+    def test_handles_missing_individual_rules(self):
+        """Test handling when some rule files are missing."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "rules"
+            skill_dir.mkdir(parents=True)
+
+            # Only create one rule file
+            (skill_dir / "animations.md").write_text("# Animations")
+
+            generator = ShortsCustomSceneGenerator(
+                remotion_skill_path=skill_dir,
+            )
+
+            # Request two files, only one exists
+            rules = generator._load_remotion_rules(["animations.md", "nonexistent.md"])
+
+            assert "Animations" in rules
+            # Should not crash, just skip missing file
+
+
+class TestBuildSystemPrompt:
+    """Tests for _build_system_prompt method."""
+
+    def test_combines_remotion_rules_and_shorts_constraints(self):
+        """Test that system prompt includes both Remotion rules and shorts constraints."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "rules"
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "animations.md").write_text("# Animation Rules\nUse interpolate.")
+
+            generator = ShortsCustomSceneGenerator(
+                remotion_skill_path=skill_dir,
+            )
+
+            prompt = generator._build_system_prompt(["animations.md"])
+
+            # Should contain Remotion rules
+            assert "Animation Rules" in prompt
+            assert "interpolate" in prompt
+
+            # Should contain shorts constraints
+            assert "1080x1920" in prompt  # Vertical canvas
+            assert "Visual area: Top 70%" in prompt
+            assert "Dark Theme" in prompt
+
+    def test_includes_shorts_constraints(self):
+        """Test that shorts-specific constraints are included."""
+        generator = ShortsCustomSceneGenerator(
+            remotion_skill_path=Path("/nonexistent"),  # Force fallback
+        )
+
+        prompt = generator._build_system_prompt()
+
+        # Check for shorts-specific content
+        assert "YouTube Shorts" in prompt
+        assert "1080x1920" in prompt
+        assert "COLORS.backgroundGradient" in prompt
+        assert "Phase-Based Animation" in prompt
+
+    def test_prompt_structure(self):
+        """Test the overall structure of the generated prompt."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            skill_dir = Path(tmpdir) / "rules"
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "timing.md").write_text("# Timing content")
+
+            generator = ShortsCustomSceneGenerator(
+                remotion_skill_path=skill_dir,
+            )
+
+            prompt = generator._build_system_prompt(["timing.md"])
+
+            # Should have section headers
+            assert "Remotion Best Practices" in prompt
+            assert "Your Task" in prompt
+
+
+class TestShortsConstraintsContent:
+    """Tests for the SHORTS_CONSTRAINTS constant."""
+
+    def test_contains_canvas_dimensions(self):
+        """Test that canvas dimensions are specified."""
+        assert "1080x1920" in SHORTS_CONSTRAINTS
+        assert "vertical" in SHORTS_CONSTRAINTS.lower()
+
+    def test_contains_visual_area_constraint(self):
+        """Test that visual area constraint is specified."""
+        assert "Top 70%" in SHORTS_CONSTRAINTS
+        assert "1344" in SHORTS_CONSTRAINTS  # 1920 * 0.7
+
+    def test_contains_dark_theme_requirement(self):
+        """Test that dark theme is required."""
+        assert "Dark Theme" in SHORTS_CONSTRAINTS
+        assert "COLORS.backgroundGradient" in SHORTS_CONSTRAINTS
+
+    def test_contains_animation_speed_guidelines(self):
+        """Test that fast animation guidelines are included."""
+        assert "10-15 frames" in SHORTS_CONSTRAINTS
+        assert "damping: 12" in SHORTS_CONSTRAINTS
+        assert "stiffness: 120" in SHORTS_CONSTRAINTS
+
+    def test_contains_typography_sizes(self):
+        """Test that mobile typography sizes are specified."""
+        assert "72-96px" in SHORTS_CONSTRAINTS  # Main text
+        assert "48-64px" in SHORTS_CONSTRAINTS  # Secondary
+
+    def test_contains_phase_based_animation_requirement(self):
+        """Test that phase-based animation is required."""
+        assert "Phase-Based Animation" in SHORTS_CONSTRAINTS
+        assert "2-3 phases" in SHORTS_CONSTRAINTS
 
 
 # ============================================================================
@@ -487,3 +681,34 @@ export const Beat1Scene = () => <AbsoluteFill />;
 
             # No scenes should be generated
             assert len(results["scenes"]) == 0
+
+    def test_uses_remotion_skill_when_available(self, sample_storyboard, sample_visual):
+        """Test that Remotion skill rules are loaded when available."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Create mock skill directory
+            skill_dir = Path(tmpdir) / "skills" / "remotion" / "rules"
+            skill_dir.mkdir(parents=True)
+            (skill_dir / "animations.md").write_text("# Custom Animation Rules\nThese are project-specific rules.")
+
+            generator = ShortsCustomSceneGenerator(
+                remotion_skill_path=skill_dir,
+            )
+
+            prompt = generator._build_system_prompt(["animations.md"])
+
+            # Should include the custom rules
+            assert "Custom Animation Rules" in prompt
+            assert "project-specific" in prompt
+
+    def test_generator_works_without_skill_directory(self, sample_storyboard):
+        """Test that generator works even if skill directory is missing."""
+        generator = ShortsCustomSceneGenerator(
+            remotion_skill_path=Path("/definitely/not/a/real/path"),
+        )
+
+        # Should not raise, just use fallback
+        prompt = generator._build_system_prompt()
+
+        # Should still have shorts constraints
+        assert "1080x1920" in prompt
+        assert "Dark Theme" in prompt

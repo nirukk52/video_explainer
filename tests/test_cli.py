@@ -2352,6 +2352,7 @@ class TestCmdShortScript:
         args.project = "test-project"
         args.projects_dir = str(mock_project_with_prereqs.parent)
         args.variant = "default"
+        args.mode = "hook"
         args.duration = 45
         args.scenes = None
         args.force = False
@@ -2435,11 +2436,11 @@ class TestCmdShortScenes:
         short_script = {
             "source_project": "test-project",
             "title": "Test Short",
+            "condensed_narration": "Test content.",  # At script level
             "hook_question": "How did they do it?",
             "scenes": [
                 {
                     "source_scene_id": "scene1",
-                    "condensed_narration": "Test content.",
                     "duration_seconds": 20.0,
                 }
             ],
@@ -2522,11 +2523,11 @@ class TestCmdShortVoiceover:
         short_script = {
             "source_project": "test-project",
             "title": "Test Short",
+            "condensed_narration": "Test content here.",  # At script level
             "hook_question": "How did they do it?",
             "scenes": [
                 {
                     "source_scene_id": "scene1",
-                    "condensed_narration": "Test content here.",
                     "duration_seconds": 20.0,
                 }
             ],
@@ -2635,11 +2636,11 @@ class TestCmdShortStoryboard:
         short_script = {
             "source_project": "test-project",
             "title": "Test Short",
+            "condensed_narration": "Test content here.",  # At script level
             "hook_question": "How did they do it?",
             "scenes": [
                 {
                     "source_scene_id": "scene1",
-                    "condensed_narration": "Test content here.",
                     "duration_seconds": 20.0,
                 }
             ],
@@ -2740,11 +2741,11 @@ class TestCmdShortStoryboard:
         short_script = {
             "source_project": "test-project",
             "title": "Test Short",
+            "condensed_narration": "Content.",  # At script level
             "hook_question": "How?",
             "scenes": [
                 {
                     "source_scene_id": "scene1",
-                    "condensed_narration": "Content.",
                     "duration_seconds": 20.0,
                 }
             ],
@@ -2847,6 +2848,7 @@ class TestShortSubcommandsIntegration:
         args.project = "test-project"
         args.projects_dir = str(mock_full_project.parent)
         args.variant = "test-variant"
+        args.mode = "hook"
         args.duration = 45
         args.scenes = None
         args.force = False

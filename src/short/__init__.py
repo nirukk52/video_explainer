@@ -16,6 +16,7 @@ Pipeline:
 
 from .models import (
     ShortConfig,
+    ShortMode,
     ShortScene,
     ShortScript,
     ShortResult,
@@ -24,6 +25,8 @@ from .models import (
     ShortsBeat,
     ShortsStoryboard,
     SceneComponentConfig,
+    SummaryAnalysis,
+    SceneHighlight,
 )
 from .generator import ShortGenerator
 from .scene_generator import ShortSceneGenerator
@@ -31,6 +34,7 @@ from .custom_scene_generator import ShortsCustomSceneGenerator
 
 __all__ = [
     "ShortConfig",
+    "ShortMode",
     "ShortScene",
     "ShortScript",
     "ShortResult",
@@ -39,6 +43,8 @@ __all__ = [
     "ShortsBeat",
     "ShortsStoryboard",
     "SceneComponentConfig",
+    "SummaryAnalysis",
+    "SceneHighlight",
     "ShortGenerator",
     "ShortSceneGenerator",
     "ShortsCustomSceneGenerator",

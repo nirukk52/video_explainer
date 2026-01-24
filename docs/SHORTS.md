@@ -4,28 +4,82 @@ Generate vertical shorts (1080x1920) optimized for YouTube Shorts, Instagram Ree
 
 ## Overview
 
-Shorts are condensed, hook-driven versions of your explainer video designed for mobile-first platforms.
+Shorts are condensed versions of your explainer video designed for mobile-first platforms. Two generation modes are available:
+
+**Hook Mode** (default): Deep dive into 1-3 compelling scenes, ending with a cliffhanger
+**Summary Mode**: Rapid-fire sweep through ALL scenes, creating intrigue through breadth
 
 **Features:**
 - Single-word captions (72px bold, uppercase, glow effect)
 - Dark gradient theme optimized for mobile
 - Phase-based animations synced with voiceover
 - Custom React scene generation for each beat
-- Automatic hook selection from most intriguing scenes
+- Automatic hook selection (hook mode) or full-video sweep (summary mode)
 
 ## Quick Start
 
 **Prerequisites:** Run `script` and `narration` commands first for your full video.
 
 ```bash
-# Generate everything end-to-end
+# Generate everything end-to-end (hook mode - default)
 python -m src.cli short generate <project>
+
+# Generate a summary short (sweeps all scenes)
+python -m src.cli short generate <project> --mode summary --variant summary
 
 # Render the short
 python -m src.cli render <project> --short
 ```
 
-Output: `projects/<project>/short/default/`
+Output: `projects/<project>/short/default/` (or `short/summary/` for summary mode)
+
+## Generation Modes
+
+### Hook Mode (Default)
+
+Selects 1-3 compelling scenes and creates a deep-dive short that ends with a cliffhanger.
+
+```bash
+python -m src.cli short generate <project>
+# or explicitly:
+python -m src.cli short generate <project> --mode hook
+```
+
+**Characteristics:**
+- Duration: 45 seconds (default)
+- Selects most intriguing scenes via LLM analysis
+- Deep dive into specific content
+- Ends with "How did they solve this?" style hook
+- CTA: "Full breakdown in description"
+
+**Best for:** Technical deep-dives, surprising reveals, problem-solution teasers
+
+### Summary Mode
+
+Rapid-fire sweep through ALL scenes, creating intrigue through the breadth of content.
+
+```bash
+python -m src.cli short generate <project> --mode summary --variant summary
+```
+
+**Characteristics:**
+- Duration: 60 seconds (default, max)
+- Covers every scene with brief teaser phrases
+- Builds momentum through accumulation
+- Emphasizes scale ("19 layers!", "billions of parameters")
+- CTA: "See the complete journey"
+
+**Best for:** Journey-style videos, multi-layer explanations, "overview" teasers
+
+### Mode Comparison
+
+| Aspect | Hook Mode | Summary Mode |
+|--------|-----------|--------------|
+| Default duration | 45s | 60s |
+| Scenes covered | 1-3 selected | ALL scenes |
+| Narrative style | Deep dive | Rapid-fire sweep |
+| Intrigue mechanism | Unanswered question | Overwhelming breadth |
+| CTA tone | "How did they solve this?" | "See the complete journey" |
 
 ## Full Workflow
 
@@ -111,6 +165,23 @@ This eliminates manual scene file updates when voiceover timing changes.
 
 ## CLI Options
 
+### Generate Options
+
+```bash
+python -m src.cli short generate <project> [options]
+```
+
+| Option | Description |
+|--------|-------------|
+| `--mode` | Generation mode: `hook` (default) or `summary` |
+| `--duration` | Target duration in seconds (default: 45 for hook, 60 for summary, max: 60) |
+| `--variant` | Variant name for multiple shorts from same project |
+| `--scenes` | Override scene selection (comma-separated scene IDs, hook mode only) |
+| `--skip-voiceover` | Skip voiceover generation |
+| `--skip-custom-scenes` | Use generic visuals instead of custom components |
+| `--force` | Force regenerate even if files exist |
+| `--mock` | Use mock LLM for testing |
+
 ### Script Options
 
 ```bash
@@ -119,9 +190,10 @@ python -m src.cli short script <project> [options]
 
 | Option | Description |
 |--------|-------------|
-| `--duration` | Target duration in seconds (default: 45, range: 30-60) |
+| `--mode` | Generation mode: `hook` (default) or `summary` |
+| `--duration` | Target duration in seconds (default: 45 for hook, 60 for summary, max: 60) |
 | `--variant` | Variant name for multiple shorts from same project |
-| `--scenes` | Override scene selection (comma-separated scene IDs) |
+| `--scenes` | Override scene selection (comma-separated scene IDs, hook mode only) |
 | `--force` | Force regenerate even if files exist |
 | `--mock` | Use mock LLM for testing |
 
@@ -186,12 +258,26 @@ projects/<project>/short/
 Create multiple shorts from the same project:
 
 ```bash
-# Create a teaser variant
+# Create a hook-style teaser (default mode)
 python -m src.cli short generate <project> --variant teaser --duration 30
 
-# Create a deep-dive variant
-python -m src.cli short generate <project> --variant deep-dive --duration 60
+# Create a summary variant (sweep all scenes)
+python -m src.cli short generate <project> --mode summary --variant summary
+
+# Create a deep-dive variant (specific scenes)
+python -m src.cli short generate <project> --variant deep-dive --scenes scene1,scene2,scene3
 
 # Render specific variant
-python -m src.cli render <project> --short --variant teaser
+python -m src.cli render <project> --short --variant summary
+```
+
+### Example: Abstractions Project
+
+```bash
+# Hook mode - deep dive into one layer (e.g., TLS encryption)
+python -m src.cli short generate abstractions --variant tls-hook
+
+# Summary mode - rapid sweep through all 19 layers
+python -m src.cli short generate abstractions --mode summary --variant summary
+# Output: "You press a key. 300 milliseconds. 19 layers of technology..."
 ```
