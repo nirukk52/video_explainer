@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Optional
 
 from ...config import LLMConfig
+from ...ingestion import parse_pdf
 from ...project import Project
 from ...understanding.llm_provider import ClaudeCodeLLMProvider, LLMProvider
 from ..models import (
@@ -299,6 +300,8 @@ class ScriptAnalyzer:
     def _load_source_material(self) -> tuple[Path, str]:
         """Load source material from the input directory.
 
+        Supports markdown, text, and PDF files.
+
         Returns:
             Tuple of (file path, content) or (None, "") if not found
         """
@@ -306,13 +309,24 @@ class ScriptAnalyzer:
         if not input_dir.exists():
             return Path(), ""
 
-        # Look for markdown or text files
+        # Look for markdown or text files first
         for pattern in ["*.md", "*.txt", "*.markdown"]:
             files = list(input_dir.glob(pattern))
             if files:
                 # Use the first file found (or largest if multiple)
                 source_file = max(files, key=lambda f: f.stat().st_size)
                 return source_file, source_file.read_text()
+
+        # Look for PDF files
+        pdf_files = list(input_dir.glob("*.pdf"))
+        if pdf_files:
+            source_file = max(pdf_files, key=lambda f: f.stat().st_size)
+            try:
+                parsed = parse_pdf(source_file)
+                return source_file, parsed.raw_content
+            except Exception as e:
+                self._log(f"Warning: Failed to parse PDF {source_file}: {e}")
+                return Path(), ""
 
         return Path(), ""
 
