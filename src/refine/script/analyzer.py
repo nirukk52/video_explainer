@@ -240,7 +240,7 @@ class ScriptAnalyzer:
             self.llm = ClaudeCodeLLMProvider(
                 config=config,
                 working_dir=project.root_dir,
-                timeout=600,  # 10 minute timeout for analysis
+                timeout=900,  # 15 minute timeout for analysis
             )
         else:
             self.llm = llm_provider
@@ -381,10 +381,12 @@ class ScriptAnalyzer:
         prompt = CONCEPT_EXTRACTION_PROMPT.format(source_content=source_content)
 
         try:
+            self._log(f"Sending {len(source_content)} chars to LLM for concept extraction...")
             response = self.llm.generate_json(
                 prompt=prompt,
                 system_prompt=CONCEPT_EXTRACTION_SYSTEM_PROMPT,
             )
+            self._log("Concept extraction complete.")
 
             concepts = []
             for c in response.get("concepts", []):
@@ -434,10 +436,12 @@ class ScriptAnalyzer:
         )
 
         try:
+            self._log(f"Sending {len(concepts)} concepts and {len(scenes)} scenes to LLM for gap analysis...")
             response = self.llm.generate_json(
                 prompt=prompt,
                 system_prompt=GAP_ANALYSIS_SYSTEM_PROMPT,
             )
+            self._log("Gap analysis complete.")
 
             # Parse concept coverage
             coverage_list = []
