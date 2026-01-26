@@ -1,18 +1,24 @@
 """
-Company Researcher - Core research logic using Exa.ai.
+Company Researcher - Core research logic using Exa.ai with web scraping fallback.
 
 Orchestrates multiple Exa.ai searches to build comprehensive
-company intelligence reports. Mirrors the functionality of
+company intelligence reports. Falls back to direct web scraping
+and LLM extraction when Exa.ai returns poor results (common for
+new/niche companies not well indexed).
+
+Mirrors the functionality of:
 https://github.com/exa-labs/company-researcher but in Python.
 """
 
 import json
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Optional
 from urllib.parse import urlparse
 
-from exa_py import Exa
+import httpx
+from bs4 import BeautifulSoup
 
 from .models import (
     CompanyInfo,
@@ -22,6 +28,12 @@ from .models import (
     NewsArticle,
     SocialProfile,
     WikipediaInfo,
+)
+
+# User agent for direct web requests
+DEFAULT_USER_AGENT = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+    "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
 
@@ -120,26 +132,51 @@ class CompanyReport:
 
 class CompanyResearcher:
     """
-    Researches companies using Exa.ai semantic search.
+    Researches companies using Exa.ai semantic search with web scraping fallback.
     
     Provides methods to gather comprehensive company intelligence
     including website content, funding data, founders, competitors,
     news coverage, and social media presence.
     
+    When Exa.ai returns poor results (common for new/niche companies),
+    falls back to direct web scraping + LLM extraction.
+    
     Based on: https://github.com/exa-labs/company-researcher
     """
     
-    def __init__(self, exa_api_key: str | None = None):
+    def __init__(
+        self,
+        exa_api_key: str | None = None,
+        openai_api_key: str | None = None,
+    ):
         """
         Initialize the Company Researcher.
         
         Args:
             exa_api_key: Exa.ai API key. Falls back to EXA_API_KEY env var.
+            openai_api_key: OpenAI API key for LLM extraction fallback.
+                           Falls back to OPENAI_API_KEY env var.
         """
-        api_key = exa_api_key or os.getenv("EXA_API_KEY", "")
-        if not api_key:
-            raise ValueError("EXA_API_KEY not configured")
-        self._client = Exa(api_key=api_key)
+        self._exa_client = None
+        self._openai_client = None
+        
+        # Initialize Exa client (optional - can work without it)
+        exa_key = exa_api_key or os.getenv("EXA_API_KEY", "")
+        if exa_key:
+            try:
+                from exa_py import Exa
+                self._exa_client = Exa(api_key=exa_key)
+            except Exception:
+                pass  # Exa not available, will use fallback
+        
+        # Initialize OpenAI client for LLM extraction
+        openai_key = openai_api_key or os.getenv("OPENAI_API_KEY", "")
+        if openai_key:
+            try:
+                import openai
+                self._openai_client = openai.OpenAI(api_key=openai_key)
+            except Exception:
+                pass  # OpenAI not available
     
     def research(
         self,
@@ -150,10 +187,14 @@ class CompanyResearcher:
         include_news: bool = True,
         include_social: bool = True,
         include_wikipedia: bool = True,
+        enrich_with_llm: bool = True,
         verbose: bool = False,
     ) -> CompanyReport:
         """
         Perform comprehensive research on a company.
+        
+        Uses Exa.ai as primary source, with direct web scraping + LLM
+        extraction as fallback for companies not well indexed.
         
         Args:
             company_url: The company's website URL (e.g., "exa.ai")
@@ -163,6 +204,7 @@ class CompanyResearcher:
             include_news: Fetch recent news coverage
             include_social: Fetch social media profiles
             include_wikipedia: Fetch Wikipedia info
+            enrich_with_llm: Use LLM to clean up and structure results
             verbose: Print progress messages
             
         Returns:
@@ -175,10 +217,31 @@ class CompanyResearcher:
         if verbose:
             print(f"Researching: {domain}")
         
-        # 1. Scrape main website content
+        # 1. Scrape main website content (try Exa first, then direct scraping)
         if verbose:
             print("  - Fetching website content...")
-        company = self._fetch_website_content(url, domain)
+        company = self._fetch_website_content(url, domain, verbose=verbose)
+        
+        # Check if we got meaningful content - if not, try fallback
+        use_fallback = (
+            self._is_poor_result(company.description) or
+            self._has_html_artifacts(company.description)
+        )
+        
+        if use_fallback:
+            if verbose:
+                print("  - Exa.ai returned poor/messy results, trying direct scraping + LLM...")
+            company = self._fetch_website_content_fallback(url, domain, verbose=verbose)
+        elif enrich_with_llm and self._openai_client and self._has_html_artifacts(company.description):
+            # Even if Exa worked, clean up the description with LLM
+            if verbose:
+                print("  - Cleaning up results with LLM...")
+            raw_content = company.key_points.get("website_content", company.description)
+            enriched = self._extract_company_info_with_llm(
+                raw_content, url, domain, company.name, company.description[:200], verbose
+            )
+            if enriched:
+                company = enriched
         
         # 2. Fetch LinkedIn company profile
         if verbose:
@@ -205,12 +268,14 @@ class CompanyResearcher:
                 print("  - Finding founders...")
             founders = self._fetch_founders(domain)
         
-        # 5. Find competitors
+        # 5. Find competitors (only if we have valid company description)
         competitors = []
-        if include_competitors and company.description:
+        if include_competitors and company.description and not self._is_poor_result(company.description):
             if verbose:
                 print("  - Analyzing competitors...")
             competitors = self._fetch_competitors(domain, company.description)
+            # Filter out irrelevant results
+            competitors = self._filter_relevant_competitors(competitors, domain)
         
         # 6. Fetch news
         news = []
@@ -225,6 +290,8 @@ class CompanyResearcher:
             if verbose:
                 print("  - Finding social profiles...")
             social_profiles = self._fetch_social_profiles(domain)
+            # Filter out irrelevant social results
+            social_profiles = self._filter_relevant_social(social_profiles, domain)
         
         # 8. Fetch Wikipedia
         wikipedia = None
@@ -250,48 +317,326 @@ class CompanyResearcher:
             tracxn_url=tracxn_url,
         )
     
+    def _is_poor_result(self, text: str) -> bool:
+        """Check if a result indicates poor/failed Exa.ai response."""
+        if not text:
+            return True
+        
+        # Common error indicators
+        error_indicators = [
+            "error fetching",
+            "missing 1 required positional argument",
+            "not found",
+            "no results",
+            "unable to",
+            "failed to",
+        ]
+        
+        text_lower = text.lower()
+        for indicator in error_indicators:
+            if indicator in text_lower:
+                return True
+        
+        # Too short to be meaningful
+        if len(text) < 50:
+            return True
+        
+        return False
+    
+    def _has_html_artifacts(self, text: str) -> bool:
+        """Check if text has HTML/markdown artifacts that indicate raw scraping."""
+        artifact_patterns = [
+            r"\\\_",  # Escaped underscores
+            r"&#x?\d+;",  # HTML entities like &#x27;
+            r"\!\[.*?\]",  # Markdown image syntax
+            r"arrow\_forward",  # Material icons
+            r"check\_circle",
+            r"mic\n",  # Icon names
+        ]
+        
+        for pattern in artifact_patterns:
+            if re.search(pattern, text):
+                return True
+        return False
+    
+    def _filter_relevant_competitors(
+        self, 
+        competitors: list[CompetitorInfo], 
+        domain: str
+    ) -> list[CompetitorInfo]:
+        """Filter out irrelevant competitor results (e.g., StackOverflow links)."""
+        # Domains that are never actual competitors
+        irrelevant_domains = {
+            "stackoverflow.com", "github.com", "dev.to", "medium.com",
+            "reddit.com", "quora.com", "youtube.com", "twitter.com",
+            "x.com", "linkedin.com", "facebook.com", "instagram.com",
+            "readthedocs.io", "docs.python.org", "pypi.org", "npmjs.com",
+            "exakat.io", "exakat.readthedocs.io",  # Specific noise seen in results
+        }
+        
+        filtered = []
+        for c in competitors:
+            comp_domain = urlparse(c.url).netloc.replace("www.", "")
+            
+            # Skip if it's a known irrelevant domain
+            if any(irr in comp_domain for irr in irrelevant_domains):
+                continue
+            
+            # Skip if the description mentions "error" or common programming terms
+            desc_lower = c.description.lower()
+            if any(term in desc_lower for term in [
+                "error", "exception", "python", "javascript", "php",
+                "missing argument", "positional argument", "stack trace"
+            ]):
+                continue
+            
+            filtered.append(c)
+        
+        return filtered
+    
+    def _filter_relevant_social(
+        self, 
+        profiles: list[SocialProfile], 
+        domain: str
+    ) -> list[SocialProfile]:
+        """Filter out social profiles that aren't actually the company's."""
+        company_name = domain.split(".")[0].lower()
+        
+        filtered = []
+        for p in profiles:
+            url_lower = p.url.lower()
+            handle_lower = p.handle.lower()
+            
+            # Check if the URL or handle contains the company name
+            if company_name in url_lower or company_name in handle_lower:
+                filtered.append(p)
+                continue
+            
+            # For platforms like GitHub, be more lenient
+            # (the company might have a different username)
+            # But filter out obviously unrelated results
+            if p.platform == "github":
+                # Skip obviously unrelated repos
+                if any(term in url_lower for term in [
+                    "machine-learning", "algorithms", "tutorial", "example"
+                ]):
+                    continue
+            
+            # For Twitter, skip if it's a completely different company
+            if p.platform == "twitter":
+                if "kyowa" in url_lower or "media-center" in url_lower:
+                    continue
+        
+        return filtered
+    
     def _normalize_url(self, url: str) -> str:
         """Normalize URL to have https:// prefix."""
         if not url.startswith("http"):
             url = f"https://{url}"
         return url
     
-    def _fetch_website_content(self, url: str, domain: str) -> CompanyInfo:
-        """Fetch and summarize main website content."""
+    def _fetch_website_content_fallback(
+        self, 
+        url: str, 
+        domain: str, 
+        verbose: bool = False
+    ) -> CompanyInfo:
+        """
+        Fallback: Directly scrape website and use LLM to extract company info.
+        
+        Used when Exa.ai returns poor results for new/niche companies.
+        """
         try:
-            # Get main page content
-            result = self._client.get_contents(
-                ids=[url],
-                text=True,
-                summary=True,
+            # Direct HTTP request to the website
+            headers = {"User-Agent": DEFAULT_USER_AGENT}
+            with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+                response = client.get(url, headers=headers)
+                response.raise_for_status()
+                html_content = response.text
+            
+            # Parse HTML and extract text
+            soup = BeautifulSoup(html_content, "html.parser")
+            
+            # Remove unwanted elements
+            for element in soup.select("script, style, nav, footer, header, noscript"):
+                element.decompose()
+            
+            # Get text content
+            raw_text = soup.get_text(separator="\n", strip=True)
+            
+            # Truncate to reasonable size for LLM
+            raw_text = raw_text[:15000]
+            
+            # Extract meta description if available
+            meta_desc = ""
+            desc_tag = soup.find("meta", {"name": "description"})
+            if desc_tag and desc_tag.get("content"):
+                meta_desc = desc_tag["content"]
+            
+            og_desc = soup.find("meta", property="og:description")
+            if og_desc and og_desc.get("content"):
+                meta_desc = meta_desc or og_desc["content"]
+            
+            # Extract title
+            title = domain.split(".")[0].title()
+            title_tag = soup.find("title")
+            if title_tag and title_tag.string:
+                title = title_tag.string.strip().split("|")[0].split("-")[0].strip()
+            
+            # Use LLM to extract structured company info
+            if self._openai_client:
+                company_info = self._extract_company_info_with_llm(
+                    raw_text, url, domain, title, meta_desc, verbose
+                )
+                if company_info:
+                    return company_info
+            
+            # Fallback to basic extraction without LLM
+            description = meta_desc if meta_desc else raw_text[:500]
+            
+            return CompanyInfo(
+                name=title,
+                url=url,
+                description=description,
+                key_points={"website_content": raw_text[:3000]},
             )
             
-            main_content = ""
-            if result.results:
-                main_content = result.results[0].text or ""
+        except Exception as e:
+            if verbose:
+                print(f"    Warning: Fallback scraping failed: {e}")
+            return CompanyInfo(
+                name=domain.split(".")[0].title(),
+                url=url,
+                description=f"Could not fetch website content",
+            )
+    
+    def _extract_company_info_with_llm(
+        self,
+        raw_text: str,
+        url: str,
+        domain: str,
+        title: str,
+        meta_desc: str,
+        verbose: bool = False,
+    ) -> Optional[CompanyInfo]:
+        """Use OpenAI to extract structured company info from raw website text."""
+        try:
+            prompt = f"""Analyze this company website content and extract structured information.
+
+Website URL: {url}
+Website Title: {title}
+Meta Description: {meta_desc}
+
+Website Content:
+{raw_text[:10000]}
+
+Extract the following information in JSON format:
+{{
+    "name": "Company name (proper casing)",
+    "description": "2-3 sentence description of what the company does and its main product",
+    "main_product": "Name and brief description of main product/service",
+    "target_users": "Who is this product for? Be specific.",
+    "pricing": "Pricing info if available, or 'Not specified'",
+    "strengths": ["Key strength 1", "Key strength 2", ...],
+    "key_points": {{
+        "tagline": "Company tagline or main value prop",
+        "unique_features": "What makes this product unique",
+        "problem_solved": "What problem does it solve"
+    }}
+}}
+
+Respond ONLY with valid JSON, no markdown formatting."""
+
+            response = self._openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.3,
+                max_tokens=1000,
+            )
             
-            # Get subpages (about, pricing, faq, blog)
-            subpages_result = self._client.search_and_contents(
-                query=f"{domain}",
-                type="neural",
+            result_text = response.choices[0].message.content.strip()
+            
+            # Clean up potential markdown formatting
+            if result_text.startswith("```"):
+                result_text = re.sub(r"^```(?:json)?\n?", "", result_text)
+                result_text = re.sub(r"\n?```$", "", result_text)
+            
+            data = json.loads(result_text)
+            
+            return CompanyInfo(
+                name=data.get("name", title),
+                url=url,
+                description=data.get("description", meta_desc),
+                main_product=data.get("main_product", ""),
+                target_users=data.get("target_users", ""),
+                pricing=data.get("pricing", ""),
+                strengths=data.get("strengths", []),
+                key_points=data.get("key_points", {}),
+            )
+            
+        except Exception as e:
+            if verbose:
+                print(f"    Warning: LLM extraction failed: {e}")
+            return None
+    
+    def _fetch_website_content(self, url: str, domain: str, verbose: bool = False) -> CompanyInfo:
+        """Fetch and summarize main website content using Exa.ai."""
+        if not self._exa_client:
+            # No Exa client, return empty to trigger fallback
+            return CompanyInfo(
+                name=domain.split(".")[0].title(),
+                url=url,
+                description="",
+            )
+        
+        try:
+            # Get main page content using search_and_contents with the URL
+            # This is more reliable than get_contents which has parameter issues
+            result = self._exa_client.search_and_contents(
+                query=f"site:{domain}",
+                type="keyword",
                 text=True,
                 num_results=1,
                 livecrawl="always",
-                subpages=10,
-                subpage_target=["about", "pricing", "faq", "blog"],
                 include_domains=[domain],
             )
             
-            subpages_content = ""
-            if subpages_result.results:
-                for r in subpages_result.results:
-                    if r.text:
-                        subpages_content += f"\n\n{r.url}:\n{r.text[:2000]}"
-            
-            # Extract company info from content
+            main_content = ""
             description = ""
-            if result.results and hasattr(result.results[0], 'summary'):
-                description = result.results[0].summary or ""
+            if result.results:
+                main_content = result.results[0].text or ""
+                # Use summary if available
+                if hasattr(result.results[0], 'summary') and result.results[0].summary:
+                    description = result.results[0].summary
+                else:
+                    # Extract first meaningful paragraph as description
+                    description = main_content[:500].strip()
+            
+            # Get subpages (about, pricing, faq, blog) for more context
+            try:
+                subpages_result = self._exa_client.search_and_contents(
+                    query=f"{domain}",
+                    type="neural",
+                    text=True,
+                    num_results=5,
+                    livecrawl="always",
+                    include_domains=[domain],
+                )
+                
+                if subpages_result.results:
+                    for r in subpages_result.results:
+                        if r.text:
+                            main_content += f"\n\n{r.url}:\n{r.text[:2000]}"
+            except Exception:
+                pass  # Subpages are optional
+            
+            # Check if we got meaningful content
+            if not description or len(description) < 50:
+                return CompanyInfo(
+                    name=domain.split(".")[0].title(),
+                    url=url,
+                    description="",  # Will trigger fallback
+                )
             
             return CompanyInfo(
                 name=domain.split(".")[0].title(),
@@ -301,16 +646,21 @@ class CompanyResearcher:
             )
             
         except Exception as e:
+            if verbose:
+                print(f"    Warning: Exa.ai failed: {e}")
             return CompanyInfo(
                 name=domain.split(".")[0].title(),
                 url=url,
-                description=f"Error fetching content: {e}",
+                description="",  # Will trigger fallback
             )
     
     def _fetch_linkedin_profile(self, domain: str) -> str:
         """Find company LinkedIn profile URL."""
+        if not self._exa_client:
+            return ""
+        
         try:
-            result = self._client.search(
+            result = self._exa_client.search(
                 query=f"{domain} company linkedin profile:",
                 type="keyword",
                 num_results=1,
@@ -326,8 +676,11 @@ class CompanyResearcher:
     
     def _fetch_funding(self, domain: str) -> Optional[FundingInfo]:
         """Fetch funding information using Exa summary feature."""
+        if not self._exa_client:
+            return None
+        
         try:
-            result = self._client.search_and_contents(
+            result = self._exa_client.search_and_contents(
                 query=f"{domain} Funding:",
                 type="keyword",
                 num_results=1,
@@ -356,8 +709,11 @@ class CompanyResearcher:
     
     def _fetch_founders(self, domain: str) -> list[FounderInfo]:
         """Find founder LinkedIn profiles."""
+        if not self._exa_client:
+            return []
+        
         try:
-            result = self._client.search(
+            result = self._exa_client.search(
                 query=f"{domain} founder's Linkedin page:",
                 type="keyword",
                 num_results=5,
@@ -386,11 +742,18 @@ class CompanyResearcher:
     
     def _fetch_competitors(self, domain: str, company_description: str) -> list[CompetitorInfo]:
         """Find and analyze competitors."""
+        if not self._exa_client:
+            return []
+        
         try:
-            result = self._client.search_and_contents(
-                query=company_description,
+            # Use a more targeted query to find actual competitors
+            # Strip any error messages from description
+            clean_desc = company_description[:300] if len(company_description) > 300 else company_description
+            
+            result = self._exa_client.search_and_contents(
+                query=f"companies similar to {clean_desc}",
                 type="auto",
-                num_results=5,
+                num_results=10,  # Get more results to filter
                 summary={
                     "query": "Explain in one/two lines what does this company do in simple english. "
                              "Don't use any difficult words."
@@ -416,8 +779,11 @@ class CompanyResearcher:
     
     def _fetch_news(self, domain: str) -> list[NewsArticle]:
         """Fetch recent news coverage."""
+        if not self._exa_client:
+            return []
+        
         try:
-            result = self._client.search_and_contents(
+            result = self._exa_client.search_and_contents(
                 query=f"{domain} Latest News:",
                 category="news",
                 type="keyword",
@@ -497,8 +863,11 @@ class CompanyResearcher:
         include_domains: list[str],
     ) -> Optional[SocialProfile]:
         """Fetch a single social media profile."""
+        if not self._exa_client:
+            return None
+        
         try:
-            result = self._client.search(
+            result = self._exa_client.search(
                 query=query,
                 type="keyword",
                 num_results=1,
@@ -518,8 +887,11 @@ class CompanyResearcher:
     
     def _fetch_wikipedia(self, domain: str) -> Optional[WikipediaInfo]:
         """Fetch Wikipedia information if available."""
+        if not self._exa_client:
+            return None
+        
         try:
-            result = self._client.search_and_contents(
+            result = self._exa_client.search_and_contents(
                 query=f"{domain} company wikipedia page:",
                 type="keyword",
                 num_results=1,
@@ -540,8 +912,11 @@ class CompanyResearcher:
     
     def _fetch_profile_url(self, domain: str, profile_domain: str) -> str:
         """Fetch a specific profile URL (crunchbase, pitchbook, tracxn)."""
+        if not self._exa_client:
+            return ""
+        
         try:
-            result = self._client.search(
+            result = self._exa_client.search(
                 query=f"{domain} {profile_domain.split('.')[0]} profile:",
                 type="keyword",
                 num_results=1,

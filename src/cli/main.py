@@ -6,8 +6,11 @@ VARUN MAYYA STYLE SHORTS (Primary Workflow)
 
 Complete workflow for vertical 9:16 shorts with avatar, backgrounds, and captions:
 
-    # Phase 0 (optional): Research a company for video content
+    # Phase 0: Research a company for video content
     python -m src.cli director my-short research --company "exa.ai"
+    
+    # Phase 0.1: Summarize research into ad-ready insights
+    python -m src.cli director my-short summarize
     
     # Phase 1: Create project + draft script
     python -m src.cli director my-short draft --topic "Your topic" --duration 30
@@ -32,6 +35,7 @@ Complete workflow for vertical 9:16 shorts with avatar, backgrounds, and caption
 
 Director subcommands:
     research   - Research a company using Exa.ai (creates research.json)
+    summarize  - Extract ad-ready insights from research (creates research-display.json)
     draft      - Generate initial script with LLM (creates scenes + assets_needed)
     voiceover  - Generate audio from script.json scenes using ElevenLabs
     avatar     - Generate lip-synced avatar videos using HeyGen
@@ -2282,6 +2286,7 @@ def cmd_director(args: argparse.Namespace) -> int:
         print("\nCommands:")
         print("  research   - Research a company using Exa.ai")
         print("  draft      - Generate initial script with LLM")
+        print("  summarize  - Extract ad-ready insights from research")
         print("  status     - Show current production phase")
         print("  review     - Review captured assets")
         print("  finalize   - Create render-ready script")
@@ -2293,6 +2298,9 @@ def cmd_director(args: argparse.Namespace) -> int:
     
     if args.director_command == "research":
         return _director_research(args, state)
+    
+    elif args.director_command == "summarize":
+        return _director_summarize(args, state)
     
     elif args.director_command == "draft":
         return _director_draft(args, state)
@@ -2424,7 +2432,10 @@ def _director_research(args, state) -> int:
         print(f"{'='*60}")
         print("1. Review research.json and optionally edit it")
         print()
-        print("2. Generate script using the research:")
+        print("2. Summarize research into ad-ready insights:")
+        print(f"   python -m src.cli director {state.project_id} summarize")
+        print()
+        print("3. Or generate script directly using the research:")
         print(f"   python -m src.cli director {state.project_id} draft --topic \"{report.company.name}\"")
         print()
         
@@ -2437,6 +2448,109 @@ def _director_research(args, state) -> int:
         return 1
     except Exception as e:
         print(f"Error during research: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        return 1
+
+
+def _director_summarize(args, state) -> int:
+    """
+    Summarize research into ad-ready insights (Phase 0.1).
+    
+    Takes research.json and produces research-display.json with:
+    - Key findings summary
+    - Hook angles for ads
+    - Testimonial themes
+    - Unique value propositions
+    """
+    import json
+    from pathlib import Path
+    
+    verbose = getattr(args, 'verbose', False)
+    
+    print(f"\n{'='*60}")
+    print(f"DIRECTOR - Phase 0.1: Research Summarization")
+    print(f"{'='*60}")
+    print(f"Project: {state.project_id}")
+    print()
+    
+    # Check if research.json exists
+    research_path = state.project_dir / "input" / "research.json"
+    if not research_path.exists():
+        print(f"Error: research.json not found at {research_path}", file=sys.stderr)
+        print("\nRun research first:")
+        print(f"   python -m src.cli director {state.project_id} research --company \"company.com\"")
+        return 1
+    
+    try:
+        from ..company_researcher import ResearchSummarizer
+        
+        summarizer = ResearchSummarizer()
+        
+        print("Extracting ad-ready insights from research...")
+        print("(Using LLM to generate hook angles and testimonials)")
+        print()
+        
+        output_path = state.project_dir / "input" / "research-display.json"
+        display = summarizer.summarize_from_file(
+            research_path=research_path,
+            output_path=output_path,
+            verbose=verbose,
+        )
+        
+        print(f"Research display saved to: {output_path}")
+        
+        # Display summary
+        print(f"\n{'='*60}")
+        print("KEY FINDINGS")
+        print(f"{'='*60}")
+        print(f"Product: {display.product_name}")
+        print(f"Tagline: \"{display.tagline}\"")
+        print(f"Core Differentiator: {display.core_differentiator}")
+        print(f"Target Users: {display.target_users}")
+        print(f"Key Feature: {display.key_feature}")
+        
+        if display.hook_angles:
+            print(f"\n{'='*60}")
+            print("HOOK ANGLES (for ad openings)")
+            print(f"{'='*60}")
+            for i, hook in enumerate(display.hook_angles[:5], 1):
+                print(f"  {i}. \"{hook}\"")
+        
+        if display.testimonial_themes:
+            print(f"\n{'='*60}")
+            print("TESTIMONIAL THEMES")
+            print(f"{'='*60}")
+            for i, theme in enumerate(display.testimonial_themes[:5], 1):
+                print(f"  {i}. \"{theme}\"")
+        
+        if display.unique_value_props:
+            print(f"\n{'='*60}")
+            print("UNIQUE VALUE PROPS")
+            print(f"{'='*60}")
+            for prop in display.unique_value_props[:5]:
+                print(f"  - {prop}")
+        
+        if display.main_competitors:
+            print(f"\n{'='*60}")
+            print("MAIN COMPETITORS")
+            print(f"{'='*60}")
+            for comp in display.main_competitors[:5]:
+                print(f"  - {comp}")
+        
+        print(f"\n{'='*60}")
+        print("NEXT STEPS")
+        print(f"{'='*60}")
+        print("1. Review research-display.json and optionally edit it")
+        print()
+        print("2. Generate script using the insights:")
+        print(f"   python -m src.cli director {state.project_id} draft --topic \"{display.product_name}\"")
+        print()
+        
+        return 0
+        
+    except Exception as e:
+        print(f"Error during summarization: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
         return 1
@@ -5664,8 +5778,9 @@ Commands:
   finalize   - Create render-ready script from approved assets
 
 Full Workflow:
-  0. python -m src.cli director my-short research --company "exa.ai"  (optional)
-  1. python -m src.cli director my-short draft --topic "Your topic"
+  0.  python -m src.cli director my-short research --company "exa.ai"  (optional)
+  0.1 python -m src.cli director my-short summarize  (optional, after research)
+  1.  python -m src.cli director my-short draft --topic "Your topic"
   2. python -m src.cli director my-short voiceover
   3. python -m src.cli director my-short avatar
   4. python -m src.cli director my-short background
@@ -5720,6 +5835,17 @@ Full Workflow:
         "--skip-social",
         action="store_true",
         help="Skip social media profile research",
+    )
+    
+    # director summarize - Extract ad-ready insights from research
+    director_summarize_parser = director_subparsers.add_parser(
+        "summarize",
+        help="Extract ad-ready insights from research (creates research-display.json)",
+    )
+    director_summarize_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show progress messages during summarization",
     )
     
     # director draft
