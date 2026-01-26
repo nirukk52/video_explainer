@@ -31,14 +31,47 @@
         "id": { "type": "string" },
         "template": {
           "type": "string",
-          "enum": ["TextOverProof", "SplitProof", "FullAvatar", "ProofOnly", "TextCard"]
+          "enum": ["TextOverProof", "SplitProof", "FullAvatar", "ProofOnly", "TextCard", "SplitVideo", "VideoCard", "composite"],
+          "description": "Use 'composite' when scene has word_groups with different templates"
         },
         "start_seconds": { "type": "number" },
         "end_seconds": { "type": "number" },
         "audio": { "$ref": "#/definitions/audio" },
         "background": { "$ref": "#/definitions/background" },
         "avatar": { "$ref": "#/definitions/avatar" },
-        "text": { "$ref": "#/definitions/text" }
+        "text": { "$ref": "#/definitions/text" },
+        "word_groups": {
+          "type": "array",
+          "description": "Array of word groups, each with its own template. Used when template is 'composite'",
+          "items": { "$ref": "#/definitions/word_group" }
+        }
+      }
+    },
+    "word_group": {
+      "type": "object",
+      "description": "A segment of the scene defined by a range of words, each with its own template and visual treatment",
+      "required": ["id", "template", "word_range", "start_seconds", "end_seconds"],
+      "properties": {
+        "id": { "type": "string" },
+        "template": {
+          "type": "string",
+          "enum": ["TextOverProof", "SplitProof", "FullAvatar", "ProofOnly", "TextCard", "SplitVideo", "VideoCard"]
+        },
+        "word_range": {
+          "type": "object",
+          "description": "Range of word indices (0-based) from the audio.word_timestamps array",
+          "properties": {
+            "start": { "type": "integer", "minimum": 0 },
+            "end": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["start", "end"]
+        },
+        "start_seconds": { "type": "number" },
+        "end_seconds": { "type": "number" },
+        "background": { "$ref": "#/definitions/background" },
+        "avatar": { "$ref": "#/definitions/avatar" },
+        "text": { "$ref": "#/definitions/text" },
+        "video_inset": { "$ref": "#/definitions/video_inset" }
       }
     },
     "audio": {
@@ -66,9 +99,17 @@
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["screenshot", "ai_video", "gradient", "stock"]
+          "enum": ["screenshot", "ai_video", "gradient", "stock", "video", "solid"]
         },
         "src": { "type": "string" },
+        "prompt": {
+          "type": "string",
+          "description": "AI generation prompt used to create the video (for ai_video type). Stored for reproducibility."
+        },
+        "color": {
+          "type": "string",
+          "description": "Solid color for background (for solid type)"
+        },
         "colors": {
           "type": "array",
           "items": { "type": "string" }
@@ -93,6 +134,20 @@
         }
       }
     },
+    "video_inset": {
+      "type": "object",
+      "description": "Video displayed as an inset card (used by VideoCard template)",
+      "properties": {
+        "src": { "type": "string" },
+        "position": {
+          "type": "string",
+          "enum": ["center", "top", "bottom"]
+        },
+        "width_percent": { "type": "number", "minimum": 0, "maximum": 100 },
+        "border_radius": { "type": "number" },
+        "border_color": { "type": "string" }
+      }
+    },
     "avatar": {
       "type": "object",
       "required": ["visible"],
@@ -102,7 +157,11 @@
           "type": "string",
           "enum": ["full", "bottom", "pip_corner", "off"]
         },
-        "src": { "type": "string" }
+        "src": { "type": "string" },
+        "use_avatar_audio": {
+          "type": "boolean",
+          "description": "When true, extract and use audio from avatar video even if avatar is not visible"
+        }
       }
     },
     "text": {
@@ -112,6 +171,11 @@
         "caption_style": {
           "type": "string",
           "enum": ["word_by_word", "sentence"]
+        },
+        "animate": {
+          "type": "string",
+          "enum": ["word_by_word", "fade_in"],
+          "description": "Animation style for text. word_by_word reveals each word synced to audio timestamps"
         },
         "position": {
           "type": "string",

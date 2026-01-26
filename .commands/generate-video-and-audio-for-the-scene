@@ -1,0 +1,5 @@
+Generate audio from @config.json using voiceover-generation skill
+Generate the avatar video using HeyGen and avatar-generation skill
+
+refer @avatar-generation.skill  and @.claude/skills/background-video-generation 
+ for scene {ask the user if not provided}

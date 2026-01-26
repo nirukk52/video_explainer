@@ -22,8 +22,9 @@ export interface SceneAudio {
 
 /** Background configuration */
 export interface SceneBackground {
-  type: 'screenshot' | 'video' | 'gradient' | 'solid' | 'stock';
+  type: 'screenshot' | 'video' | 'ai_video' | 'gradient' | 'solid' | 'stock';
   src?: string;
+  prompt?: string;
   color?: string;
   colors?: string[];
   position?: 'top' | 'center' | 'bottom';
@@ -48,6 +49,8 @@ export interface SceneAvatar {
   position?: 'full' | 'bottom' | 'pip_corner' | 'off';
   src?: string;
   height_percent?: number;
+  /** When true, extract and use audio from avatar video even if avatar is not visible */
+  use_avatar_audio?: boolean;
 }
 
 /** Video inset for VideoCard template */
@@ -55,7 +58,9 @@ export interface VideoInset {
   src: string;
   position: 'center' | 'top' | 'bottom';
   width_percent: number;
+  height_multiplier?: number;
   border_radius?: number;
+  border_width?: number;
   border_color?: string;
 }
 
@@ -89,7 +94,39 @@ export type TemplateType =
   | 'FullAvatar' 
   | 'ProofOnly' 
   | 'TextCard' 
-  | 'VideoCard';
+  | 'VideoCard'
+  | 'composite';
+
+/** Word range for word_groups */
+export interface WordRange {
+  start: number;
+  end: number;
+}
+
+/** Word group - a segment of a scene with its own template */
+export interface WordGroup {
+  id: string;
+  template: Exclude<TemplateType, 'composite'>;
+  word_range: WordRange;
+  start_seconds: number;
+  end_seconds: number;
+  background?: SceneBackground & { prompt?: string };
+  avatar?: SceneAvatar;
+  video_inset?: VideoInset;
+  text?: SceneText;
+}
+
+/** Audio file entry for composite scenes with multiple audio files */
+export interface AudioFile {
+  file: string;
+  start_offset: number;
+  duration_seconds: number;
+}
+
+/** Extended audio for composite scenes */
+export interface CompositeSceneAudio extends SceneAudio {
+  files?: AudioFile[];
+}
 
 /** Scene definition - matches JSON schema */
 export interface Scene {
@@ -97,11 +134,12 @@ export interface Scene {
   template: TemplateType;
   start_seconds: number;
   end_seconds: number;
-  audio?: SceneAudio;
+  audio?: SceneAudio | CompositeSceneAudio;
   background?: SceneBackground;
   avatar?: SceneAvatar;
   video_inset?: VideoInset;
   text?: SceneText;
+  word_groups?: WordGroup[];
 }
 
 /** Full script definition */

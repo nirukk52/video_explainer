@@ -1,21 +1,13 @@
 {
   "_description": "Styled text on top, rounded video card in center, black background",
-  "_use_when": "Dramatic reveal with video evidence, text builds anticipation",
+  "_use_when": "Dramatic reveal with video evidence, word-by-word text animation synced to audio. Great for hook scenes where words appear one by one as spoken.",
   "_screenshot": "templates/screenshots/VideoCard.png",
+  "_visual_reference": "Varun Mayya frame at 0:02-0:04 - black bg, serif text with mixed italic/normal styling, video in rounded rectangle",
   
   "id": "scene_002",
   "template": "VideoCard",
-  "start_seconds": 1.5,
-  "end_seconds": 4.0,
-  
-  "audio": {
-    "text": "looks like something straight out of a sci-fi movie except it's real",
-    "word_timestamps": [
-      { "word": "looks", "start": 1.5, "end": 1.7 },
-      { "word": "like", "start": 1.7, "end": 1.85 },
-      { "word": "something", "start": 1.85, "end": 2.2 }
-    ]
-  },
+  "start_seconds": 1.4,
+  "end_seconds": 4.76,
   
   "background": {
     "type": "solid",
@@ -23,7 +15,7 @@
   },
   
   "video_inset": {
-    "src": "backgrounds/footage.mp4",
+    "src": "backgrounds/drone_swarm_veo3.mp4",
     "position": "center",
     "width_percent": 85,
     "border_radius": 16,
@@ -31,18 +23,40 @@
   },
   
   "avatar": {
-    "visible": false
+    "visible": false,
+    "use_avatar_audio": true,
+    "src": "avatar/scene_002_bottom.mp4",
+    "_note": "use_avatar_audio extracts audio from avatar video even when avatar is not visible"
   },
   
   "text": {
+    "animate": "word_by_word",
     "headline": {
       "lines": [
-        { "text": "looks like", "style": "normal" },
-        { "text": "something", "style": "italic" },
-        { "text": "straight out of a", "style": "normal" }
-      ]
+        { "text": "sci-fi", "style": "italic" },
+        { "text": "movie", "style": "normal" },
+        { "text": "except it's real", "style": "italic" }
+      ],
+      "_note": "headline.lines provides styling hints - words matching these phrases inherit their style"
     },
-    "position": "top",
-    "animate": "word_by_word"
+    "position": "top"
+  },
+  
+  "audio": {
+    "text": "looks like something straight out of a sci-fi movie except its real",
+    "word_timestamps": [
+      { "word": "looks", "start": 0.0, "end": 0.232 },
+      { "word": "like", "start": 0.255, "end": 0.383 },
+      { "word": "something", "start": 0.406, "end": 0.673 },
+      { "word": "straight", "start": 0.743, "end": 1.057 },
+      { "word": "out", "start": 1.091, "end": 1.207 },
+      { "word": "of", "start": 1.242, "end": 1.289 },
+      { "word": "a", "start": 1.324, "end": 1.347 },
+      { "word": "sci-fi", "start": 1.393, "end": 1.718 },
+      { "word": "movie", "start": 1.788, "end": 2.067 },
+      { "word": "except", "start": 2.125, "end": 2.45 },
+      { "word": "its", "start": 2.485, "end": 2.601 },
+      { "word": "real", "start": 2.682, "end": 3.36 }
+    ]
   }
 }

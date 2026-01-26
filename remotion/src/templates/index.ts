@@ -12,9 +12,11 @@ export { VarunPlayer } from './VarunPlayer';
 
 // Individual templates
 export { SplitVideo } from './SplitVideo';
+export { SplitProof } from './SplitProof';
 export { VideoCard } from './VideoCard';
 export { TextOverProof } from './TextOverProof';
 export { TextCard } from './TextCard';
+export { CompositeScene } from './CompositeScene';
 
 // Shared components
 export { WordByWordCaption } from './WordByWordCaption';
