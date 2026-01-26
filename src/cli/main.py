@@ -2638,15 +2638,14 @@ def _director_draft(args, state) -> int:
             state.save()
             return 1
     
-    # Save draft script
-    state.draft_script = draft_script
+    # Save draft script to file (single source of truth)
     script_path = state.project_dir / "script" / "script.json"
     with open(script_path, "w") as f:
         json.dump(draft_script, f, indent=2)
     
     print(f"\nDraft script saved to: {script_path}")
     
-    # Extract assets needed
+    # Extract assets needed (track status only, metadata stays in script file)
     if "assets_needed" in draft_script:
         assets = draft_script["assets_needed"]
         
@@ -2655,7 +2654,6 @@ def _director_draft(args, state) -> int:
                 id=bg["id"],
                 asset_type="background",
                 status="pending",
-                metadata={"source": bg.get("source"), "description": bg.get("description")}
             ))
         
         for ev in assets.get("evidence", []):
@@ -2663,7 +2661,6 @@ def _director_draft(args, state) -> int:
                 id=ev["id"],
                 asset_type="evidence",
                 status="pending",
-                metadata={"source": ev.get("source"), "url_hint": ev.get("url_hint")}
             ))
         
         for av in assets.get("avatar", []):
@@ -2671,7 +2668,6 @@ def _director_draft(args, state) -> int:
                 id=av["id"],
                 asset_type="avatar",
                 status="pending",
-                metadata={"source": av.get("source"), "text": av.get("text")}
             ))
     
     # Update state
@@ -2746,16 +2742,12 @@ def _director_status(args, state) -> int:
                 print(f"      Error: {asset.error}")
         print()
     
-    # Script status
-    if state.draft_script:
-        print(f"Draft script: ✅ ({len(state.draft_script.get('scenes', []))} scenes)")
+    # Script status (script lives in script/script.json, not in state)
+    script = state.get_script()
+    if script:
+        print(f"Script: ✅ ({len(script.get('scenes', []))} scenes)")
     else:
-        print("Draft script: ❌ Not generated")
-    
-    if state.final_script:
-        print(f"Final script: ✅")
-    else:
-        print("Final script: ❌ Not finalized")
+        print("Script: ❌ Not generated")
     
     # Audio status
     if state.audio_file:
@@ -2834,12 +2826,14 @@ def _director_finalize(args, state) -> int:
     print(f"DIRECTOR FINALIZE: {state.project_id}")
     print(f"{'='*60}")
     
-    if not state.draft_script:
-        print("Error: No draft script found. Run 'director draft' first.", file=sys.stderr)
+    # Load script from file (single source of truth)
+    script = state.get_script()
+    if not script:
+        print("Error: No script found. Run 'director draft' first.", file=sys.stderr)
         return 1
     
-    # Copy draft to final
-    final_script = json.loads(json.dumps(state.draft_script))  # Deep copy
+    # Work with a copy to modify
+    final_script = json.loads(json.dumps(script))  # Deep copy
     
     # Remove assets_needed section (assets are now captured)
     if "assets_needed" in final_script:
@@ -2870,8 +2864,7 @@ def _director_finalize(args, state) -> int:
                     if asset.file_path:
                         avatar["src"] = asset.file_path
     
-    # Save final script
-    state.final_script = final_script
+    # Save finalized script back to file
     script_path = state.project_dir / "script" / "script.json"
     with open(script_path, "w") as f:
         json.dump(final_script, f, indent=2)
@@ -3656,10 +3649,9 @@ def _director_assemble(args, state) -> int:
     else:
         print("\nNo updates needed - all paths already set")
     
-    # Update director state
+    # Update director state (script already saved to file)
     if not dry_run:
         from ..factory.director_state import DirectorPhase
-        state.final_script = script
         if state.phase not in (DirectorPhase.READY_FOR_RENDER, DirectorPhase.RENDERING, DirectorPhase.COMPLETE):
             state.transition_to(DirectorPhase.READY_FOR_RENDER, "Assets assembled")
         state.save()

@@ -95,7 +95,12 @@ class DirectorPhase(str, Enum):
 
 @dataclass
 class AssetStatus:
-    """Status of a single asset (background, evidence, avatar clip)."""
+    """
+    Tracks status of a single asset (background, evidence, avatar clip).
+    
+    Metadata like description, source, prompts live in script/script.json.
+    This only tracks capture/approval status.
+    """
     
     id: str
     """Asset identifier (e.g., 'drone_swarm.mp4')"""
@@ -111,9 +116,6 @@ class AssetStatus:
     
     error: Optional[str] = None
     """Error message if failed"""
-    
-    metadata: dict = field(default_factory=dict)
-    """Additional metadata (dimensions, duration, etc.)"""
 
 
 @dataclass
@@ -152,14 +154,9 @@ class DirectorState:
     evidence_urls: list[str] = field(default_factory=list)
     """URLs to investigate for evidence"""
     
-    # === Script Versions ===
-    draft_script: Optional[dict] = None
-    """Initial script with assets_needed (Phase 1 output)"""
-    
-    final_script: Optional[dict] = None
-    """Render-ready script with real paths (Phase 2 output)"""
-    
     # === Asset Tracking ===
+    # NOTE: Script content lives in script/script.json, not in state.
+    # Use get_script() to load it when needed.
     assets: list[AssetStatus] = field(default_factory=list)
     """All assets and their capture status"""
     
@@ -203,6 +200,27 @@ class DirectorState:
         self.error_message = message
         self.transition_to(DirectorPhase.ERROR, message)
     
+    @property
+    def script_path(self) -> Path:
+        """Path to script/script.json"""
+        return self.project_dir / "script" / "script.json"
+    
+    @property
+    def script_exists(self) -> bool:
+        """Check if script file exists."""
+        return self.script_path.exists()
+    
+    def get_script(self) -> Optional[dict]:
+        """
+        Load script from script/script.json.
+        
+        Returns None if file doesn't exist.
+        """
+        if not self.script_exists:
+            return None
+        with open(self.script_path) as f:
+            return json.load(f)
+    
     def get_pending_assets(self) -> list[AssetStatus]:
         """Get assets that haven't been captured yet."""
         return [a for a in self.assets if a.status == "pending"]
@@ -232,15 +250,16 @@ class DirectorState:
         """
         missing = []
         
-        if self.final_script is None:
-            missing.append("final_script")
+        script = self.get_script()
+        if script is None:
+            missing.append("script/script.json")
         
         if self.audio_file is None:
             missing.append("audio_file")
         
         # Check avatar clips for scenes that need them
-        if self.final_script:
-            for scene in self.final_script.get("scenes", []):
+        if script:
+            for scene in script.get("scenes", []):
                 if scene.get("avatar", {}).get("visible"):
                     avatar_src = scene.get("avatar", {}).get("src")
                     if avatar_src:
@@ -251,7 +270,12 @@ class DirectorState:
         return len(missing) == 0, missing
     
     def to_dict(self) -> dict:
-        """Serialize state to dictionary."""
+        """
+        Serialize state to dictionary.
+        
+        NOTE: Script content is NOT serialized here - it lives in script/script.json.
+        Asset metadata is NOT serialized - it lives in script/script.json.assets_needed.
+        """
         return {
             "project_id": self.project_id,
             "project_dir": str(self.project_dir),
@@ -260,8 +284,6 @@ class DirectorState:
             "topic": self.topic,
             "duration_seconds": self.duration_seconds,
             "evidence_urls": self.evidence_urls,
-            "draft_script": self.draft_script,
-            "final_script": self.final_script,
             "assets": [
                 {
                     "id": a.id,
@@ -269,7 +291,6 @@ class DirectorState:
                     "status": a.status,
                     "file_path": a.file_path,
                     "error": a.error,
-                    "metadata": a.metadata
                 }
                 for a in self.assets
             ],
@@ -289,7 +310,11 @@ class DirectorState:
     
     @classmethod
     def load(cls, project_dir: Path) -> "DirectorState":
-        """Load state from project directory."""
+        """
+        Load state from project directory.
+        
+        NOTE: Script content is loaded on-demand via get_script().
+        """
         state_path = project_dir / ".director_state.json"
         if not state_path.exists():
             raise FileNotFoundError(f"No director state found at {state_path}")
@@ -305,13 +330,11 @@ class DirectorState:
         state.topic = data.get("topic", "")
         state.duration_seconds = data.get("duration_seconds", 6)
         state.evidence_urls = data.get("evidence_urls", [])
-        state.draft_script = data.get("draft_script")
-        state.final_script = data.get("final_script")
         state.audio_file = data.get("audio_file")
         state.error_message = data.get("error_message")
         state.history = data.get("history", [])
         
-        # Load assets
+        # Load assets (status only, metadata lives in script/script.json)
         for a in data.get("assets", []):
             state.assets.append(AssetStatus(
                 id=a["id"],
@@ -319,7 +342,6 @@ class DirectorState:
                 status=a["status"],
                 file_path=a.get("file_path"),
                 error=a.get("error"),
-                metadata=a.get("metadata", {})
             ))
         
         return state
