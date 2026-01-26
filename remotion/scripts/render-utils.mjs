@@ -12,6 +12,7 @@ export function parseArgs(args) {
   const config = {
     propsPath: null,
     storyboardPath: null,
+    scriptPath: null, // For VarunPlayer - script.json path
     projectDir: null,
     outputPath: "./output.mp4",
     compositionId: "ScenePlayer",
@@ -31,6 +32,10 @@ export function parseArgs(args) {
       i++;
     } else if (args[i] === "--storyboard" && args[i + 1]) {
       config.storyboardPath = args[i + 1];
+      i++;
+    } else if (args[i] === "--script" && args[i + 1]) {
+      // For VarunPlayer composition
+      config.scriptPath = args[i + 1];
       i++;
     } else if (args[i] === "--project" && args[i + 1]) {
       config.projectDir = args[i + 1];
@@ -71,7 +76,10 @@ export function parseArgs(args) {
  * @returns {number} Total duration in seconds
  */
 export function calculateDuration(compositionId, props) {
-  if (compositionId === "ScenePlayer" && props.storyboard) {
+  if (compositionId === "VarunPlayer" && props.script) {
+    // VarunPlayer uses script.json with duration_seconds
+    return props.script.duration_seconds || 60;
+  } else if (compositionId === "ScenePlayer" && props.storyboard) {
     // New scene-based format
     const buffer = props.storyboard.audio?.buffer_between_scenes_seconds ?? 1.0;
     return props.storyboard.scenes.reduce(
@@ -130,12 +138,12 @@ export const SHORTS_RESOLUTION_PRESETS = {
 
 /**
  * Check if a composition should skip scene validation.
- * ShortsPlayer uses its own component system and doesn't need project scenes.
+ * ShortsPlayer and VarunPlayer use their own component systems and don't need project scenes.
  * @param {string} compositionId - The composition ID
  * @returns {boolean} True if scene validation should be skipped
  */
 export function shouldSkipSceneValidation(compositionId) {
-  return compositionId === "ShortsPlayer";
+  return compositionId === "ShortsPlayer" || compositionId === "VarunPlayer";
 }
 
 /**

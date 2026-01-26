@@ -58,7 +58,33 @@ async function main() {
   let props;
   let projectDir = config.projectDir;
 
-  if (config.storyboardPath) {
+  if (config.scriptPath) {
+    // VarunPlayer with script.json (director workflow)
+    if (!existsSync(config.scriptPath)) {
+      console.error(`Script file not found: ${config.scriptPath}`);
+      process.exit(1);
+    }
+
+    const script = JSON.parse(readFileSync(config.scriptPath, "utf-8"));
+    props = { script };
+
+    // Derive project directory from script path if not specified
+    if (!projectDir) {
+      projectDir = resolve(dirname(config.scriptPath), "..");
+    }
+
+    // Auto-set VarunPlayer composition if using --script
+    if (config.compositionId === "ScenePlayer") {
+      config.compositionId = "VarunPlayer";
+    }
+
+    console.log(`Loaded script from ${config.scriptPath}`);
+    console.log(`Project directory: ${projectDir}`);
+    console.log(`Title: ${script.title}`);
+    console.log(`Scenes: ${script.scenes?.length || 0}`);
+    console.log(`Duration: ${script.duration_seconds}s`);
+    console.log(`Composition: ${config.compositionId}`);
+  } else if (config.storyboardPath) {
     // Scene-based storyboard (new format)
     if (!existsSync(config.storyboardPath)) {
       console.error(`Storyboard file not found: ${config.storyboardPath}`);
@@ -95,6 +121,7 @@ async function main() {
     console.log(`Composition: ${config.compositionId}`);
   } else {
     console.error("Usage:");
+    console.error("  node scripts/render.mjs --composition VarunPlayer --script <script.json> --output <output.mp4>");
     console.error("  node scripts/render.mjs --composition ScenePlayer --storyboard <storyboard.json> --output <output.mp4>");
     console.error("  node scripts/render.mjs [--composition <id>] --props <props.json> --output <output.mp4>");
     process.exit(1);

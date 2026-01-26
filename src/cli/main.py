@@ -1,49 +1,103 @@
 """Main CLI entry point for video explainer pipeline.
 
-Usage:
-    python -m src.cli list                                    # List all projects
-    python -m src.cli info <project>                          # Show project info
-    python -m src.cli create <project_id>                     # Create new project
-    python -m src.cli generate <project>                      # Run full pipeline end-to-end
-    python -m src.cli generate <project> --from scenes        # Start from a specific step
-    python -m src.cli generate <project> --to voiceover       # Stop at a specific step
-    python -m src.cli generate <project> --force              # Force regenerate all steps
+================================================================================
+VARUN MAYYA STYLE SHORTS (Primary Workflow)
+================================================================================
+
+Complete workflow for vertical 9:16 shorts with avatar, backgrounds, and captions:
+
+    # Phase 0 (optional): Research a company for video content
+    python -m src.cli director my-short research --company "exa.ai"
+    
+    # Phase 1: Create project + draft script
+    python -m src.cli director my-short draft --topic "Your topic" --duration 30
+    
+    # Phase 2: Generate voiceover (ElevenLabs TTS)
+    python -m src.cli director my-short voiceover
+    
+    # Phase 3: Generate avatar videos (HeyGen lip-sync)
+    python -m src.cli director my-short avatar
+    
+    # Phase 4: Generate AI background videos (fal.ai)
+    python -m src.cli director my-short background
+    
+    # Phase 5: Assemble script.json with asset paths
+    python -m src.cli director my-short assemble
+    
+    # Phase 6: Verify everything is ready
+    python -m src.cli director my-short status
+    
+    # Phase 7: Render final video
+    python -m src.cli render my-short --varun
+
+Director subcommands:
+    research   - Research a company using Exa.ai (creates research.json)
+    draft      - Generate initial script with LLM (creates scenes + assets_needed)
+    voiceover  - Generate audio from script.json scenes using ElevenLabs
+    avatar     - Generate lip-synced avatar videos using HeyGen
+    background - Generate AI background videos using fal.ai
+    assemble   - Update script.json with generated asset paths
+    status     - Show current phase and asset status
+    review     - Review captured evidence assets
+    finalize   - Create render-ready script from approved assets
+
+================================================================================
+FULL EXPLAINER VIDEO (Secondary Workflow)
+================================================================================
+
+For longer-form horizontal 16:9 explainer videos from documents:
+
+    python -m src.cli create <project>                        # Create new project
+    python -m src.cli generate <project>                      # Run full pipeline
+    python -m src.cli generate <project> --from scenes        # Start from specific step
+    python -m src.cli generate <project> --to voiceover       # Stop at specific step
+
+Or run individual steps:
     python -m src.cli script <project>                        # Generate script from docs
     python -m src.cli script <project> --url <url>            # Generate script from URL
-    python -m src.cli script <project> -i doc.pdf             # Generate script from PDF
     python -m src.cli narration <project>                     # Generate narrations
     python -m src.cli scenes <project>                        # Generate Remotion scenes
     python -m src.cli voiceover <project>                     # Generate voiceovers
-    python -m src.cli storyboard <project> --view             # View storyboard
+    python -m src.cli storyboard <project>                    # Create storyboard
+    python -m src.cli render <project>                        # Render video
+    python -m src.cli render <project> -r 4k                  # Render in 4K
+
+================================================================================
+UTILITY COMMANDS
+================================================================================
+
+Project management:
+    python -m src.cli list                                    # List all projects
+    python -m src.cli info <project>                          # Show project info
+
+Audio & Sound:
     python -m src.cli sound <project> plan                    # Plan sound effects
     python -m src.cli sound <project> library --list          # List sound library
     python -m src.cli sound <project> mix                     # Mix audio
     python -m src.cli music <project> generate                # Generate background music
-    python -m src.cli render <project>                        # Render video
-    python -m src.cli render <project> -r 4k                  # Render in 4K
+
+Quality & Iteration:
     python -m src.cli feedback <project> add "<text>"         # Process feedback
     python -m src.cli feedback <project> list                 # List feedback
     python -m src.cli factcheck <project>                     # Fact-check script
     python -m src.cli refine <project>                        # Refine video quality
-    python -m src.cli refine <project> --scene 1              # Refine specific scene
 
-Input formats supported:
-    - Markdown files (.md, .markdown)
-    - PDF files (.pdf)
-    - Web URLs (https://...)
+================================================================================
+ENVIRONMENT VARIABLES REQUIRED
+================================================================================
 
-Pipeline workflow:
-    1. create    - Create new project with config
-    2. script    - Generate script from input documents (MD, PDF, or URL)
-    3. narration - Generate narrations for each scene
-    4. scenes    - Generate Remotion scene components (React/TypeScript)
-    5. voiceover - Generate audio files from narrations
-    6. storyboard - Create storyboard linking scenes with audio
-    7. sound     - Plan and mix sound effects
-    8. music     - Generate AI background music (optional)
-    9. render    - Render final video
-    10. feedback - Iterate on video with natural language feedback
-    11. refine   - Refine video quality to professional standards
+For Varun-style shorts:
+    OPENAI_API_KEY          - Script generation
+    ELEVENLABS_API_KEY      - TTS voiceover
+    HEYGEN_API_KEY          - Avatar lip-sync
+    FAL_KEY                 - AI video backgrounds
+    SUPABASE_PROJECT_URL    - Audio upload for HeyGen
+    SUPABASE_ANON_KEY       - Supabase auth
+
+For explainer videos:
+    ANTHROPIC_API_KEY       - Claude for script/narration
+    OPENAI_API_KEY          - Alternative LLM
+    ELEVENLABS_API_KEY      - TTS voiceover
 """
 
 import argparse
@@ -1305,9 +1359,12 @@ def cmd_render(args: argparse.Namespace) -> int:
         return 1
 
     is_short = getattr(args, "short", False)
+    is_varun = getattr(args, "varun", False)
     variant = getattr(args, "variant", "default")
 
-    if is_short:
+    if is_varun:
+        print(f"Rendering Varun-style short for {project.id}")
+    elif is_short:
         print(f"Rendering short for {project.id} (variant: {variant})")
     else:
         print(f"Rendering video for {project.id}")
@@ -1320,33 +1377,46 @@ def cmd_render(args: argparse.Namespace) -> int:
         print(f"Error: Render script not found: {render_script}", file=sys.stderr)
         return 1
 
-    # Check for storyboard (different paths for shorts vs full video)
-    if is_short:
+    # Check for storyboard/script (different paths for shorts, varun, and full video)
+    if is_varun:
+        # VarunPlayer uses script/script.json
+        script_path = project.root_dir / "script" / "script.json"
+        voiceover_dir = project.root_dir / "avatar"  # Audio in avatar folder
+        audio_dir = "avatar"
+        composition_id = "VarunPlayer"
+        
+        if not script_path.exists():
+            print(f"Error: Script not found: {script_path}", file=sys.stderr)
+            print(f"Run 'python -m src.cli director {project.id} draft' first")
+            return 1
+    elif is_short:
         storyboard_path = project.root_dir / "short" / variant / "storyboard" / "shorts_storyboard.json"
         voiceover_dir = project.root_dir / "short" / variant / "voiceover"
         audio_dir = f"short/{variant}/voiceover"
         composition_id = "ShortsPlayer"
+        
+        if not storyboard_path.exists():
+            print(f"Error: Storyboard not found: {storyboard_path}", file=sys.stderr)
+            print(f"Run 'python -m src.cli short {project.id}' first")
+            return 1
     else:
         storyboard_path = project.get_path("storyboard")
         voiceover_dir = project.voiceover_dir
         audio_dir = "voiceover"
         composition_id = "ScenePlayer"
-
-    if not storyboard_path.exists():
-        print(f"Error: Storyboard not found: {storyboard_path}", file=sys.stderr)
-        if is_short:
-            print(f"Run 'python -m src.cli short {project.id}' first")
-        else:
+        
+        if not storyboard_path.exists():
+            print(f"Error: Storyboard not found: {storyboard_path}", file=sys.stderr)
             print("Run storyboard generation first or create storyboard/storyboard.json")
-        return 1
+            return 1
 
-    # Check for voiceover files
+    # Check for voiceover/audio files
     voiceover_files = list(voiceover_dir.glob("*.mp3"))
-    print(f"Found {len(voiceover_files)} voiceover files")
+    print(f"Found {len(voiceover_files)} audio files")
 
-    # Determine resolution (use shorts presets for shorts)
+    # Determine resolution (use shorts presets for shorts and varun)
     resolution_name = args.resolution or "1080p"
-    if is_short:
+    if is_short or is_varun:
         if resolution_name not in SHORTS_RESOLUTION_PRESETS:
             print(f"Error: Unknown resolution '{resolution_name}'", file=sys.stderr)
             print(f"Available: {', '.join(SHORTS_RESOLUTION_PRESETS.keys())}", file=sys.stderr)
@@ -1360,7 +1430,16 @@ def cmd_render(args: argparse.Namespace) -> int:
         width, height = RESOLUTION_PRESETS[resolution_name]
 
     # Determine output path
-    if is_short:
+    if is_varun:
+        output_dir = project.root_dir / "output"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        if args.preview:
+            output_path = output_dir / "preview.mp4"
+        elif resolution_name != "1080p":
+            output_path = output_dir / f"short-{resolution_name}.mp4"
+        else:
+            output_path = output_dir / "short.mp4"
+    elif is_short:
         short_output_dir = project.root_dir / "short" / variant / "output"
         short_output_dir.mkdir(parents=True, exist_ok=True)
         if args.preview:
@@ -1394,8 +1473,11 @@ def cmd_render(args: argparse.Namespace) -> int:
         "--composition", composition_id,
     ]
 
+    # For VarunPlayer, pass the script path
+    if is_varun:
+        cmd.extend(["--script", str(script_path)])
     # For shorts, pass the storyboard path explicitly
-    if is_short:
+    elif is_short:
         cmd.extend(["--storyboard", str(storyboard_path)])
 
     # Performance options
@@ -2198,13 +2280,21 @@ def cmd_director(args: argparse.Namespace) -> int:
     if not args.director_command:
         print("Usage: python -m src.cli director <project> <command>")
         print("\nCommands:")
-        print("  draft    - Generate initial script with LLM")
-        print("  status   - Show current production phase")
-        print("  review   - Review captured assets")
-        print("  finalize - Create render-ready script")
+        print("  research   - Research a company using Exa.ai")
+        print("  draft      - Generate initial script with LLM")
+        print("  status     - Show current production phase")
+        print("  review     - Review captured assets")
+        print("  finalize   - Create render-ready script")
+        print("  voiceover  - Generate voiceover audio from script.json")
+        print("  avatar     - Generate lip-synced avatar videos")
+        print("  background - Generate AI background videos")
+        print("  assemble   - Update script.json with asset paths")
         return 1
     
-    if args.director_command == "draft":
+    if args.director_command == "research":
+        return _director_research(args, state)
+    
+    elif args.director_command == "draft":
         return _director_draft(args, state)
     
     elif args.director_command == "status":
@@ -2216,8 +2306,139 @@ def cmd_director(args: argparse.Namespace) -> int:
     elif args.director_command == "finalize":
         return _director_finalize(args, state)
     
+    elif args.director_command == "voiceover":
+        return _director_voiceover(args, state)
+    
+    elif args.director_command == "avatar":
+        return _director_avatar(args, state)
+    
+    elif args.director_command == "background":
+        return _director_background(args, state)
+    
+    elif args.director_command == "assemble":
+        return _director_assemble(args, state)
+    
     else:
         print(f"Unknown director command: {args.director_command}")
+        return 1
+
+
+def _director_research(args, state) -> int:
+    """
+    Research a company using Exa.ai to gather comprehensive intelligence.
+    
+    Creates a research.json file in the project's input/ directory containing
+    company information, funding, founders, competitors, news, and social profiles.
+    This data can then be used to inform the draft script generation.
+    """
+    import json
+    from pathlib import Path
+    
+    company = getattr(args, 'company', None)
+    if not company:
+        company = input("Enter company URL or domain (e.g., exa.ai): ").strip()
+        if not company:
+            print("Error: Company URL/domain is required", file=sys.stderr)
+            return 1
+    
+    verbose = getattr(args, 'verbose', False)
+    
+    print(f"\n{'='*60}")
+    print(f"DIRECTOR - Phase 0: Company Research")
+    print(f"{'='*60}")
+    print(f"Project: {state.project_id}")
+    print(f"Company: {company}")
+    print()
+    
+    try:
+        from ..company_researcher import CompanyResearcher
+        
+        researcher = CompanyResearcher()
+        
+        print("Researching company using Exa.ai...")
+        print("(This may take 30-60 seconds)")
+        print()
+        
+        report = researcher.research(
+            company_url=company,
+            include_funding=not getattr(args, 'skip_funding', False),
+            include_founders=not getattr(args, 'skip_founders', False),
+            include_competitors=not getattr(args, 'skip_competitors', False),
+            include_news=not getattr(args, 'skip_news', False),
+            include_social=not getattr(args, 'skip_social', False),
+            include_wikipedia=True,
+            verbose=verbose,
+        )
+        
+        # Save research to input/research.json
+        input_dir = state.project_dir / "input"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        
+        research_path = input_dir / "research.json"
+        with open(research_path, "w") as f:
+            f.write(report.to_json(indent=2))
+        
+        print(f"\nResearch saved to: {research_path}")
+        
+        # Display summary
+        print(f"\n{'='*60}")
+        print("RESEARCH SUMMARY")
+        print(f"{'='*60}")
+        print(f"Company: {report.company.name}")
+        print(f"URL: {report.company.url}")
+        if report.company.description:
+            print(f"Description: {report.company.description[:200]}...")
+        print()
+        
+        if report.funding:
+            print(f"Funding: {report.funding.summary[:200] if report.funding.summary else 'Not found'}...")
+        
+        if report.founders:
+            print(f"Founders: {len(report.founders)} found")
+            for f in report.founders[:3]:
+                print(f"  - {f.name}")
+        
+        if report.competitors:
+            print(f"Competitors: {len(report.competitors)} found")
+            for c in report.competitors[:3]:
+                print(f"  - {c.name}: {c.description[:50]}...")
+        
+        if report.news:
+            print(f"News articles: {len(report.news)}")
+        
+        if report.social_profiles:
+            print(f"Social profiles: {', '.join(p.platform for p in report.social_profiles)}")
+        
+        # Show profile URLs
+        print()
+        print("Profile URLs:")
+        if report.linkedin_url:
+            print(f"  LinkedIn: {report.linkedin_url}")
+        if report.crunchbase_url:
+            print(f"  Crunchbase: {report.crunchbase_url}")
+        if report.pitchbook_url:
+            print(f"  PitchBook: {report.pitchbook_url}")
+        
+        print(f"\n{'='*60}")
+        print("NEXT STEPS")
+        print(f"{'='*60}")
+        print("1. Review research.json and optionally edit it")
+        print()
+        print("2. Generate script using the research:")
+        print(f"   python -m src.cli director {state.project_id} draft --topic \"{report.company.name}\"")
+        print()
+        
+        return 0
+        
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        print("\nMake sure EXA_API_KEY is set in your .env file")
+        print("Get your API key at: https://dashboard.exa.ai/api-keys")
+        return 1
+    except Exception as e:
+        print(f"Error during research: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
         return 1
 
 
@@ -2614,6 +2835,732 @@ def _get_mock_draft_script(topic: str, duration: int) -> dict:
             ]
         }
     }
+
+
+def _director_voiceover(args, state) -> int:
+    """Generate voiceover audio from script.json scenes using ElevenLabs TTS."""
+    import json
+    from pathlib import Path
+    from ..audio.tts import ElevenLabsTTS
+    from ..config import TTSConfig
+    from ..factory.director_state import DirectorPhase
+    
+    print(f"\n{'='*60}")
+    print(f"DIRECTOR VOICEOVER: {state.project_id}")
+    print(f"{'='*60}")
+    
+    # Load config for voice_id
+    config_path = state.project_dir / "config.json"
+    if not config_path.exists():
+        print(f"Error: config.json not found at {config_path}", file=sys.stderr)
+        return 1
+    
+    with open(config_path) as f:
+        config = json.load(f)
+    
+    voice_id = config.get("tts", {}).get("voice_id")
+    if not voice_id:
+        print("Error: tts.voice_id not found in config.json", file=sys.stderr)
+        print("Add it like: {\"tts\": {\"voice_id\": \"your-voice-id\"}}")
+        return 1
+    
+    print(f"Voice ID: {voice_id}")
+    
+    # Load script
+    script_path = state.project_dir / "script" / "script.json"
+    if not script_path.exists():
+        print(f"Error: script.json not found. Run 'director draft' first.", file=sys.stderr)
+        return 1
+    
+    with open(script_path) as f:
+        script = json.load(f)
+    
+    scenes = script.get("scenes", [])
+    if not scenes:
+        print("Error: No scenes found in script.json", file=sys.stderr)
+        return 1
+    
+    # Filter to specific scene if requested
+    scene_filter = getattr(args, 'scene', None)
+    if scene_filter:
+        scenes = [s for s in scenes if s.get("id") == scene_filter]
+        if not scenes:
+            print(f"Error: Scene '{scene_filter}' not found", file=sys.stderr)
+            return 1
+    
+    # Initialize TTS
+    try:
+        tts_config = TTSConfig(provider='elevenlabs', voice_id=voice_id, model='eleven_multilingual_v2')
+        tts = ElevenLabsTTS(tts_config)
+    except Exception as e:
+        print(f"Error initializing TTS: {e}", file=sys.stderr)
+        print("Make sure ELEVENLABS_API_KEY is set in .env")
+        return 1
+    
+    # Create output directory
+    avatar_dir = state.project_dir / "avatar"
+    avatar_dir.mkdir(parents=True, exist_ok=True)
+    
+    results = []
+    force = getattr(args, 'force', False)
+    
+    print(f"\nGenerating voiceover for {len(scenes)} scene(s)...")
+    print()
+    
+    for scene in scenes:
+        scene_id = scene.get("id", "unknown")
+        audio_text = scene.get("audio", {}).get("text", "")
+        
+        if not audio_text:
+            print(f"  [{scene_id}] Skipped - no audio.text")
+            continue
+        
+        output_path = avatar_dir / f"{scene_id}_audio.mp3"
+        
+        # Skip if exists and not forcing
+        if output_path.exists() and not force:
+            print(f"  [{scene_id}] Skipped - {output_path.name} exists (use --force to regenerate)")
+            continue
+        
+        print(f"  [{scene_id}] Generating: \"{audio_text[:50]}...\"")
+        
+        try:
+            result = tts.generate_with_timestamps(audio_text, str(output_path))
+            
+            # Store timestamps for later
+            timestamps = [
+                {"word": w.word, "start": round(w.start_seconds, 3), "end": round(w.end_seconds, 3)}
+                for w in result.word_timestamps
+            ]
+            
+            results.append({
+                "scene_id": scene_id,
+                "audio_path": str(output_path.relative_to(state.project_dir)),
+                "duration_seconds": result.duration_seconds,
+                "word_timestamps": timestamps
+            })
+            
+            print(f"           Duration: {result.duration_seconds:.2f}s, Words: {len(timestamps)}")
+            
+        except Exception as e:
+            print(f"           ERROR: {e}", file=sys.stderr)
+            continue
+    
+    # Save manifest
+    if results:
+        manifest_path = state.project_dir / "voiceover" / "manifest.json"
+        manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Load existing manifest or create new
+        if manifest_path.exists():
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+        else:
+            manifest = {"scenes": []}
+        
+        # Update/add scenes
+        existing_ids = {s["scene_id"] for s in manifest["scenes"]}
+        for r in results:
+            if r["scene_id"] in existing_ids:
+                # Update existing
+                for s in manifest["scenes"]:
+                    if s["scene_id"] == r["scene_id"]:
+                        s.update(r)
+                        break
+            else:
+                manifest["scenes"].append(r)
+        
+        with open(manifest_path, "w") as f:
+            json.dump(manifest, f, indent=2)
+        
+        print(f"\nManifest saved: {manifest_path}")
+    
+    # Update state
+    if results:
+        state.audio_file = str(results[0]["audio_path"])
+        state.word_timestamps = results[0].get("word_timestamps")
+        state.save()
+    
+    print(f"\n{'='*60}")
+    print("NEXT STEPS")
+    print(f"{'='*60}")
+    print(f"1. Generate avatar videos:")
+    print(f"   python -m src.cli director {state.project_id} avatar")
+    print()
+    print(f"2. Generate background videos:")
+    print(f"   python -m src.cli director {state.project_id} background")
+    print()
+    
+    return 0
+
+
+def _director_avatar(args, state) -> int:
+    """Generate lip-synced avatar videos using HeyGen API."""
+    import json
+    import os
+    import time
+    import subprocess
+    from pathlib import Path
+    
+    try:
+        import httpx
+    except ImportError:
+        print("Error: httpx not installed. Run: pip install httpx", file=sys.stderr)
+        return 1
+    
+    print(f"\n{'='*60}")
+    print(f"DIRECTOR AVATAR: {state.project_id}")
+    print(f"{'='*60}")
+    
+    # Load config for avatar_id
+    config_path = state.project_dir / "config.json"
+    if not config_path.exists():
+        print(f"Error: config.json not found", file=sys.stderr)
+        return 1
+    
+    with open(config_path) as f:
+        config = json.load(f)
+    
+    avatar_id = config.get("avatar", {}).get("avatar_id")
+    if not avatar_id:
+        print("Error: avatar.avatar_id not found in config.json", file=sys.stderr)
+        return 1
+    
+    # Check environment variables
+    heygen_key = os.environ.get("HEYGEN_API_KEY")
+    supabase_url = os.environ.get("SUPABASE_PROJECT_URL")
+    supabase_key = os.environ.get("SUPABASE_ANON_KEY")
+    
+    if not heygen_key:
+        print("Error: HEYGEN_API_KEY not set in environment", file=sys.stderr)
+        return 1
+    if not supabase_url or not supabase_key:
+        print("Error: SUPABASE_PROJECT_URL and SUPABASE_ANON_KEY required", file=sys.stderr)
+        return 1
+    
+    print(f"Avatar ID: {avatar_id}")
+    print(f"Supabase: {supabase_url}")
+    
+    # Load script to find scenes with avatar
+    script_path = state.project_dir / "script" / "script.json"
+    if not script_path.exists():
+        print(f"Error: script.json not found", file=sys.stderr)
+        return 1
+    
+    with open(script_path) as f:
+        script = json.load(f)
+    
+    # Find scenes that need avatar
+    scenes = []
+    for scene in script.get("scenes", []):
+        if scene.get("avatar", {}).get("visible", False):
+            scenes.append(scene)
+    
+    if not scenes:
+        print("No scenes require avatar (avatar.visible = true)")
+        return 0
+    
+    # Filter to specific scene if requested
+    scene_filter = getattr(args, 'scene', None)
+    if scene_filter:
+        scenes = [s for s in scenes if s.get("id") == scene_filter]
+        if not scenes:
+            print(f"Error: Scene '{scene_filter}' not found or doesn't need avatar", file=sys.stderr)
+            return 1
+    
+    avatar_dir = state.project_dir / "avatar"
+    force = getattr(args, 'force', False)
+    skip_crop = getattr(args, 'skip_crop', False)
+    
+    print(f"\nGenerating avatar for {len(scenes)} scene(s)...")
+    print()
+    
+    motion_prompt = "Talking Naturally: Subject talks animatedly while maintaining direct eye contact with the camera. Background elements subtly move to enhance realism. Camera remains absolutely static."
+    
+    for scene in scenes:
+        scene_id = scene.get("id", "unknown")
+        
+        # Check if audio exists
+        audio_path = avatar_dir / f"{scene_id}_audio.mp3"
+        if not audio_path.exists():
+            print(f"  [{scene_id}] Skipped - {audio_path.name} not found")
+            print(f"           Run 'director voiceover' first")
+            continue
+        
+        output_16x9 = avatar_dir / f"{scene_id}_16x9.mp4"
+        output_bottom = avatar_dir / f"{scene_id}_bottom.mp4"
+        
+        # Skip if exists and not forcing
+        if output_16x9.exists() and not force:
+            print(f"  [{scene_id}] Skipped - {output_16x9.name} exists (use --force)")
+            continue
+        
+        print(f"  [{scene_id}] Processing...")
+        
+        # Step 1: Upload audio to Supabase
+        print(f"           Uploading audio to Supabase...")
+        file_name = f"{state.project_id}_{scene_id}.mp3"
+        
+        try:
+            with httpx.Client(timeout=60.0) as client:
+                headers = {
+                    'Authorization': f'Bearer {supabase_key}',
+                    'apikey': supabase_key,
+                    'Content-Type': 'audio/mpeg',
+                }
+                
+                # Try POST first, then PUT if exists
+                resp = client.post(
+                    f'{supabase_url}/storage/v1/object/audio/{file_name}',
+                    headers=headers,
+                    content=audio_path.read_bytes()
+                )
+                if resp.status_code not in (200, 201):
+                    resp = client.put(
+                        f'{supabase_url}/storage/v1/object/audio/{file_name}',
+                        headers=headers,
+                        content=audio_path.read_bytes()
+                    )
+                    if resp.status_code not in (200, 201):
+                        print(f"           ERROR uploading: {resp.text}", file=sys.stderr)
+                        continue
+                
+                public_url = f'{supabase_url}/storage/v1/object/public/audio/{file_name}'
+                print(f"           Audio URL: {public_url[:60]}...")
+                
+        except Exception as e:
+            print(f"           ERROR: {e}", file=sys.stderr)
+            continue
+        
+        # Step 2: Generate HeyGen video
+        print(f"           Generating HeyGen video...")
+        
+        try:
+            with httpx.Client(timeout=300.0) as client:
+                payload = {
+                    'video_inputs': [{
+                        'character': {
+                            'type': 'avatar',
+                            'avatar_id': avatar_id,
+                            'avatar_style': 'normal',
+                            'motion_prompt': motion_prompt
+                        },
+                        'voice': {
+                            'type': 'audio',
+                            'audio_url': public_url
+                        }
+                    }],
+                    'dimension': {'width': 1280, 'height': 720}
+                }
+                
+                headers = {'X-Api-Key': heygen_key, 'Content-Type': 'application/json'}
+                
+                resp = client.post('https://api.heygen.com/v2/video/generate', headers=headers, json=payload)
+                if resp.status_code != 200:
+                    print(f"           ERROR: {resp.text}", file=sys.stderr)
+                    continue
+                
+                video_id = resp.json()['data']['video_id']
+                print(f"           Video ID: {video_id}")
+                
+                # Poll for completion
+                max_wait = 300
+                elapsed = 0
+                while elapsed < max_wait:
+                    status_resp = client.get(
+                        f'https://api.heygen.com/v1/video_status.get?video_id={video_id}',
+                        headers=headers
+                    )
+                    status_data = status_resp.json()
+                    status = status_data.get('data', {}).get('status')
+                    
+                    if status == 'completed':
+                        video_url = status_data['data']['video_url']
+                        video_data = client.get(video_url).content
+                        output_16x9.write_bytes(video_data)
+                        print(f"           Saved: {output_16x9.name}")
+                        break
+                    elif status == 'failed':
+                        error = status_data.get('data', {}).get('error', 'Unknown error')
+                        print(f"           FAILED: {error}", file=sys.stderr)
+                        break
+                    else:
+                        print(f"           Status: {status} ({elapsed}s)")
+                        time.sleep(5)
+                        elapsed += 5
+                else:
+                    print(f"           TIMEOUT after {max_wait}s", file=sys.stderr)
+                    continue
+                    
+        except Exception as e:
+            print(f"           ERROR: {e}", file=sys.stderr)
+            continue
+        
+        # Step 3: Crop for template
+        if not skip_crop and output_16x9.exists():
+            print(f"           Cropping for SplitProof template...")
+            try:
+                cmd = [
+                    'ffmpeg', '-y', '-i', str(output_16x9),
+                    '-vf', 'crop=1012:720:134:0',
+                    '-c:a', 'copy',
+                    str(output_bottom)
+                ]
+                result = subprocess.run(cmd, capture_output=True, text=True)
+                if result.returncode == 0:
+                    print(f"           Saved: {output_bottom.name}")
+                else:
+                    print(f"           Crop failed: {result.stderr[:100]}", file=sys.stderr)
+            except Exception as e:
+                print(f"           Crop error: {e}", file=sys.stderr)
+    
+    print(f"\n{'='*60}")
+    print("NEXT STEPS")
+    print(f"{'='*60}")
+    print(f"1. Generate background videos:")
+    print(f"   python -m src.cli director {state.project_id} background")
+    print()
+    print(f"2. Assemble script.json with asset paths:")
+    print(f"   python -m src.cli director {state.project_id} assemble")
+    print()
+    
+    return 0
+
+
+def _director_background(args, state) -> int:
+    """Generate AI background videos using fal.ai API."""
+    import json
+    import asyncio
+    import os
+    from pathlib import Path
+    
+    print(f"\n{'='*60}")
+    print(f"DIRECTOR BACKGROUND: {state.project_id}")
+    print(f"{'='*60}")
+    
+    # Check for FAL_KEY
+    if not os.environ.get("FAL_KEY"):
+        print("Error: FAL_KEY not set in environment", file=sys.stderr)
+        print("Get your API key from: https://fal.ai/dashboard/keys")
+        return 1
+    
+    # Load script
+    script_path = state.project_dir / "script" / "script.json"
+    if not script_path.exists():
+        print(f"Error: script.json not found", file=sys.stderr)
+        return 1
+    
+    with open(script_path) as f:
+        script = json.load(f)
+    
+    # Check for ai_video_config.json
+    config_path = state.project_dir / "backgrounds" / "ai_video_config.json"
+    
+    if config_path.exists():
+        print(f"Using existing config: {config_path}")
+        with open(config_path) as f:
+            ai_config = json.load(f)
+    else:
+        # Generate config from script.json
+        print("Generating ai_video_config.json from script.json...")
+        ai_config = {}
+        
+        for scene in script.get("scenes", []):
+            scene_id = scene.get("id", "")
+            bg = scene.get("background", {})
+            
+            # Skip if no background video needed
+            if bg.get("type") not in ("video", "ai_video"):
+                continue
+            
+            # Get prompt from background.note or generate from description
+            prompt = bg.get("note", "")
+            if not prompt:
+                prompt = scene.get("description", f"Background video for {scene_id}")
+            
+            ai_config[scene_id] = {
+                "narration": scene.get("audio", {}).get("text", ""),
+                "timing": {
+                    "start_seconds": scene.get("start_seconds", 0),
+                    "end_seconds": scene.get("end_seconds", 5)
+                },
+                "prompt": {
+                    "main": prompt,
+                    "context": scene.get("description", "")
+                },
+                "generation": {
+                    "model": getattr(args, 'model', "fal-ai/kling-video/v1.5/pro/text-to-video"),
+                    "aspect_ratio": "9:16",
+                    "duration": "5",
+                    "resolution": "1080p",
+                    "generate_audio": False,
+                    "negative_prompt": "blurry, low quality, distorted, text, watermark"
+                },
+                "output": {
+                    "filename": f"{scene_id}_background.mp4"
+                }
+            }
+        
+        if not ai_config:
+            print("No scenes with video backgrounds found")
+            return 0
+        
+        # Save config
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(config_path, "w") as f:
+            json.dump(ai_config, f, indent=2)
+        print(f"Config saved: {config_path}")
+    
+    # Filter to specific scene if requested
+    scene_filter = getattr(args, 'scene', None)
+    if scene_filter:
+        if scene_filter not in ai_config:
+            print(f"Error: Scene '{scene_filter}' not found in config", file=sys.stderr)
+            return 1
+        ai_config = {scene_filter: ai_config[scene_filter]}
+    
+    dry_run = getattr(args, 'dry_run', False)
+    force = getattr(args, 'force', False)
+    
+    print(f"\nGenerating {len(ai_config)} background video(s)...")
+    print()
+    
+    if dry_run:
+        print("[DRY RUN MODE]")
+        for scene_id, cfg in ai_config.items():
+            print(f"\n  [{scene_id}]")
+            print(f"    Prompt: {cfg['prompt']['main'][:80]}...")
+            print(f"    Model: {cfg['generation']['model']}")
+            print(f"    Duration: {cfg['generation']['duration']}s")
+            print(f"    Output: {cfg['output']['filename']}")
+        return 0
+    
+    # Import fal generator
+    try:
+        from ..video_gen import FalVideoGenerator, FalVideoConfig, AspectRatio, Duration, Resolution
+    except ImportError as e:
+        print(f"Error importing video_gen: {e}", file=sys.stderr)
+        return 1
+    
+    backgrounds_dir = state.project_dir / "backgrounds"
+    backgrounds_dir.mkdir(parents=True, exist_ok=True)
+    
+    async def generate_video(scene_id: str, cfg: dict) -> bool:
+        output_path = backgrounds_dir / cfg["output"]["filename"]
+        
+        if output_path.exists() and not force:
+            print(f"  [{scene_id}] Skipped - {output_path.name} exists (use --force)")
+            return True
+        
+        print(f"  [{scene_id}] Generating...")
+        print(f"    Prompt: {cfg['prompt']['main'][:60]}...")
+        
+        gen = cfg["generation"]
+        prompt = cfg["prompt"]["main"]
+        if cfg["prompt"].get("context"):
+            prompt = f"{prompt}\n\nContext: {cfg['prompt']['context']}"
+        
+        # Map aspect ratio
+        ar_map = {"16:9": AspectRatio.LANDSCAPE, "9:16": AspectRatio.PORTRAIT, "1:1": AspectRatio.SQUARE}
+        aspect = ar_map.get(gen.get("aspect_ratio", "9:16"), AspectRatio.PORTRAIT)
+        
+        # Map duration
+        dur_str = str(gen.get("duration", "5")).replace("s", "")
+        dur_map = {"4": Duration.SHORT, "5": Duration.FIVE, "6": Duration.MEDIUM, "8": Duration.LONG, "10": Duration.TEN}
+        duration = dur_map.get(dur_str, Duration.FIVE)
+        
+        try:
+            generator = FalVideoGenerator(config=FalVideoConfig(
+                model=gen.get("model", "fal-ai/kling-video/v1.5/pro/text-to-video"),
+                aspect_ratio=aspect,
+                duration=duration,
+            ))
+            
+            result = await generator.generate(
+                prompt=prompt,
+                output_path=output_path,
+                negative_prompt=gen.get("negative_prompt"),
+                aspect_ratio=aspect,
+                duration=duration,
+            )
+            
+            print(f"    Saved: {output_path.name} ({result.duration_seconds}s)")
+            return True
+            
+        except Exception as e:
+            print(f"    ERROR: {e}", file=sys.stderr)
+            return False
+    
+    # Run generation
+    async def run_all():
+        for scene_id, cfg in ai_config.items():
+            await generate_video(scene_id, cfg)
+    
+    asyncio.run(run_all())
+    
+    print(f"\n{'='*60}")
+    print("NEXT STEPS")
+    print(f"{'='*60}")
+    print(f"1. Assemble script.json with asset paths:")
+    print(f"   python -m src.cli director {state.project_id} assemble")
+    print()
+    print(f"2. Render the video:")
+    print(f"   python -m src.cli render {state.project_id}")
+    print()
+    
+    return 0
+
+
+def _director_assemble(args, state) -> int:
+    """Scan asset folders and update script.json with file paths and timestamps."""
+    import json
+    from pathlib import Path
+    
+    print(f"\n{'='*60}")
+    print(f"DIRECTOR ASSEMBLE: {state.project_id}")
+    print(f"{'='*60}")
+    
+    # Load script
+    script_path = state.project_dir / "script" / "script.json"
+    if not script_path.exists():
+        print(f"Error: script.json not found", file=sys.stderr)
+        return 1
+    
+    with open(script_path) as f:
+        script = json.load(f)
+    
+    # Load voiceover manifest for timestamps
+    manifest_path = state.project_dir / "voiceover" / "manifest.json"
+    timestamps_by_scene = {}
+    if manifest_path.exists():
+        with open(manifest_path) as f:
+            manifest = json.load(f)
+        for s in manifest.get("scenes", []):
+            timestamps_by_scene[s["scene_id"]] = s
+    
+    # Scan asset directories
+    avatar_dir = state.project_dir / "avatar"
+    backgrounds_dir = state.project_dir / "backgrounds"
+    
+    dry_run = getattr(args, 'dry_run', False)
+    updates = []
+    
+    print("\nScanning assets...")
+    
+    for scene in script.get("scenes", []):
+        scene_id = scene.get("id", "")
+        scene_updates = []
+        
+        # Update audio
+        audio_file = avatar_dir / f"{scene_id}_audio.mp3"
+        if audio_file.exists():
+            rel_path = f"avatar/{scene_id}_audio.mp3"
+            if scene.get("audio", {}).get("file") != rel_path:
+                scene_updates.append(f"audio.file = {rel_path}")
+                if not dry_run:
+                    if "audio" not in scene:
+                        scene["audio"] = {}
+                    scene["audio"]["file"] = rel_path
+            
+            # Add word timestamps
+            if scene_id in timestamps_by_scene:
+                ts_data = timestamps_by_scene[scene_id]
+                if ts_data.get("word_timestamps"):
+                    scene_updates.append(f"audio.word_timestamps = [{len(ts_data['word_timestamps'])} words]")
+                    if not dry_run:
+                        scene["audio"]["word_timestamps"] = ts_data["word_timestamps"]
+                
+                # Update duration
+                if ts_data.get("duration_seconds"):
+                    scene_updates.append(f"end_seconds adjusted by duration {ts_data['duration_seconds']:.2f}s")
+        
+        # Update avatar
+        avatar_bottom = avatar_dir / f"{scene_id}_bottom.mp4"
+        avatar_16x9 = avatar_dir / f"{scene_id}_16x9.mp4"
+        
+        if scene.get("avatar", {}).get("visible"):
+            if avatar_bottom.exists():
+                rel_path = f"avatar/{scene_id}_bottom.mp4"
+                if scene.get("avatar", {}).get("src") != rel_path:
+                    scene_updates.append(f"avatar.src = {rel_path}")
+                    if not dry_run:
+                        scene["avatar"]["src"] = rel_path
+            elif avatar_16x9.exists():
+                rel_path = f"avatar/{scene_id}_16x9.mp4"
+                if scene.get("avatar", {}).get("src") != rel_path:
+                    scene_updates.append(f"avatar.src = {rel_path}")
+                    if not dry_run:
+                        scene["avatar"]["src"] = rel_path
+        
+        # Update background
+        # Try multiple naming patterns
+        bg_patterns = [
+            f"{scene_id}_background.mp4",
+            f"{scene_id}_*.mp4",
+        ]
+        
+        for pattern in bg_patterns:
+            if "*" in pattern:
+                matches = list(backgrounds_dir.glob(pattern))
+                if matches:
+                    bg_file = matches[0]
+                    break
+            else:
+                bg_file = backgrounds_dir / pattern
+                if bg_file.exists():
+                    break
+        else:
+            bg_file = None
+        
+        if bg_file and bg_file.exists():
+            rel_path = f"backgrounds/{bg_file.name}"
+            if scene.get("background", {}).get("src") != rel_path:
+                scene_updates.append(f"background.src = {rel_path}")
+                if not dry_run:
+                    if "background" not in scene:
+                        scene["background"] = {}
+                    scene["background"]["src"] = rel_path
+        
+        if scene_updates:
+            updates.append((scene_id, scene_updates))
+    
+    # Display updates
+    if updates:
+        print("\nUpdates:")
+        for scene_id, scene_updates in updates:
+            print(f"\n  [{scene_id}]")
+            for u in scene_updates:
+                print(f"    - {u}")
+        
+        if dry_run:
+            print("\n[DRY RUN] No changes written")
+        else:
+            # Save updated script
+            with open(script_path, "w") as f:
+                json.dump(script, f, indent=2)
+            print(f"\nScript updated: {script_path}")
+    else:
+        print("\nNo updates needed - all paths already set")
+    
+    # Update director state
+    if not dry_run:
+        from ..factory.director_state import DirectorPhase
+        state.final_script = script
+        if state.phase not in (DirectorPhase.READY_FOR_RENDER, DirectorPhase.RENDERING, DirectorPhase.COMPLETE):
+            state.transition_to(DirectorPhase.READY_FOR_RENDER, "Assets assembled")
+        state.save()
+    
+    print(f"\n{'='*60}")
+    print("NEXT STEPS")
+    print(f"{'='*60}")
+    print(f"1. Check status:")
+    print(f"   python -m src.cli director {state.project_id} status")
+    print()
+    print(f"2. Render the video:")
+    print(f"   python -m src.cli render {state.project_id}")
+    print()
+    
+    return 0
 
 
 def cmd_factcheck(args: argparse.Namespace) -> int:
@@ -4111,6 +5058,11 @@ Commands:
         help="Render a short video instead of the full video",
     )
     render_parser.add_argument(
+        "--varun",
+        action="store_true",
+        help="Render using VarunPlayer (director workflow with script.json)",
+    )
+    render_parser.add_argument(
         "--variant",
         default="default",
         help="Short variant to render (default: 'default')",
@@ -4701,17 +5653,25 @@ Commands:
 Director - The brain/orchestrator for Varun Mayya style shorts.
 
 Commands:
-  draft    - Generate initial script with LLM (creates assets_needed)
-  status   - Show current production phase and asset status
-  review   - Review captured assets (approve/reject)
-  finalize - Create render-ready script from approved assets
+  research   - Research a company using Exa.ai (Phase 0)
+  draft      - Generate initial script with LLM (creates assets_needed)
+  status     - Show current production phase and asset status
+  voiceover  - Generate voiceover audio from script.json
+  avatar     - Generate lip-synced avatar videos using HeyGen
+  background - Generate AI background videos using fal.ai
+  assemble   - Update script.json with asset paths
+  review     - Review captured assets (approve/reject)
+  finalize   - Create render-ready script from approved assets
 
-Workflow:
-  1. python -m src.cli director my-short draft --topic "Your topic here"
-  2. Capture evidence with Witness agent
-  3. python -m src.cli director my-short review --approve-all
-  4. python -m src.cli director my-short finalize
-  5. Generate audio, then render
+Full Workflow:
+  0. python -m src.cli director my-short research --company "exa.ai"  (optional)
+  1. python -m src.cli director my-short draft --topic "Your topic"
+  2. python -m src.cli director my-short voiceover
+  3. python -m src.cli director my-short avatar
+  4. python -m src.cli director my-short background
+  5. python -m src.cli director my-short assemble
+  6. python -m src.cli director my-short status
+  7. python -m src.cli render my-short
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -4720,6 +5680,46 @@ Workflow:
     director_subparsers = director_parser.add_subparsers(
         dest="director_command",
         help="Director commands",
+    )
+    
+    # director research - Research a company using Exa.ai
+    director_research_parser = director_subparsers.add_parser(
+        "research",
+        help="Research a company using Exa.ai (creates research.json)",
+    )
+    director_research_parser.add_argument(
+        "--company", "-c",
+        help="Company URL or domain to research (e.g., 'exa.ai' or 'https://openai.com')",
+    )
+    director_research_parser.add_argument(
+        "--verbose", "-v",
+        action="store_true",
+        help="Show progress messages during research",
+    )
+    director_research_parser.add_argument(
+        "--skip-funding",
+        action="store_true",
+        help="Skip funding/valuation research",
+    )
+    director_research_parser.add_argument(
+        "--skip-founders",
+        action="store_true",
+        help="Skip founder research",
+    )
+    director_research_parser.add_argument(
+        "--skip-competitors",
+        action="store_true",
+        help="Skip competitor analysis",
+    )
+    director_research_parser.add_argument(
+        "--skip-news",
+        action="store_true",
+        help="Skip news coverage research",
+    )
+    director_research_parser.add_argument(
+        "--skip-social",
+        action="store_true",
+        help="Skip social media profile research",
     )
     
     # director draft
@@ -4777,6 +5777,77 @@ Workflow:
     director_finalize_parser = director_subparsers.add_parser(
         "finalize",
         help="Create render-ready script from approved assets",
+    )
+    
+    # director voiceover - Generate voiceover audio from script.json
+    director_voiceover_parser = director_subparsers.add_parser(
+        "voiceover",
+        help="Generate voiceover audio from script.json scenes",
+    )
+    director_voiceover_parser.add_argument(
+        "--scene", "-s",
+        help="Generate for specific scene only (e.g., scene_001)",
+    )
+    director_voiceover_parser.add_argument(
+        "--force", "-f",
+        action="store_true",
+        help="Regenerate even if audio files exist",
+    )
+    
+    # director avatar - Generate avatar videos with HeyGen
+    director_avatar_parser = director_subparsers.add_parser(
+        "avatar",
+        help="Generate lip-synced avatar videos using HeyGen",
+    )
+    director_avatar_parser.add_argument(
+        "--scene", "-s",
+        help="Generate for specific scene only (e.g., scene_001)",
+    )
+    director_avatar_parser.add_argument(
+        "--force", "-f",
+        action="store_true",
+        help="Regenerate even if avatar files exist",
+    )
+    director_avatar_parser.add_argument(
+        "--skip-crop",
+        action="store_true",
+        help="Skip FFmpeg cropping step",
+    )
+    
+    # director background - Generate AI background videos
+    director_background_parser = director_subparsers.add_parser(
+        "background",
+        help="Generate AI background videos using fal.ai",
+    )
+    director_background_parser.add_argument(
+        "--scene", "-s",
+        help="Generate for specific scene only (e.g., scene_001)",
+    )
+    director_background_parser.add_argument(
+        "--model",
+        default="fal-ai/kling-video/v1.5/pro/text-to-video",
+        help="fal.ai model to use (default: kling-video)",
+    )
+    director_background_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print config without generating videos",
+    )
+    director_background_parser.add_argument(
+        "--force", "-f",
+        action="store_true",
+        help="Regenerate even if video files exist",
+    )
+    
+    # director assemble - Update script.json with asset paths
+    director_assemble_parser = director_subparsers.add_parser(
+        "assemble",
+        help="Scan assets and update script.json with file paths",
+    )
+    director_assemble_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Show what would be updated without writing",
     )
     
     director_parser.set_defaults(func=cmd_director)
