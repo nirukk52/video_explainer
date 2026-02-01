@@ -1893,6 +1893,8 @@ class TestCmdScenesSync:
         args.scene = None
         args.timeout = 60
         args.verbose = False
+        args.verify = False  # Don't run verify-only mode
+        args.no_auto_fix = False
         return args
 
     @pytest.fixture
@@ -2085,6 +2087,8 @@ class TestCmdScenesRegenerateSingle:
         args.scene = "6"  # Will be overridden in tests
         args.timeout = 60
         args.verbose = False
+        args.verify = False  # Don't run verify-only mode
+        args.no_auto_fix = False
         return args
 
     @pytest.fixture

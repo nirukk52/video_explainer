@@ -183,6 +183,8 @@ python -m src.cli scenes <project> --scene 3         # Single scene by index
 python -m src.cli scenes <project> --scene Hook.tsx  # Single scene by name
 python -m src.cli scenes <project> --sync            # Sync timing only
 python -m src.cli scenes <project> --timeout 600     # 10 min per scene
+python -m src.cli scenes <project> --verify          # Verify syntax only
+python -m src.cli scenes <project> --verify --no-auto-fix  # Verify without fixing
 ```
 
 | Option | Description |
@@ -191,7 +193,19 @@ python -m src.cli scenes <project> --timeout 600     # 10 min per scene
 | `--scene` | Generate specific scene (index or filename) |
 | `--sync` | Update timing without regenerating visuals |
 | `--timeout` | Timeout per scene in seconds |
+| `--verify` | Run syntax verification only (no generation) |
+| `--no-auto-fix` | With `--verify`, report errors without fixing |
+| `--no-validate` | Skip validation during generation |
 | `-v, --verbose` | Verbose output |
+
+**Syntax Verification:**
+
+After generating scenes, the system automatically verifies all scene files for syntax errors and attempts to fix common issues:
+- Unbalanced braces, parentheses, brackets
+- Missing semicolons
+- JSX fragment mismatches
+
+Use `--verify` to run verification on existing scenes without regenerating them.
 
 **Output:** `projects/<project>/scenes/*.tsx`, `styles.ts`, `index.ts`
 

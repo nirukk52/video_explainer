@@ -7,6 +7,7 @@ from typing import Any
 
 from ..config import Config, LLMConfig, load_config
 from ..understanding.llm_provider import ClaudeCodeLLMProvider
+from .syntax_verifier import SyntaxVerifier, VerificationResult as SyntaxVerificationResult
 from .validator import SceneValidator, ValidationResult
 
 
@@ -1644,7 +1645,40 @@ class SceneGenerator:
         # Generate index.ts
         self._generate_index(scenes_dir, results["scenes"], script.get("title", "Untitled"))
 
+        # Run final syntax verification on all generated scenes
+        if not self.skip_validation:
+            print("\nVerifying scene syntax...")
+            syntax_result = self._verify_and_fix_syntax(scenes_dir)
+            results["syntax_verification"] = {
+                "success": syntax_result.success,
+                "errors": [str(e) for e in syntax_result.errors],
+                "fixed_files": syntax_result.fixed_files,
+                "unfixed_files": syntax_result.unfixed_files,
+            }
+            if syntax_result.fixed_files:
+                print(f"  ✓ Auto-fixed syntax in: {', '.join(syntax_result.fixed_files)}")
+            if syntax_result.unfixed_files:
+                print(f"  ⚠ Syntax errors remain in: {', '.join(syntax_result.unfixed_files)}")
+                for error in syntax_result.errors[:5]:  # Show first 5 errors
+                    print(f"    - {error}")
+                if len(syntax_result.errors) > 5:
+                    print(f"    ... and {len(syntax_result.errors) - 5} more errors")
+            if syntax_result.success:
+                print("  ✓ All scenes pass syntax verification")
+
         return results
+
+    def _verify_and_fix_syntax(self, scenes_dir: Path) -> SyntaxVerificationResult:
+        """Verify and attempt to fix syntax errors in all scene files.
+
+        Args:
+            scenes_dir: Directory containing scene files
+
+        Returns:
+            SyntaxVerificationResult with errors and fix status
+        """
+        verifier = SyntaxVerifier(remotion_dir=self.working_dir / "remotion")
+        return verifier.verify_scenes(scenes_dir, auto_fix=True)
 
     def sync_all_scenes(
         self,

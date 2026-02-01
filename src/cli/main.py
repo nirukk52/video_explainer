@@ -918,13 +918,17 @@ def _old_generate_mock_narrations(topic: str) -> dict:
 def cmd_scenes(args: argparse.Namespace) -> int:
     """Generate Remotion scene components from script."""
     from ..project import load_project
-    from ..scenes import SceneGenerator
+    from ..scenes import SceneGenerator, SyntaxVerifier
 
     try:
         project = load_project(Path(args.projects_dir) / args.project)
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
+
+    # Handle verify-only mode
+    if getattr(args, "verify", False):
+        return _cmd_scenes_verify(args, project)
 
     # Handle sync mode
     if args.sync:
@@ -1015,6 +1019,48 @@ def cmd_scenes(args: argparse.Namespace) -> int:
         return 1
 
     return 0
+
+
+def _cmd_scenes_verify(args: argparse.Namespace, project) -> int:
+    """Verify syntax of existing scene files."""
+    from ..scenes import SyntaxVerifier
+
+    scenes_dir = project.root_dir / "scenes"
+    if not scenes_dir.exists() or not list(scenes_dir.glob("*.tsx")):
+        print(f"Error: No scenes found in {scenes_dir}", file=sys.stderr)
+        print("Run 'scenes' command first to generate scenes.")
+        return 1
+
+    print(f"Verifying scene syntax for {project.id}")
+    print(f"Scenes directory: {scenes_dir}")
+    print()
+
+    auto_fix = not getattr(args, "no_auto_fix", False)
+    verifier = SyntaxVerifier(remotion_dir=project.root_dir.parent.parent / "remotion")
+
+    result = verifier.verify_scenes(scenes_dir, auto_fix=auto_fix)
+
+    if result.success:
+        print("✓ All scenes pass syntax verification")
+        if result.fixed_files:
+            print(f"\nAuto-fixed files: {', '.join(result.fixed_files)}")
+        return 0
+
+    # Report errors
+    print(f"✗ Found {result.error_count} syntax error(s)")
+    print()
+
+    if result.fixed_files:
+        print(f"Auto-fixed: {', '.join(result.fixed_files)}")
+
+    if result.unfixed_files:
+        print(f"Files with remaining errors: {', '.join(result.unfixed_files)}")
+        print()
+        print("Errors:")
+        for error in result.errors:
+            print(f"  {error}")
+
+    return 1 if result.unfixed_files else 0
 
 
 def _cmd_scenes_sync(args: argparse.Namespace, project) -> int:
@@ -3444,6 +3490,16 @@ Commands:
         "--no-validate",
         action="store_true",
         help="Skip validation (generate scene without checking for errors). Use when LLM keeps failing validation.",
+    )
+    scenes_parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="Run syntax verification only (no generation). Checks existing scenes for syntax errors and attempts to fix them.",
+    )
+    scenes_parser.add_argument(
+        "--no-auto-fix",
+        action="store_true",
+        help="With --verify, report errors but don't attempt automatic fixes.",
     )
     scenes_parser.add_argument(
         "-v", "--verbose",
