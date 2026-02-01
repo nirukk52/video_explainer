@@ -639,6 +639,7 @@ def cmd_script(args: argparse.Namespace) -> int:
     from ..ingestion import parse_document
     from ..understanding import ContentAnalyzer
     from ..script import ScriptGenerator
+    from ..planning import PlanGenerator
     from ..config import Config
 
     try:
@@ -648,6 +649,19 @@ def cmd_script(args: argparse.Namespace) -> int:
         return 1
 
     print(f"Generating script for {project.id}")
+
+    # Check for approved plan
+    plan_path = project.plan_dir / "plan.json"
+    plan = None
+    skip_plan = getattr(args, "skip_plan", False)
+
+    if plan_path.exists() and not skip_plan:
+        plan = PlanGenerator.load_plan(plan_path)
+        if plan.status != "approved":
+            print(f"Warning: Plan exists but is not approved (status: {plan.status})")
+            print("Use 'plan review' to approve, or --skip-plan to generate without plan.")
+            return 1
+        print(f"Using approved plan: {plan.title}")
 
     documents = []
 
@@ -731,11 +745,22 @@ def cmd_script(args: argparse.Namespace) -> int:
     # Generate script
     print("\nGenerating script...")
     generator = ScriptGenerator(config)
-    script = generator.generate(
-        documents[0],
-        analysis,
-        target_duration=args.duration or project.video.target_duration_seconds,
-    )
+
+    if plan:
+        # Generate script constrained by approved plan
+        print(f"  Using plan with {len(plan.scenes)} scenes")
+        script = generator.generate_from_plan(
+            plan=plan,
+            document=documents[0],
+            analysis=analysis,
+        )
+    else:
+        # Original behavior - generate script directly
+        script = generator.generate(
+            documents[0],
+            analysis,
+            target_duration=args.duration or project.video.target_duration_seconds,
+        )
 
     print(f"  Generated {len(script.scenes)} scenes")
     print(f"  Total duration: {script.total_duration_seconds}s")
@@ -2670,24 +2695,184 @@ def cmd_short_timing(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_plan(args: argparse.Namespace) -> int:
+    """Create, review, or manage video plans."""
+    from ..project import load_project
+    from ..ingestion import parse_document
+    from ..understanding import ContentAnalyzer
+    from ..planning import PlanGenerator, PlanEditor
+    from ..config import Config
+
+    try:
+        project = load_project(Path(args.projects_dir) / args.project)
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 1
+
+    plan_dir = project.plan_dir
+    plan_path = plan_dir / "plan.json"
+
+    # Handle subcommands
+    subcommand = getattr(args, "plan_command", None)
+
+    if subcommand == "show":
+        # Display existing plan
+        if not plan_path.exists():
+            print(f"Error: No plan found at {plan_path}", file=sys.stderr)
+            print(f"Run 'python -m src.cli plan create {args.project}' to create one.")
+            return 1
+
+        plan = PlanGenerator.load_plan(plan_path)
+        config = Config()
+        if args.mock:
+            config.llm.provider = "mock"
+        generator = PlanGenerator(config=config)
+        print(generator.format_for_display(plan))
+        return 0
+
+    elif subcommand == "approve":
+        # Approve existing plan without interactive session
+        if not plan_path.exists():
+            print(f"Error: No plan found at {plan_path}", file=sys.stderr)
+            return 1
+
+        plan = PlanGenerator.load_plan(plan_path)
+        if plan.status == "approved":
+            print(f"Plan is already approved (at {plan.approved_at})")
+            return 0
+
+        config = Config()
+        generator = PlanGenerator(config=config)
+        editor = PlanEditor(generator=generator, plan_dir=plan_dir)
+        plan = editor.approve_plan(plan)
+        print(f"✓ Plan approved!")
+        print(f"Run 'python -m src.cli script {args.project}' to generate the script.")
+        return 0
+
+    elif subcommand == "review":
+        # Review/refine existing plan interactively
+        if not plan_path.exists():
+            print(f"Error: No plan found at {plan_path}", file=sys.stderr)
+            print(f"Run 'python -m src.cli plan create {args.project}' to create one.")
+            return 1
+
+        plan = PlanGenerator.load_plan(plan_path)
+        config = Config()
+        if args.mock:
+            config.llm.provider = "mock"
+        generator = PlanGenerator(config=config)
+        editor = PlanEditor(generator=generator, plan_dir=plan_dir)
+
+        plan, was_approved = editor.run_interactive_session(plan)
+        return 0 if was_approved else 1
+
+    elif subcommand == "create" or subcommand is None:
+        # Create new plan (default behavior)
+        print(f"Creating video plan for {project.id}")
+
+        # Check if plan exists and --force not specified
+        if plan_path.exists() and not args.force:
+            print(f"Plan already exists: {plan_path}")
+            print("Use --force to regenerate, or 'plan review' to refine.")
+            return 0
+
+        # Load input documents
+        documents = []
+        input_dir = project.input_dir
+        if not input_dir.exists():
+            print(f"Error: Input directory not found: {input_dir}", file=sys.stderr)
+            print("Add source documents to the input/ directory first.")
+            return 1
+
+        # Find all supported input files
+        input_files = []
+        for pattern in ["*.md", "*.markdown", "*.pdf"]:
+            input_files.extend(input_dir.glob(pattern))
+
+        if not input_files:
+            print(f"Error: No supported files found in {input_dir}", file=sys.stderr)
+            return 1
+
+        print(f"Found {len(input_files)} input file(s)")
+
+        # Parse documents
+        for f in input_files:
+            print(f"  Parsing: {f.name}")
+            try:
+                doc = parse_document(f)
+                documents.append(doc)
+            except Exception as e:
+                print(f"    Error: {e}", file=sys.stderr)
+                return 1
+
+        if not documents:
+            print("Error: No documents were successfully parsed.", file=sys.stderr)
+            return 1
+
+        # Analyze content
+        print("\nAnalyzing content...")
+        config = Config()
+        if args.mock:
+            config.llm.provider = "mock"
+
+        analyzer = ContentAnalyzer(config)
+        analysis = analyzer.analyze(documents[0])
+
+        print(f"  Thesis: {analysis.core_thesis[:60]}...")
+        print(f"  Concepts: {len(analysis.key_concepts)}")
+
+        # Generate plan
+        print("\nGenerating video plan...")
+        generator = PlanGenerator(config=config)
+        plan = generator.generate(
+            documents[0],
+            analysis,
+            target_duration=args.duration or project.video.target_duration_seconds,
+        )
+
+        # Save plan
+        json_path, md_path = generator.save_plan(plan, plan_dir)
+        print(f"\nPlan saved to: {json_path}")
+
+        # Interactive mode or just display
+        if args.no_interactive:
+            print(generator.format_for_display(plan))
+            print(f"\nRun 'python -m src.cli plan review {args.project}' to refine.")
+        else:
+            editor = PlanEditor(generator=generator, plan_dir=plan_dir)
+            plan, was_approved = editor.run_interactive_session(plan)
+            if was_approved:
+                return 0
+            else:
+                print(f"\nDraft saved. Run 'python -m src.cli plan review {args.project}' to continue.")
+                return 0
+
+        return 0
+
+    else:
+        print(f"Unknown plan command: {subcommand}")
+        return 1
+
+
 def cmd_generate(args: argparse.Namespace) -> int:
     """Run the full video generation pipeline end-to-end.
 
     This command orchestrates all the steps needed to create a video:
-    1. script - Generate script from input docs
-    2. narration - Generate narrations for scenes
-    3. scenes - Generate Remotion scene components
-    4. voiceover - Generate audio from narrations
-    5. storyboard - Create storyboard linking scenes + audio
-    6. render - Render final video
+    1. plan - Generate video plan (auto-approved unless --interactive)
+    2. script - Generate script from plan/docs
+    3. narration - Generate narrations for scenes
+    4. scenes - Generate Remotion scene components
+    5. voiceover - Generate audio from narrations
+    6. storyboard - Create storyboard linking scenes + audio
+    7. render - Render final video
     """
     from ..project import load_project
 
     # Define pipeline steps in order
-    PIPELINE_STEPS = ["script", "narration", "scenes", "voiceover", "storyboard", "render"]
+    PIPELINE_STEPS = ["plan", "script", "narration", "scenes", "voiceover", "storyboard", "render"]
 
     # Parse --from and --to options
-    start_step = args.from_step.lower() if args.from_step else "script"
+    start_step = args.from_step.lower() if args.from_step else "plan"
     end_step = args.to_step.lower() if args.to_step else "render"
 
     if start_step not in PIPELINE_STEPS:
@@ -2731,7 +2916,18 @@ def cmd_generate(args: argparse.Namespace) -> int:
     # Helper to check if step output exists
     def step_output_exists(step: str) -> bool:
         """Check if a step's output already exists."""
-        if step == "script":
+        if step == "plan":
+            plan_path = project.plan_dir / "plan.json"
+            if not plan_path.exists():
+                return False
+            # Check if plan is approved
+            try:
+                with open(plan_path) as f:
+                    plan_data = json.load(f)
+                return plan_data.get("status") == "approved"
+            except (json.JSONDecodeError, KeyError):
+                return False
+        elif step == "script":
             return (project.root_dir / "script" / "script.json").exists()
         elif step == "narration":
             return (project.root_dir / "narration" / "narrations.json").exists()
@@ -2772,7 +2968,43 @@ def cmd_generate(args: argparse.Namespace) -> int:
         )
 
         # Add step-specific arguments
-        if step == "script":
+        if step == "plan":
+            # Check if input files exist
+            input_dir = project.root_dir / "input"
+            if not input_dir.exists() or not list(input_dir.glob("*")):
+                print(f"Error: No input files found in {input_dir}")
+                print("Please add input documents (PDF, MD, or run with --url)")
+                return 1
+            step_args.plan_command = "create"
+            step_args.duration = None
+            step_args.mock = args.mock
+            step_args.force = args.force or not step_output_exists(step)
+            # Auto-approve plan unless --interactive is specified
+            step_args.no_interactive = not getattr(args, "interactive", False)
+            result = cmd_plan(step_args)
+
+            # If interactive mode and plan wasn't approved, stop pipeline
+            if getattr(args, "interactive", False) and result != 0:
+                print("\nPipeline paused. Approve the plan to continue.")
+                return result
+
+            # Auto-approve plan if not interactive
+            if not getattr(args, "interactive", False):
+                plan_path = project.plan_dir / "plan.json"
+                if plan_path.exists():
+                    from ..planning import PlanGenerator
+                    plan = PlanGenerator.load_plan(plan_path)
+                    if plan.status != "approved":
+                        from datetime import datetime
+                        plan.status = "approved"
+                        plan.approved_at = datetime.now().isoformat()
+                        plan_dir = project.plan_dir
+                        plan_dir.mkdir(parents=True, exist_ok=True)
+                        with open(plan_path, "w") as f:
+                            json.dump(plan.model_dump(), f, indent=2)
+                        print("✓ Plan auto-approved")
+
+        elif step == "script":
             # Check if input files exist
             input_dir = project.root_dir / "input"
             if not input_dir.exists() or not list(input_dir.glob("*")):
@@ -2786,6 +3018,8 @@ def cmd_generate(args: argparse.Namespace) -> int:
             step_args.timeout = args.timeout
             step_args.force = args.force or not step_output_exists(step)
             step_args.verbose = False
+            step_args.skip_plan = False  # Use plan if available
+            step_args.continue_on_error = False
             result = cmd_script(step_args)
 
         elif step == "narration":
@@ -2901,15 +3135,17 @@ def main() -> int:
         help="Run the full video generation pipeline end-to-end",
         description="""
 Run all steps to generate a video from input documents:
-  1. script     - Generate script from input docs
-  2. narration  - Generate narrations for scenes
-  3. scenes     - Generate Remotion scene components
-  4. voiceover  - Generate audio from narrations
-  5. storyboard - Create storyboard linking scenes + audio
-  6. render     - Render final video
+  1. plan       - Generate and auto-approve video plan
+  2. script     - Generate script from approved plan
+  3. narration  - Generate narrations for scenes
+  4. scenes     - Generate Remotion scene components
+  5. voiceover  - Generate audio from narrations
+  6. storyboard - Create storyboard linking scenes + audio
+  7. render     - Render final video
 
 By default, skips steps that have already been completed.
 Use --force to regenerate all steps.
+Use --interactive to pause for plan review before continuing.
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -2920,15 +3156,20 @@ Use --force to regenerate all steps.
         help="Force regenerate all steps even if output exists",
     )
     generate_parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Pause for interactive plan review before continuing",
+    )
+    generate_parser.add_argument(
         "--from",
         dest="from_step",
-        choices=["script", "narration", "scenes", "voiceover", "storyboard", "render"],
+        choices=["plan", "script", "narration", "scenes", "voiceover", "storyboard", "render"],
         help="Start from this step (skip earlier steps)",
     )
     generate_parser.add_argument(
         "--to",
         dest="to_step",
-        choices=["script", "narration", "scenes", "voiceover", "storyboard", "render"],
+        choices=["plan", "script", "narration", "scenes", "voiceover", "storyboard", "render"],
         help="Stop after this step (skip later steps)",
     )
     generate_parser.add_argument(
@@ -3056,11 +3297,96 @@ Use --force to regenerate all steps.
         help="Continue even if some files fail to parse",
     )
     script_parser.add_argument(
+        "--skip-plan",
+        action="store_true",
+        help="Generate script without using approved plan (backward compatible mode)",
+    )
+    script_parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Show detailed output",
     )
     script_parser.set_defaults(func=cmd_script)
+
+    # plan command (with subcommands)
+    plan_parser = subparsers.add_parser(
+        "plan",
+        help="Create and manage video plans before script generation",
+        description="""
+Interactive video planning - create and refine a structured plan before generating scripts.
+
+Commands:
+  plan create <project>     Generate new plan (interactive by default)
+  plan review <project>     Review and refine existing plan
+  plan show <project>       Display current plan
+  plan approve <project>    Approve plan without interactive session
+        """,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    plan_subparsers = plan_parser.add_subparsers(
+        dest="plan_command",
+        help="Plan commands",
+    )
+
+    # plan create
+    plan_create_parser = plan_subparsers.add_parser(
+        "create",
+        help="Generate a new video plan",
+    )
+    plan_create_parser.add_argument("project", help="Project ID")
+    plan_create_parser.add_argument(
+        "--no-interactive",
+        action="store_true",
+        help="Generate plan without interactive review",
+    )
+    plan_create_parser.add_argument(
+        "--duration",
+        type=int,
+        help="Target duration in seconds",
+    )
+    plan_create_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite existing plan",
+    )
+    plan_create_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock LLM (for testing)",
+    )
+
+    # plan review
+    plan_review_parser = plan_subparsers.add_parser(
+        "review",
+        help="Review and refine existing plan interactively",
+    )
+    plan_review_parser.add_argument("project", help="Project ID")
+    plan_review_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Use mock LLM for refinement (for testing)",
+    )
+
+    # plan show
+    plan_show_parser = plan_subparsers.add_parser(
+        "show",
+        help="Display current plan",
+    )
+    plan_show_parser.add_argument("project", help="Project ID")
+    plan_show_parser.add_argument(
+        "--mock",
+        action="store_true",
+        help="Unused, for consistency",
+    )
+
+    # plan approve
+    plan_approve_parser = plan_subparsers.add_parser(
+        "approve",
+        help="Approve plan without interactive session",
+    )
+    plan_approve_parser.add_argument("project", help="Project ID")
+
+    plan_parser.set_defaults(func=cmd_plan)
 
     # narration command
     narration_parser = subparsers.add_parser("narration", help="Generate narrations for a project")

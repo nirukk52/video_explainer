@@ -80,11 +80,21 @@ class MockLLMProvider(LLMProvider):
         """Generate mock JSON responses for known prompt patterns.
 
         Pattern matching order is important:
-        1. Storyboard (most specific - contains "storyboard" keyword)
-        2. Script (contains "script" + "create/generate", but NOT "storyboard")
-        3. Content analysis (contains "analyze" + "content/document")
+        1. Plan refinement (most specific - contains "refine" + "plan")
+        2. Plan generation (contains "video plan" or "create a video plan")
+        3. Storyboard (most specific - contains "storyboard" keyword)
+        4. Script (contains "script" + "create/generate", but NOT "storyboard")
+        5. Content analysis (contains "analyze" + "content/document")
         """
         prompt_lower = prompt.lower()
+
+        # Plan refinement request (check first - most specific)
+        if "refine" in prompt_lower and "plan" in prompt_lower:
+            return self._mock_plan_refinement(prompt)
+
+        # Plan generation request
+        if "video plan" in prompt_lower or "create a video plan" in prompt_lower:
+            return self._mock_plan_generation(prompt)
 
         # Storyboard generation request (check first - most specific)
         if "storyboard" in prompt_lower or "scene id:" in prompt_lower:
@@ -256,6 +266,105 @@ class MockLLMProvider(LLMProvider):
             ],
             "total_duration_seconds": 80,
         }
+
+    def _mock_plan_generation(self, prompt: str = "") -> dict[str, Any]:
+        """Return mock video plan for testing."""
+        return {
+            "title": "Understanding the Core Concept",
+            "central_question": "How does this technology actually work under the hood?",
+            "target_audience": "Technical professionals and enthusiasts",
+            "estimated_total_duration_seconds": 300,
+            "core_thesis": "This concept transforms how we approach the problem by introducing a fundamentally different approach.",
+            "key_concepts": [
+                "Basic foundations",
+                "Core mechanism",
+                "Optimization techniques",
+                "Practical applications",
+            ],
+            "complexity_score": 6,
+            "visual_style": "Clean diagrams with animated data flow visualizations",
+            "scenes": [
+                {
+                    "scene_number": 1,
+                    "scene_type": "hook",
+                    "title": "The Challenge",
+                    "concept_to_cover": "The problem that needs solving",
+                    "visual_approach": "Show a dramatic visualization of the scale of the problem, with numbers animating to emphasize the challenge.",
+                    "ascii_visual": "┌─────────────────────────────────────────────────────┐\n│                                                     │\n│    ┌───┬───┬───┬───┐         ╔═══════════════╗     │\n│    │ A │ B │ C │...│  ───►   ║   MASSIVE     ║     │\n│    ├───┼───┼───┼───┤         ║   SCALE!      ║     │\n│    │...│...│...│...│         ╚═══════════════╝     │\n│    └───┴───┴───┴───┘              ↓                │\n│       Input Data           [explosion effect]      │\n│                                                     │\n└─────────────────────────────────────────────────────┘",
+                    "estimated_duration_seconds": 45,
+                    "key_points": [
+                        "Hook the viewer with a surprising fact",
+                        "Establish the scale of the problem",
+                        "Create curiosity about the solution",
+                    ],
+                },
+                {
+                    "scene_number": 2,
+                    "scene_type": "context",
+                    "title": "Background Context",
+                    "concept_to_cover": "Historical context and why this matters",
+                    "visual_approach": "Timeline animation showing evolution of approaches, highlighting limitations of previous solutions.",
+                    "ascii_visual": "┌─────────────────────────────────────────────────────┐\n│                                                     │\n│  2010        2015        2020        NOW            │\n│    ●──────────●──────────●──────────●               │\n│    │          │          │          │               │\n│  [Old]     [Better]  [Improved]  [Current]          │\n│    ↓          ↓          ↓          ↓               │\n│  Slow      Faster    Fast      BREAKTHROUGH         │\n│                                                     │\n└─────────────────────────────────────────────────────┘",
+                    "estimated_duration_seconds": 60,
+                    "key_points": [
+                        "Previous approaches and their limitations",
+                        "Why a new solution was needed",
+                        "Setup for the main explanation",
+                    ],
+                },
+                {
+                    "scene_number": 3,
+                    "scene_type": "explanation",
+                    "title": "How It Works",
+                    "concept_to_cover": "The core mechanism explained step by step",
+                    "visual_approach": "Step-by-step animation showing data flow through the system, with each step clearly labeled and highlighted.",
+                    "ascii_visual": "┌─────────────────────────────────────────────────────┐\n│                                                     │\n│    INPUT          PROCESS          OUTPUT           │\n│    ┌───┐         ┌───────┐         ┌───┐           │\n│    │ X │  ─────► │ MAGIC │ ─────►  │ Y │           │\n│    └───┘         │  BOX  │         └───┘           │\n│                  └───────┘                         │\n│                      │                             │\n│                      ▼                             │\n│              [Detailed breakdown]                  │\n│                                                     │\n└─────────────────────────────────────────────────────┘",
+                    "estimated_duration_seconds": 90,
+                    "key_points": [
+                        "Input processing",
+                        "Core transformation",
+                        "Output generation",
+                    ],
+                },
+                {
+                    "scene_number": 4,
+                    "scene_type": "insight",
+                    "title": "The Key Insight",
+                    "concept_to_cover": "Why this approach is so effective",
+                    "visual_approach": "Side-by-side comparison showing old vs new approach, with dramatic performance metrics.",
+                    "ascii_visual": "┌─────────────────────────────────────────────────────┐\n│                                                     │\n│     OLD WAY           vs           NEW WAY          │\n│    ┌───────┐                      ┌───────┐         │\n│    │ Slow  │                      │ Fast  │         │\n│    │ O(n²) │                      │ O(n)  │         │\n│    └───────┘                      └───────┘         │\n│        │                              │             │\n│        ▼                              ▼             │\n│      40x/s          ───►         3,500x/s          │\n│                                                     │\n└─────────────────────────────────────────────────────┘",
+                    "estimated_duration_seconds": 60,
+                    "key_points": [
+                        "Performance comparison",
+                        "Key architectural difference",
+                        "Why this matters in practice",
+                    ],
+                },
+                {
+                    "scene_number": 5,
+                    "scene_type": "conclusion",
+                    "title": "Putting It All Together",
+                    "concept_to_cover": "Summary and practical implications",
+                    "visual_approach": "Recap animation connecting all concepts, ending with forward-looking applications.",
+                    "ascii_visual": "┌─────────────────────────────────────────────────────┐\n│                                                     │\n│           KEY TAKEAWAYS                             │\n│           ═════════════                             │\n│                                                     │\n│    ✓ Challenge understood                          │\n│    ✓ Mechanism explained                           │\n│    ✓ Performance demonstrated                      │\n│                                                     │\n│              WHAT'S NEXT?                          │\n│              ────────────                          │\n│         [Future possibilities]                     │\n│                                                     │\n└─────────────────────────────────────────────────────┘",
+                    "estimated_duration_seconds": 45,
+                    "key_points": [
+                        "Recap main points",
+                        "Practical applications",
+                        "Future directions",
+                    ],
+                },
+            ],
+        }
+
+    def _mock_plan_refinement(self, prompt: str = "") -> dict[str, Any]:
+        """Return mock refined video plan for testing."""
+        # Return same structure as plan generation but with slightly modified content
+        plan = self._mock_plan_generation(prompt)
+        plan["title"] = "Understanding the Core Concept (Refined)"
+        plan["scenes"][0]["visual_approach"] = "Refined visual approach based on feedback"
+        plan["scenes"][0]["key_points"].append("Added based on user feedback")
+        return plan
 
     def _mock_storyboard_generation(self, prompt: str = "") -> dict[str, Any]:
         """Return mock storyboard beats for testing."""

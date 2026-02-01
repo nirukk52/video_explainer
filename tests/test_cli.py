@@ -1766,6 +1766,7 @@ class TestCmdGenerate:
         args.voice_provider = "elevenlabs"
         args.mock = True
         args.timeout = 60
+        args.interactive = False  # Don't pause for plan review
         return args
 
     @pytest.fixture

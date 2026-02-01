@@ -107,6 +107,11 @@ class Project:
         """Directory for YouTube Shorts."""
         return self.root_dir / "short"
 
+    @property
+    def plan_dir(self) -> Path:
+        """Directory for video plan files."""
+        return self.root_dir / "plan"
+
     def get_short_variant_dir(self, variant: str = "default") -> Path:
         """Get directory for a specific short variant.
 
@@ -232,6 +237,7 @@ class Project:
             self.remotion_dir,
             self.output_dir,
             self.output_dir / "preview",
+            self.plan_dir,
         ]:
             dir_path.mkdir(parents=True, exist_ok=True)
 

@@ -8,6 +8,7 @@ from ..models import (
     ParsedDocument,
     Script,
     ScriptScene,
+    VideoPlan,
     VisualCue,
 )
 from ..understanding.llm_provider import LLMProvider, get_llm_provider
@@ -119,6 +120,62 @@ Describe visuals specific to what's being explained:
 - Be detailed enough for an animator to implement
 
 Always respond with valid JSON matching the requested schema."""
+
+
+SCRIPT_FROM_PLAN_PROMPT_TEMPLATE = """Create a video script following this approved plan. The plan defines the structure, concepts, and visual approach for each scene.
+
+# Approved Video Plan
+
+**Title**: {plan_title}
+**Central Question**: {central_question}
+**Target Audience**: {audience}
+**Visual Style**: {visual_style}
+
+## Planned Scenes
+
+{scenes_plan}
+
+---
+
+# Source Material
+
+**Full Content**:
+{content}
+
+---
+
+# Your Task
+
+Generate a complete script following the approved plan EXACTLY. For each planned scene:
+
+1. **Follow the scene structure** - Match the scene_type, title, and concept_to_cover
+2. **Use the visual approach** - Create visual cues that match the planned visual_approach and ASCII preview
+3. **Cover the key points** - Make sure each key point is addressed in the voiceover
+4. **Match the duration** - Target the estimated duration for each scene
+
+## Output Format
+
+Respond with JSON matching this schema:
+{{
+  "title": "{plan_title}",
+  "central_question": "{central_question}",
+  "total_duration_seconds": number,
+  "scenes": [
+    {{
+      "scene_id": number,
+      "scene_type": "hook|context|explanation|insight|conclusion",
+      "title": "string - use the planned title",
+      "concept_covered": "string - the planned concept_to_cover",
+      "voiceover": "string - the exact narration text covering the key points",
+      "connection_to_previous": "string - how this connects (But.../Therefore.../So...) - null for first scene",
+      "visual_description": "string - detailed description based on the planned visual_approach",
+      "key_visual_moments": ["string - specific moments based on the ASCII preview"],
+      "duration_seconds": number - match the planned duration
+    }}
+  ]
+}}
+
+Follow the plan precisely. Make each scene's voiceover genuinely understandable."""
 
 
 SCRIPT_USER_PROMPT_TEMPLATE = """Create a video script that tells the story in this source material while making it deeply understandable.
@@ -292,6 +349,63 @@ class ScriptGenerator:
             thesis=analysis.core_thesis,
             concepts=concepts_text,
             content=content_text[:50000],  # Include more content for thorough understanding
+        )
+
+        # Generate script via LLM
+        result = self.llm.generate_json(prompt, SCRIPT_SYSTEM_PROMPT)
+
+        # Parse into Script model
+        return self._parse_script_result(result, document.source_path)
+
+    def generate_from_plan(
+        self,
+        plan: VideoPlan,
+        document: ParsedDocument,
+        analysis: ContentAnalysis,
+    ) -> Script:
+        """Generate a video script constrained by an approved plan.
+
+        Args:
+            plan: The approved video plan with scene structure
+            document: The parsed source document
+            analysis: Content analysis with key concepts
+
+        Returns:
+            Script following the plan's structure
+        """
+        # Format the scenes plan
+        scenes_plan_parts = []
+        for scene in plan.scenes:
+            scene_text = f"""### Scene {scene.scene_number}: {scene.title}
+- **Type**: {scene.scene_type}
+- **Concept**: {scene.concept_to_cover}
+- **Duration**: {scene.estimated_duration_seconds}s
+- **Visual Approach**: {scene.visual_approach}
+- **Key Points**: {', '.join(scene.key_points)}
+
+**ASCII Preview**:
+```
+{scene.ascii_visual}
+```
+"""
+            scenes_plan_parts.append(scene_text)
+
+        scenes_plan = "\n".join(scenes_plan_parts)
+
+        # Get content from document
+        content_parts = []
+        for section in document.sections[:15]:
+            content_parts.append(f"## {section.heading}\n{section.content[:2000]}")
+        content_text = "\n\n".join(content_parts)
+
+        # Build the prompt
+        prompt = SCRIPT_FROM_PLAN_PROMPT_TEMPLATE.format(
+            plan_title=plan.title,
+            central_question=plan.central_question,
+            audience=plan.target_audience,
+            visual_style=plan.visual_style,
+            scenes_plan=scenes_plan,
+            content=content_text[:50000],
         )
 
         # Generate script via LLM

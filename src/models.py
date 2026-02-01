@@ -141,3 +141,39 @@ class VideoProject(BaseModel):
     assets: GeneratedAssets = Field(default_factory=GeneratedAssets)
     output_path: str | None = None
     status: str = "initialized"  # initialized, parsed, analyzed, scripted, storyboarded, rendered
+
+
+class PlannedScene(BaseModel):
+    """A planned scene in the video plan."""
+
+    scene_number: int
+    scene_type: str  # hook, context, explanation, insight, conclusion
+    title: str
+    concept_to_cover: str
+    visual_approach: str
+    ascii_visual: str  # ASCII art representation of the scene layout
+    estimated_duration_seconds: float
+    key_points: list[str] = Field(default_factory=list)
+
+
+class VideoPlan(BaseModel):
+    """A video plan for user review and approval before script generation."""
+
+    status: str = "draft"  # draft, approved
+    created_at: str
+    approved_at: str | None = None
+
+    title: str
+    central_question: str
+    target_audience: str
+    estimated_total_duration_seconds: float
+
+    core_thesis: str
+    key_concepts: list[str]
+    complexity_score: int = Field(ge=1, le=10)
+
+    scenes: list[PlannedScene]
+    visual_style: str
+
+    source_document: str
+    user_notes: str = ""

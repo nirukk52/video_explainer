@@ -48,13 +48,17 @@ python -m src.cli generate <project>
 python -m src.cli generate <project> --force           # Regenerate everything
 python -m src.cli generate <project> --from scenes     # Start from step
 python -m src.cli generate <project> --to voiceover    # Stop at step
+python -m src.cli generate <project> --interactive     # Pause for plan review
 python -m src.cli generate <project> --mock            # Use mock LLM/TTS
 ```
+
+**Pipeline steps:** plan → script → narration → scenes → voiceover → storyboard → render
 
 | Option | Description |
 |--------|-------------|
 | `--force` | Regenerate all steps, even if outputs exist |
-| `--from STEP` | Start from: script, narration, scenes, voiceover, storyboard, render |
+| `--interactive` | Pause for interactive plan review before continuing |
+| `--from STEP` | Start from: plan, script, narration, scenes, voiceover, storyboard, render |
 | `--to STEP` | Stop after this step |
 | `--resolution` | Output: 4k, 1440p, 1080p (default), 720p, 480p |
 | `--voice-provider` | TTS: elevenlabs, edge, mock |
@@ -63,14 +67,70 @@ python -m src.cli generate <project> --mock            # Use mock LLM/TTS
 
 ---
 
-### script
+### plan
 
-Generate a video script from input documents.
+Create and manage video plans before script generation. Plans provide a structured outline with scene breakdowns, visual approaches, and ASCII art previews for user review and approval.
 
 ```bash
-python -m src.cli script <project>                    # From input/ directory
+python -m src.cli plan create <project>                # Interactive plan creation
+python -m src.cli plan create <project> --no-interactive  # Auto-generate without review
+python -m src.cli plan create <project> --force        # Overwrite existing plan
+python -m src.cli plan review <project>                # Review and refine existing plan
+python -m src.cli plan show <project>                  # Display current plan
+python -m src.cli plan approve <project>               # Approve without interactive session
+```
+
+**Subcommands:**
+
+| Command | Description |
+|---------|-------------|
+| `create` | Generate a new video plan |
+| `review` | Review and refine existing plan interactively |
+| `show` | Display the current plan |
+| `approve` | Approve plan without interactive session |
+
+**Options for `create`:**
+
+| Option | Description |
+|--------|-------------|
+| `--no-interactive` | Generate plan without interactive review |
+| `--duration` | Target video duration in seconds |
+| `--force` | Overwrite existing plan |
+| `--mock` | Use mock LLM |
+
+**Interactive Commands:**
+
+When in interactive mode, use these commands:
+
+| Command | Description |
+|---------|-------------|
+| `a`, `approve` | Approve the plan and proceed |
+| `r <feedback>`, `refine <feedback>` | Refine with natural language feedback |
+| `s`, `save` | Save current draft |
+| `q`, `quit` | Exit (saves draft automatically) |
+| `h`, `help` | Show help |
+
+**Refinement examples:**
+```
+> r Add arrows showing data flow in scene 2
+> r Make the ASCII visual for scene 3 show a side-by-side comparison
+> r Scene 4 should have the formula more prominent
+> r Reduce the duration of the hook scene
+```
+
+**Output:** `projects/<project>/plan/plan.json`, `plan.md`
+
+---
+
+### script
+
+Generate a video script from input documents. If an approved plan exists, the script will follow the plan's structure.
+
+```bash
+python -m src.cli script <project>                    # From input/ directory (uses plan if approved)
 python -m src.cli script <project> --input file.pdf  # From specific file
 python -m src.cli script <project> --url https://... # From URL
+python -m src.cli script <project> --skip-plan       # Generate without using plan
 python -m src.cli script <project> --mock            # Mock for testing
 ```
 
@@ -81,6 +141,7 @@ python -m src.cli script <project> --mock            # Mock for testing
 | `--input, -i` | Input file path |
 | `--url` | Web URL to fetch |
 | `--duration` | Target video duration in seconds |
+| `--skip-plan` | Generate script without using approved plan (backward compatible) |
 | `--continue-on-error` | Skip failed files |
 | `--mock` | Use mock LLM |
 | `-v, --verbose` | Verbose output |
