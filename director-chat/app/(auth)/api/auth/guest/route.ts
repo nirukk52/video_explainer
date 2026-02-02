@@ -17,5 +17,15 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  return signIn("guest", { redirect: true, redirectTo: redirectUrl });
+  try {
+    return await signIn("guest", { redirect: true, redirectTo: redirectUrl });
+  } catch (err) {
+    console.error("[auth] guest signIn failed:", err);
+    const cause = err instanceof Error ? err.cause : undefined;
+    const message =
+      cause instanceof Error ? cause.message : "Guest sign-in failed";
+    return NextResponse.redirect(
+      new URL(`/login?error=GuestSignInFailed&message=${encodeURIComponent(message)}`, request.url)
+    );
+  }
 }

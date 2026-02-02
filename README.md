@@ -1,10 +1,19 @@
-# Shorts Factory - Its a high quality Varun Maya style youtube/insta shorts/reels generator factory
+# UGC Ad Factory (Shorts Factory)
 
-Create Varun Mayya / Johnny Harris style vertical shorts (30-60 seconds) with AI-powered research, evidence capture, and video generation.
+Create high-quality UGC ads and vertical shorts (30-60 seconds) with AI-powered research, evidence capture, and video generation. Varun Mayya / Ali Abdaal style editing.
+
+## Use Cases
+
+| Vertical | Description | Example |
+|----------|-------------|---------|
+| **UGC Ads** | Product/service ads with company research | "Ad for Chronic Life symptom tracking app" |
+| **Content Shorts** | News commentary with evidence screenshots | "Chinese peptides taking over Silicon Valley" |
 
 ## Philosophy
 
-**Evidence-First Production:** Gather proof screenshots BEFORE writing the script. The script references real evidence, not hallucinated claims.
+**Research-First Production:** For UGC ads, research the company (Exa.ai) → extract ad insights (hook angles, testimonials, value props) → THEN write the script.
+
+**Evidence-First Production:** For content shorts, gather proof screenshots BEFORE writing the script. The script references real evidence, not hallucinated claims.
 
 **JSON-Driven Templates:** Everything is JSON. Templates, scenes, timing - all defined in JSON so agents can read, understand, and generate.
 
@@ -14,31 +23,42 @@ Create Varun Mayya / Johnny Harris style vertical shorts (30-60 seconds) with AI
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        SHORTS FACTORY                            │
+│                     UGC AD FACTORY PIPELINE                      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  1. RESEARCH        2. EVIDENCE         3. SCRIPT               │
+│  0. RESEARCH (UGC Ads)                                          │
+│  ┌──────────────────────────────────────────────────────┐       │
+│  │  Company URL  ──▶  Exa.ai  ──▶  research.json        │       │
+│  │       │                              │                │       │
+│  │       ▼                              ▼                │       │
+│  │  Assets (upload)      LLM Summarizer ──▶ research-   │       │
+│  │                                          display.json │       │
+│  │                                          • hook_angles│       │
+│  │                                          • testimonials│      │
+│  │                                          • value_props│       │
+│  └──────────────────────────────────────────────────────┘       │
+│       │                                                          │
+│       ▼ (human approves research insights)                      │
+│                                                                  │
+│  1. EVIDENCE        2. SCRIPT           3. AUDIO                │
 │  ┌──────────┐      ┌──────────┐       ┌──────────┐             │
-│  │ URLs     │ ──▶  │ Witness  │ ──▶   │ Director │             │
-│  │ Articles │      │ Agent    │       │ Agent    │             │
-│  │ Prompts  │      │          │       │          │             │
+│  │ Witness  │ ──▶  │ Director │ ──▶   │ Eleven   │             │
+│  │ Agent    │      │ Agent    │       │ Labs     │             │
 │  └──────────┘      └──────────┘       └──────────┘             │
 │       │                 │                   │                   │
 │       ▼                 ▼                   ▼                   │
-│  input/            evidence/           script.json              │
+│  evidence/         script.json          audio/                  │
 │                                                                  │
-│  4. AUDIO           5. AVATAR          6. RENDER                │
+│  4. AVATAR          5. BACKGROUND       6. RENDER               │
 │  ┌──────────┐      ┌──────────┐       ┌──────────┐             │
-│  │ Eleven   │ ──▶  │ HeyGen   │ ──▶   │ Remotion │             │
-│  │ Labs     │      │ Lip-sync │       │          │             │
+│  │ HeyGen   │      │ fal.ai   │ ──▶   │ Remotion │             │
+│  │ Lip-sync │      │ Kling/Veo│       │          │             │
 │  └──────────┘      └──────────┘       └──────────┘             │
 │       │                 │                   │                   │
 │       ▼                 ▼                   ▼                   │
-│  audio/            avatar/             output/                  │
+│  avatar/           backgrounds/         output/                 │
 │                                                                  │
-│  ✓ Human Review     ✓ Human Review     ✓ Human Review          │
-│    after each         after each         final render          │
-│    stage              stage                                     │
+│  ✓ Human Review at each stage                                   │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -377,10 +397,30 @@ src/
 │   ├── director.py          # Script generation
 │   └── editor.py            # Render manifest
 │
+├── company_researcher/      # UGC Ad research pipeline
+│   ├── researcher.py        # Exa.ai company research → research.json
+│   └── summarizer.py        # LLM insights → research-display.json
+│
 ├── audio/                   # ElevenLabs TTS
 ├── avatar/                  # HeyGen integration
 │
 └── cli/                     # Command interface
+
+director-mcp/                # MCP server for frontend integration
+└── src/
+    └── server.py            # HTTP API (port 8001)
+                             # factory_create_project
+                             # factory_research_company
+                             # factory_summarize_research
+
+director-chat/               # Next.js web frontend
+├── app/(chat)/
+│   ├── projects/            # Project management UI
+│   │   ├── new/page.tsx     # Input form + file drop
+│   │   └── [id]/
+│   │       └── research/    # Research review cards
+│   └── api/projects/        # REST endpoints
+└── lib/director/client.ts   # MCP client functions
 
 remotion/
 ├── src/
@@ -396,7 +436,7 @@ remotion/
 
 ## Reference
 
-- Style: Varun Mayya, Johnny Harris, Fever
+- Style: Ali Abdaal, Varun Mayya, Johnny Harris
 - Format: 9:16 vertical (1080x1920)
 - Length: 30-60 seconds
 - Scene duration: 1-10 seconds each

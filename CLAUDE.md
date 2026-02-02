@@ -1,6 +1,24 @@
-# Agent Guide: Shorts Factory
+# Agent Guide: UGC Ad Factory (Shorts Factory)
 
-This document guides AI agents working on the Shorts Factory system. Follow these patterns for consistent, high-quality video production.
+This document guides AI agents working on the UGC Ad Factory system. Follow these patterns for consistent, high-quality video production.
+
+## Product Verticals
+
+The system supports two primary verticals:
+
+| Vertical | Description | Style Reference |
+|----------|-------------|-----------------|
+| **UGC Ads** (Primary) | High-production ads for products/services with company research, hook angles, testimonials | Ali Abdaal, Varun Mayya |
+| **Content Shorts** | News commentary, explainer shorts with evidence screenshots | Varun Mayya, Johnny Harris |
+
+Both share: avatar talking heads, evidence screenshots, word-by-word captions, 9:16 vertical format.
+
+**UGC Ads add:**
+- Company research phase (Exa.ai)
+- Hook angles for ads
+- Testimonial themes
+- Value propositions
+- Target audience analysis
 
 ## Core Principle: JSON First
 
@@ -723,9 +741,116 @@ Each LLM call receives only the context it needs (not full project):
 
 **Note:** Only `generate_with_file_access()` can read project files, and only what the prompt explicitly requests.
 
+## Director Chat Frontend
+
+The web UI at `director-chat/` provides a visual interface for the UGC Ad Factory pipeline.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       DIRECTOR CHAT ARCHITECTURE                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  FRONTEND (Next.js)                    BACKEND (director-mcp)               │
+│  ─────────────────                     ──────────────────────               │
+│                                                                              │
+│  director-chat/                        director-mcp/src/server.py           │
+│  ├── app/(chat)/                       ├── factory_create_project           │
+│  │   ├── projects/                     ├── factory_research_company         │
+│  │   │   ├── new/page.tsx              ├── factory_summarize_research       │
+│  │   │   └── [id]/                     ├── factory_get_status               │
+│  │   │       ├── page.tsx              ├── factory_approve_stage            │
+│  │   │       └── research/page.tsx     └── factory_get_artifacts            │
+│  │   └── api/projects/                                                       │
+│  │       ├── route.ts                                                        │
+│  │       └── [id]/upload/route.ts                                           │
+│  └── lib/director/client.ts            HTTP (port 8001)                     │
+│          │                                    │                              │
+│          └────────────────────────────────────┘                              │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### UGC Ad Creation Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         UGC AD CREATION FLOW                                 │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  1. INPUT (/projects/new)                                                    │
+│  ┌────────────────────────────────┐                                         │
+│  │ • Company URL                  │                                         │
+│  │ • Assets (file drop)           │ ──▶ POST /api/projects                  │
+│  │ • Topic/Angle                  │                                         │
+│  │ • Voice/Avatar settings        │                                         │
+│  └────────────────────────────────┘                                         │
+│                    │                                                         │
+│                    ▼                                                         │
+│  2. RESEARCH (MCP Backend)                                                   │
+│  ┌────────────────────────────────┐                                         │
+│  │ factory_create_project         │ Creates project folder                  │
+│  │         │                      │                                         │
+│  │         ▼                      │                                         │
+│  │ factory_research_company       │ Exa.ai → research.json                  │
+│  │         │                      │                                         │
+│  │         ▼                      │                                         │
+│  │ factory_summarize_research     │ LLM → research-display.json             │
+│  └────────────────────────────────┘                                         │
+│                    │                                                         │
+│                    ▼                                                         │
+│  3. REVIEW (/projects/[id]/research)                                        │
+│  ┌────────────────────────────────┐                                         │
+│  │ Editable Cards UI:             │                                         │
+│  │ • Hook Angles (select/edit)    │                                         │
+│  │ • Testimonial Themes           │                                         │
+│  │ • Value Propositions           │                                         │
+│  │ • Target Audience              │                                         │
+│  └────────────────────────────────┘                                         │
+│                    │                                                         │
+│                    ▼ (approve selections)                                    │
+│  4. SCRIPT GENERATION → 5. VOICEOVER → 6. AVATAR → 7. RENDER                │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Frontend Routes
+
+| Route | Purpose |
+|-------|---------|
+| `/projects/new` | Input form + file drop for new UGC ad project |
+| `/projects/[id]` | Project overview and status |
+| `/projects/[id]/research` | Review research-display.json as editable cards |
+| `/chat/[id]` | Chat interface for project refinement |
+
+### API Routes
+
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/projects` | POST | Create project → research → summarize |
+| `/api/projects` | GET | List all projects |
+| `/api/projects/[id]/upload` | POST | Upload assets to projects/{id}/input/ |
+
+### MCP Client (lib/director/client.ts)
+
+TypeScript functions for calling director-mcp tools:
+
+```typescript
+// Research pipeline
+researchCompany(projectId, companyUrl)    // → research.json
+summarizeResearch(projectId)               // → research-display.json
+
+// Project lifecycle
+createProject(params)                      // → project folder
+getProjectStatus(projectId)                // → status + gates
+approveStage(projectId, gateId, userId)   // → unlock next stage
+getArtifacts(projectId, type?)            // → artifacts array
+```
+
 ## Reference Videos
 
-Style reference: Varun Mayya (@VarunMayya)
+Style reference: Varun Mayya (@VarunMayya), Ali Abdaal
 - Bold typography
 - Evidence screenshots with highlights
 - Avatar in various positions

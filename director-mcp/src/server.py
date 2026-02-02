@@ -58,7 +58,7 @@ mcp = FastMCP("director_mcp", host="0.0.0.0", port=_port)
 
 # Global project storage (in-memory for now, persisted to disk)
 _active_projects: dict = {}
-_output_dir = Path(os.getenv("SHORTS_OUTPUT_DIR", "output"))
+_output_dir = Path(os.getenv("SHORTS_OUTPUT_DIR", "projects"))
 
 
 # ============================================================================
@@ -131,6 +131,30 @@ class SearchEvidenceInput(BaseModel):
         default=None,
         description="Optional custom search query (uses script evidence needs if not provided)",
     )
+
+
+class ResearchCompanyInput(BaseModel):
+    """Input for researching a company via Exa.ai."""
+    
+    project_id: str = Field(..., description="Project ID to store research results")
+    company_url: str = Field(
+        ...,
+        description="Company website URL (e.g., 'https://chroniclife.app' or 'chroniclife.app')",
+    )
+    include_competitors: bool = Field(
+        default=True,
+        description="Whether to research competitors",
+    )
+    include_news: bool = Field(
+        default=True,
+        description="Whether to fetch recent news",
+    )
+
+
+class SummarizeResearchInput(BaseModel):
+    """Input for summarizing research into ad-ready insights."""
+    
+    project_id: str = Field(..., description="Project ID with existing research.json")
 
 
 @mcp.tool(
@@ -656,6 +680,147 @@ async def factory_get_render_manifest(params: GetStatusInput) -> str:
 
 
 # ============================================================================
+# RESEARCH TOOLS (UGC Ad Pipeline)
+# ============================================================================
+
+
+@mcp.tool(
+    name="factory_research_company",
+    annotations={
+        "title": "Research Company",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    },
+)
+async def factory_research_company(params: ResearchCompanyInput) -> str:
+    """
+    Research a company using Exa.ai for UGC ad creation.
+    
+    Gathers comprehensive company intelligence:
+    - Website content and key messaging
+    - Funding and valuation data
+    - Founders and team
+    - Competitors
+    - Recent news coverage
+    - Social media profiles
+    
+    Results are saved to projects/{id}/input/research.json.
+    
+    Args:
+        params: ResearchCompanyInput with project_id and company_url
+    
+    Returns:
+        JSON with research summary and file path
+    """
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+        from src.company_researcher.researcher import CompanyResearcher
+        
+        # Get or create project directory
+        project_dir = _output_dir / params.project_id
+        input_dir = project_dir / "input"
+        input_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Initialize researcher
+        researcher = CompanyResearcher()
+        
+        # Perform research
+        report = researcher.research(
+            company_url=params.company_url,
+            include_competitors=params.include_competitors,
+            include_news=params.include_news,
+            verbose=True,
+        )
+        
+        # Save to project
+        research_path = input_dir / "research.json"
+        with open(research_path, "w") as f:
+            f.write(report.to_json(indent=2))
+        
+        return json.dumps({
+            "success": True,
+            "project_id": params.project_id,
+            "company_name": report.company.name,
+            "file_path": str(research_path),
+            "summary": {
+                "description": report.company.description[:200] + "..." if len(report.company.description) > 200 else report.company.description,
+                "main_product": report.company.main_product,
+                "competitors_found": len(report.competitors),
+                "news_articles_found": len(report.news),
+                "founders_found": len(report.founders),
+            },
+        }, indent=2)
+        
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+@mcp.tool(
+    name="factory_summarize_research",
+    annotations={
+        "title": "Summarize Research for Ads",
+        "readOnlyHint": False,
+        "destructiveHint": False,
+        "idempotentHint": False,
+        "openWorldHint": True,
+    },
+)
+async def factory_summarize_research(params: SummarizeResearchInput) -> str:
+    """
+    Summarize company research into ad-ready insights.
+    
+    Takes research.json and produces research-display.json with:
+    - Hook angles for ads (conversational, not marketing-speak)
+    - Testimonial themes (sound like real users)
+    - Unique value propositions
+    - Target audience details
+    
+    This is the content that users review and select before script generation.
+    
+    Args:
+        params: SummarizeResearchInput with project_id
+    
+    Returns:
+        JSON with summarized insights
+    """
+    try:
+        import sys
+        sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+        from src.company_researcher.summarizer import ResearchSummarizer
+        
+        # Find research file
+        project_dir = _output_dir / params.project_id
+        research_path = project_dir / "input" / "research.json"
+        
+        if not research_path.exists():
+            return json.dumps({
+                "error": f"research.json not found at {research_path}. Run factory_research_company first.",
+            })
+        
+        # Initialize summarizer and process
+        summarizer = ResearchSummarizer()
+        display = summarizer.summarize_from_file(
+            research_path=research_path,
+            verbose=True,
+        )
+        
+        output_path = project_dir / "input" / "research-display.json"
+        
+        return json.dumps({
+            "success": True,
+            "project_id": params.project_id,
+            "file_path": str(output_path),
+            "research_display": display.to_dict(),
+        }, indent=2)
+        
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+# ============================================================================
 # EVAL/SCORING TOOLS
 # ============================================================================
 
@@ -774,14 +939,75 @@ async def eval_get_similar_winners(params: GetWinnersInput) -> str:
         return json.dumps({"error": str(e)})
 
 
+# ============================================================================
+# REST API ENDPOINTS (for director-chat frontend)
+# ============================================================================
+
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+import uvicorn
+
+# Create FastAPI app for REST endpoints
+rest_app = FastAPI(title="Director MCP REST API")
+
+# Add CORS middleware
+rest_app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+@rest_app.post("/mcp/v1/tools/{tool_name}")
+async def call_tool(tool_name: str, request: dict):
+    """REST endpoint to call MCP tools."""
+    args = request.get("arguments", {})
+    
+    # Map tool names to handlers
+    tool_handlers = {
+        "factory_create_project": lambda p: factory_create_project(CreateProjectInput(**p)),
+        "factory_get_status": lambda p: factory_get_status(GetStatusInput(**p)),
+        "factory_approve_stage": lambda p: factory_approve_stage(ApproveStageInput(**p)),
+        "factory_reject_stage": lambda p: factory_reject_stage(RejectStageInput(**p)),
+        "factory_get_artifacts": lambda p: factory_get_artifacts(GetArtifactsInput(**p)),
+        "factory_get_script": lambda p: factory_get_script(GetStatusInput(**p)),
+        "factory_get_render_manifest": lambda p: factory_get_render_manifest(GetStatusInput(**p)),
+        "factory_research_company": lambda p: factory_research_company(ResearchCompanyInput(**p)),
+        "factory_summarize_research": lambda p: factory_summarize_research(SummarizeResearchInput(**p)),
+        "director_plan_short": lambda p: director_plan_short(PlanShortInput(**p)),
+        "director_analyze_hook": lambda p: director_analyze_hook(AnalyzeHookInput(**p)),
+        "director_generate_beats": lambda p: director_generate_beats(GenerateBeatSheetInput(**p)),
+        "director_validate_retention": lambda p: director_validate_retention(ValidateRetentionInput(**p)),
+        "eval_score_template": lambda p: eval_score_template(ScoreTemplateInput(**p)),
+        "eval_get_similar_winners": lambda p: eval_get_similar_winners(GetWinnersInput(**p)),
+    }
+    
+    if tool_name not in tool_handlers:
+        raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found")
+    
+    try:
+        result = await tool_handlers[tool_name](args)
+        return {"content": [{"type": "text", "text": result}]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@rest_app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "ok", "server": "director-mcp"}
+
+
 def main():
     """Run the Director MCP server."""
     # Check for HTTP transport flag
     if "--http" in sys.argv:
-        print(f"Starting Director MCP on HTTP port {_port}...")
-        mcp.run(transport="streamable-http")
+        print(f"Starting Director MCP REST API on HTTP port {_port}...")
+        uvicorn.run(rest_app, host="0.0.0.0", port=_port)
     else:
-        # Default: stdio transport
+        # Default: stdio transport for MCP
         mcp.run()
 
 
