@@ -12,6 +12,7 @@ import { createResumableStreamContext } from "resumable-stream";
 import { auth, type UserType } from "@/app/(auth)/auth";
 import { entitlementsByUserType } from "@/lib/ai/entitlements";
 import { type RequestHints, systemPrompt } from "@/lib/ai/prompts";
+import { generatePromptSuggestions } from "@/lib/ai/prompt-suggestions";
 import { getLanguageModel } from "@/lib/ai/providers";
 import { createDocument } from "@/lib/ai/tools/create-document";
 import { getWeather } from "@/lib/ai/tools/get-weather";
@@ -196,7 +197,7 @@ export async function POST(request: Request) {
         }
       },
       generateId: generateUUID,
-      onFinish: async ({ messages: finishedMessages }) => {
+      onFinish: async ({ messages: finishedMessages, writer: dataStream }) => {
         if (isToolApprovalFlow) {
           for (const finishedMsg of finishedMessages) {
             const existingMsg = uiMessages.find((m) => m.id === finishedMsg.id);
@@ -231,6 +232,18 @@ export async function POST(request: Request) {
               chatId: id,
             })),
           });
+        }
+
+        // Generate contextual prompt suggestions after each response
+        try {
+          const allMessages = [...uiMessages, ...finishedMessages];
+          const suggestions = await generatePromptSuggestions(allMessages);
+          dataStream.write({
+            type: "data-prompt-suggestions",
+            data: suggestions,
+          });
+        } catch (error) {
+          console.error("Failed to generate prompt suggestions:", error);
         }
       },
       onError: () => "Oops, an error occurred!",

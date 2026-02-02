@@ -43,9 +43,11 @@ import {
 } from "./elements/prompt-input";
 import { ArrowUpIcon, PaperclipIcon, StopIcon } from "./icons";
 import { PreviewAttachment } from "./preview-attachment";
+import { PromptSuggestions } from "./prompt-suggestions";
 import { SuggestedActions } from "./suggested-actions";
 import { Button } from "./ui/button";
 import type { VisibilityType } from "./visibility-selector";
+import { usePromptSuggestions } from "@/hooks/use-prompt-suggestions";
 
 function setCookie(name: string, value: string) {
   const maxAge = 60 * 60 * 24 * 365; // 1 year
@@ -85,6 +87,7 @@ function PureMultimodalInput({
   onModelChange?: (modelId: string) => void;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { suggestions, isLoading: suggestionsLoading } = usePromptSuggestions();
   const { width } = useWindowSize();
 
   const adjustHeight = useCallback(() => {
@@ -297,6 +300,7 @@ function PureMultimodalInput({
 
   return (
     <div className={cn("relative flex w-full flex-col gap-4", className)}>
+      {/* Show static suggestions for new chats, dynamic suggestions for ongoing chats */}
       {messages.length === 0 &&
         attachments.length === 0 &&
         uploadQueue.length === 0 && (
@@ -404,6 +408,19 @@ function PureMultimodalInput({
           )}
         </PromptInputToolbar>
       </PromptInput>
+
+      {/* Subtle prompt suggestions at the bottom */}
+      {messages.length > 0 &&
+        attachments.length === 0 &&
+        uploadQueue.length === 0 &&
+        status === "ready" && (
+          <PromptSuggestions
+            chatId={chatId}
+            suggestions={suggestions}
+            sendMessage={sendMessage}
+            isLoading={suggestionsLoading}
+          />
+        )}
     </div>
   );
 }

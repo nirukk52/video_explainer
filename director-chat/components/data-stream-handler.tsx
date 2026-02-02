@@ -4,13 +4,16 @@ import { useEffect } from "react";
 import { useSWRConfig } from "swr";
 import { unstable_serialize } from "swr/infinite";
 import { initialArtifactData, useArtifact } from "@/hooks/use-artifact";
+import { usePromptSuggestions } from "@/hooks/use-prompt-suggestions";
 import { artifactDefinitions } from "./artifact";
 import { useDataStream } from "./data-stream-provider";
 import { getChatHistoryPaginationKey } from "./sidebar-history";
+import type { PromptSuggestion } from "@/lib/types";
 
 export function DataStreamHandler() {
   const { dataStream, setDataStream } = useDataStream();
   const { mutate } = useSWRConfig();
+  const { setSuggestions } = usePromptSuggestions();
 
   const { artifact, setArtifact, setMetadata } = useArtifact();
 
@@ -26,6 +29,15 @@ export function DataStreamHandler() {
       // Handle chat title updates
       if (delta.type === "data-chat-title") {
         mutate(unstable_serialize(getChatHistoryPaginationKey));
+        continue;
+      }
+
+      // Handle prompt suggestions updates
+      if (delta.type === "data-prompt-suggestions") {
+        const suggestions = delta.data as PromptSuggestion[];
+        if (Array.isArray(suggestions)) {
+          setSuggestions(suggestions);
+        }
         continue;
       }
       const artifactDefinition = artifactDefinitions.find(
