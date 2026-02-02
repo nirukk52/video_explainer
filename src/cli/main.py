@@ -2578,7 +2578,8 @@ def _director_draft(args, state) -> int:
             return 1
     
     duration = getattr(args, 'duration', 6)
-    num_scenes = max(2, duration // 2)  # ~2 seconds per scene
+    # Scene count: min 2, max 5 scenes (keeps videos punchy and focused)
+    num_scenes = min(5, max(2, duration // 6))  # ~6 seconds per scene, capped at 5
     
     state.topic = topic
     state.duration_seconds = duration
@@ -2632,6 +2633,17 @@ def _director_draft(args, state) -> int:
                 response_format={"type": "json_object"}
             )
             draft_script = json.loads(response.choices[0].message.content)
+            
+            # Enforce max 5 scenes guardrail
+            MAX_SCENES = 5
+            scenes = draft_script.get("scenes", [])
+            if len(scenes) > MAX_SCENES:
+                print(f"Warning: LLM generated {len(scenes)} scenes, truncating to {MAX_SCENES}")
+                draft_script["scenes"] = scenes[:MAX_SCENES]
+                # Recalculate duration based on last scene
+                last_scene = draft_script["scenes"][-1]
+                draft_script["duration_seconds"] = last_scene.get("end_seconds", duration)
+                
         except Exception as e:
             print(f"Error calling LLM: {e}", file=sys.stderr)
             state.set_error(str(e))

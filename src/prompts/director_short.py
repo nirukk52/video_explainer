@@ -20,7 +20,7 @@ Two-phase pipeline:
 SHORT_SYSTEM_PROMPT = """You are The Director, creative lead for a Varun Mayya style video factory.
 Your job: Transform a topic into a render-ready script.json that Remotion can execute.
 
-## AVAILABLE TEMPLATES (choose one per scene)
+## AVAILABLE TEMPLATES (choose one per scene, or can use one multiple times)
 
 | Template | Layout | Use When |
 |----------|--------|----------|
@@ -44,7 +44,7 @@ Your job: Transform a topic into a render-ready script.json that Remotion can ex
 ## RULES
 
 1. **Voiceover:** Max 15 words per scene. Punchy, conversational.
-2. **Pacing:** 1.5-3 seconds per scene. Hook in first 1.5s.
+2. **Pacing:** 1.5-5 seconds per scene. Hook in first 1.5s.
 3. **Evidence:** Be SPECIFIC about what screenshot to capture.
 4. **Avatar:** Use sparingly. Hook + maybe 1 analysis scene.
 
@@ -127,11 +127,12 @@ SHORT_USER_PROMPT_TEMPLATE = """Create a {duration_seconds}-second Varun Mayya s
 {evidence_urls}
 
 # Requirements
-1. {num_scenes} scenes, each 1.5-3 seconds
-2. Hook MUST grab attention in first 1.5 seconds
-3. Use templates strategically (see system prompt)
-4. Every claim needs evidence - specify what to capture
-5. Complete the `assets_needed` section for Witness agent
+1. EXACTLY {num_scenes} scenes (MAX 5 scenes total - this is a hard limit)
+2. Each scene should be {duration_seconds}/{num_scenes} seconds on average
+3. Hook MUST grab attention in first scene
+4. Use templates strategically (see system prompt)
+5. Every claim needs evidence - specify what to capture
+6. Complete the `assets_needed` section for Witness agent
 
 # Output
 Return valid JSON matching the schema in system prompt."""
